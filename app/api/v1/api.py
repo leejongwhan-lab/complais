@@ -1,8 +1,8 @@
-"""Aggregate API routers."""
+"""API v1 router aggregation."""
 from fastapi import APIRouter
 
-from app.api import certification_applications, companies
+from app.api.v1.endpoints import certification_applications, companies
 
-api_router = APIRouter(prefix="/api/v1")
+api_router = APIRouter()
 api_router.include_router(companies.router)
 api_router.include_router(certification_applications.router)
