@@ -1,5 +1,6 @@
 """DTO schema exports."""
 from app.schemas.audit import *  # noqa: F403
+from app.schemas.audit_md import *  # noqa: F403
 from app.schemas.auditor import *  # noqa: F403
 from app.schemas.auditor_profile import *  # noqa: F403
 from app.schemas.auth import *  # noqa: F403

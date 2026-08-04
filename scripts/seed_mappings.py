@@ -6,7 +6,34 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.database import SessionLocal
-from app.models.mapping import KsicIafMapping, MajorIafMapping
+from app.models.master_data import IafCode, KsicCode, Major, KsicIafMapping, MajorIafMapping
+
+
+def _get_or_create_ksic(db, code: str, name_ko: str) -> KsicCode:
+    obj = db.query(KsicCode).filter_by(code=code).first()
+    if not obj:
+        obj = KsicCode(code=code, name_ko=name_ko or code, digit_level=len(code))
+        db.add(obj)
+        db.flush()
+    return obj
+
+
+def _get_or_create_iaf(db, code: str, name_ko: str) -> IafCode:
+    obj = db.query(IafCode).filter_by(code=code).first()
+    if not obj:
+        obj = IafCode(code=code, name_ko=name_ko or code)
+        db.add(obj)
+        db.flush()
+    return obj
+
+
+def _get_or_create_major(db, name: str) -> Major:
+    obj = db.query(Major).filter_by(name=name).first()
+    if not obj:
+        obj = Major(name=name)
+        db.add(obj)
+        db.flush()
+    return obj
 
 
 def seed_ksic_iaf_mappings(db):
@@ -31,11 +58,24 @@ def seed_ksic_iaf_mappings(db):
     ]
 
     for row in ksic_data:
-        exists = db.query(KsicIafMapping).filter_by(ksic_code=row["ksic_code"]).first()
+        ksic_obj = _get_or_create_ksic(db, row["ksic_code"], row["ksic_name"])
+        iaf_obj = _get_or_create_iaf(db, row["iaf_code"], row["iaf_name_ko"])
+
+        exists = (
+            db.query(KsicIafMapping)
+            .filter_by(ksic_id=ksic_obj.id, iaf_id=iaf_obj.id)
+            .first()
+        )
         if not exists:
-            payload = {k: v for k, v in row.items() if k != "ksic_name"}
-            payload["description"] = row.get("ksic_name")
-            db.add(KsicIafMapping(**payload))
+            db.add(
+                KsicIafMapping(
+                    ksic_id=ksic_obj.id,
+                    iaf_id=iaf_obj.id,
+                    qms_complexity=row["qms_complexity"],
+                    ems_complexity=row["ems_complexity"],
+                    ohsms_complexity=row["ohsms_complexity"],
+                )
+            )
     db.commit()
 
 
@@ -61,9 +101,26 @@ def seed_major_iaf_mappings(db):
     ]
 
     for row in major_data:
-        exists = db.query(MajorIafMapping).filter_by(major_name=row["major_name"], iaf_code=row["iaf_code"]).first()
+        major_obj = _get_or_create_major(db, row["major_name"])
+        iaf_obj = _get_or_create_iaf(db, row["iaf_code"], row["iaf_code"])
+
+        exists = (
+            db.query(MajorIafMapping)
+            .filter_by(major_id=major_obj.id, iaf_id=iaf_obj.id)
+            .first()
+        )
         if not exists:
-            db.add(MajorIafMapping(**row))
+            db.add(
+                MajorIafMapping(
+                    major_id=major_obj.id,
+                    iaf_id=iaf_obj.id,
+                    degree_level=row["degree_level"],
+                    is_mandatory=row["is_mandatory"],
+                    extra_exp_years=row["extra_exp_years"],
+                    requires_committee=row["requires_committee"],
+                    notes=row["notes"],
+                )
+            )
     db.commit()
 
 

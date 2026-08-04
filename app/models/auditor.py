@@ -17,6 +17,7 @@ from sqlalchemy import (
     String,
     Text,
 )
+from sqlalchemy.dialects.mysql import INTEGER as MySQLInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -298,7 +299,8 @@ class AuditorQualification(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     auditor_id = Column(Integer, ForeignKey("auditors.id", ondelete="CASCADE"), nullable=False)
     standard = Column(String(20), nullable=False)
-    sub_code = Column(String(10), ForeignKey("iaf_codes.sub_code"), nullable=False)
+    # master_data.IafCode 정규화 이후 sub_code(구 iaf_ksic.IafCode PK) 대신 code를 참조
+    sub_code = Column(String(10), ForeignKey("iaf_codes.code"), nullable=False)
     approval_status = Column(String(20), default="PENDING")
     approved_by = Column(String(50), nullable=True)
 
@@ -306,10 +308,14 @@ class AuditorQualification(Base):
 
 
 class AuditorScopeGrants(Base):
+    """
+    심사원이 특정 인증원(CB)으로부터 승인받은 표준/IAF 자격 범위 (배정 사전 검증의 근거 데이터).
+    auditor_id -> auditors.id, cb_id -> certification_bodies.id FK로 정규화됨.
+    """
     __tablename__ = "auditor_scope_grants"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    auditor_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    cb_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    auditor_id: Mapped[int] = mapped_column(MySQLInteger(unsigned=True), ForeignKey("auditors.id", ondelete="CASCADE"), nullable=False)
+    cb_id: Mapped[int] = mapped_column(MySQLInteger(unsigned=True), ForeignKey("certification_bodies.id", ondelete="CASCADE"), nullable=False)
     standard_code: Mapped[str] = mapped_column(String(20), nullable=False)
     iaf_code: Mapped[str] = mapped_column(String(10), nullable=False, comment="IAF 코드 (03, 04A 등)")
     nace_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
@@ -330,10 +336,14 @@ class AuditorScopeGrants(Base):
 
 
 class AuditorScopeRequests(Base):
+    """
+    심사원의 자격범위 확대/승급 신청 (승인되면 AuditorScopeGrants에 반영).
+    auditor_id -> auditors.id, cb_id -> certification_bodies.id FK로 정규화됨.
+    """
     __tablename__ = "auditor_scope_requests"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    auditor_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    cb_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    auditor_id: Mapped[int] = mapped_column(MySQLInteger(unsigned=True), ForeignKey("auditors.id", ondelete="CASCADE"), nullable=False)
+    cb_id: Mapped[int] = mapped_column(MySQLInteger(unsigned=True), ForeignKey("certification_bodies.id", ondelete="CASCADE"), nullable=False)
     request_type: Mapped[str] = mapped_column(String(50), nullable=False, comment="qualification=자격확대, code_expand=코드확대, grade_up=등급승급")
     standard_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, comment="자격확대 시 새 표준")
     iaf_codes: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, comment="IAF 코드 (콤마구분)")
@@ -406,6 +416,120 @@ class AuditorWorkExperience(Base):
     auditor = relationship("Auditor", back_populates="careers")
 
 
+class AuditorCareer(Base):
+    """
+    심사원 산업분야별 실무경력 (KSIC/IAF 정규화 매핑).
+    부속서 1(KSIC↔IAF)·부속서 2(전공↔IAF 단서조항의 추가 실무경력 요건) 심사 근거 자료로 사용.
+    기존 `AuditorWorkExperience`(auditor_careers 테이블, 문자열 코드 기반)와 별도로,
+    master_data의 정규화 마스터를 FK로 참조하는 신규 경력 레코드.
+    """
+    __tablename__ = "auditor_career_records"
+
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    # auditors.id는 MySQL에서 INT UNSIGNED이므로 FK 타입을 정확히 맞춘다.
+    auditor_id = Column(MySQLInteger(unsigned=True), ForeignKey("auditors.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    company_name = Column(String(200), nullable=False, comment="근무/컨설팅 기업명")
+    position = Column(String(100), nullable=True, comment="직위/역할")
+
+    ksic_id = Column(BigInteger, ForeignKey("ksic_codes.id", ondelete="SET NULL"), nullable=True, comment="해당 업종 KSIC 마스터 FK")
+    iaf_id = Column(BigInteger, ForeignKey("iaf_codes.id", ondelete="SET NULL"), nullable=True, comment="환산된 IAF 코드 마스터 FK")
+
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)
+    is_current = Column(Boolean, default=False, comment="현재 재직/진행 여부")
+    career_months = Column(Integer, nullable=True, comment="경력 개월 수 (자동 계산 캐시)")
+
+    is_verified = Column(Boolean, default=False, comment="증빙 확인 여부")
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False)
+
+    auditor = relationship("Auditor", back_populates="career_records")
+    ksic = relationship("KsicCode")
+    iaf = relationship("IafCode")
+
+
+class AuditorIafQualification(Base):
+    """
+    심사원이 보유/부여받은 IAF 코드별 자격 (부속서 1·2 기준 정규화 자격 마스터).
+    부속서 2 단서조항(전공만으로 부족 시 경력 추가, 위원회 심의 등)의 최종 승인 결과를 저장.
+    """
+    __tablename__ = "auditor_iaf_qualifications"
+
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    auditor_id = Column(MySQLInteger(unsigned=True), ForeignKey("auditors.id", ondelete="CASCADE"), nullable=False, index=True)
+    iaf_id = Column(BigInteger, ForeignKey("iaf_codes.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    source_type = Column(String(20), nullable=False, comment="자격 취득 근거 (MAJOR/CAREER/COMMITTEE/TRAINING 등)")
+    source_major_id = Column(BigInteger, ForeignKey("majors.id", ondelete="SET NULL"), nullable=True, comment="전공 기반 취득 시 근거 전공 FK")
+    source_career_id = Column(BigInteger, ForeignKey("auditor_career_records.id", ondelete="SET NULL"), nullable=True, comment="경력 기반 취득 시 근거 경력 FK")
+
+    grade = Column(String(50), nullable=True, comment="심사원 등급 (Trainee/Auditor/Lead 등)")
+    granted_at = Column(Date, nullable=True)
+    expires_at = Column(Date, nullable=True)
+    is_active = Column(Boolean, default=True)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False)
+
+    auditor = relationship("Auditor", back_populates="iaf_qualifications")
+    iaf = relationship("IafCode")
+    source_major = relationship("Major")
+    source_career = relationship("AuditorCareer")
+
+
+class AuditApplication(Base):
+    """
+    심사원의 신규/확대 IAF 자격 신청서 (부속서 1·2 기준 자격인증 심사 워크플로우).
+    승인 시 AuditorIafQualification 레코드를 생성/연결한다.
+    """
+    __tablename__ = "audit_applications"
+
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    auditor_id = Column(MySQLInteger(unsigned=True), ForeignKey("auditors.id", ondelete="CASCADE"), nullable=False, index=True)
+    iaf_id = Column(BigInteger, ForeignKey("iaf_codes.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    application_type = Column(String(20), nullable=False, comment="신청 유형 (NEW=신규자격, EXPAND=자격확대, RENEWAL=갱신)")
+    career_id = Column(BigInteger, ForeignKey("auditor_career_records.id", ondelete="SET NULL"), nullable=True, comment="근거 경력")
+    major_id = Column(BigInteger, ForeignKey("majors.id", ondelete="SET NULL"), nullable=True, comment="근거 전공")
+
+    status = Column(String(20), default="PENDING", comment="PENDING/APPROVED/REJECTED/COMMITTEE_REVIEW")
+    requires_committee = Column(Boolean, default=False, comment="자격인증위원회 심의 필요 여부 (부속서 2 단서조항)")
+    reason = Column(Text, nullable=True, comment="신청 사유/자기소개")
+    review_note = Column(Text, nullable=True)
+    reviewed_by = Column(String(50), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+
+    resulting_qualification_id = Column(
+        BigInteger, ForeignKey("auditor_iaf_qualifications.id", ondelete="SET NULL"), nullable=True,
+        comment="승인 시 생성된 자격 레코드",
+    )
+
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=True)
+
+    auditor = relationship("Auditor", back_populates="iaf_applications")
+    iaf = relationship("IafCode")
+    career = relationship("AuditorCareer")
+    major = relationship("Major")
+    resulting_qualification = relationship("AuditorIafQualification")
+    md_review = relationship(
+        "AuditMdReview",
+        back_populates="application",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    contracts = relationship(
+        "Contract",
+        back_populates="application",
+        cascade="all, delete-orphan",
+    )
+    assignments = relationship(
+        "AuditAssignment",
+        back_populates="application",
+        cascade="all, delete-orphan",
+    )
+
+
 class Auditor(Base):
     """인증심사원 — columns aligned to live MySQL `auditors` table."""
     __tablename__ = "auditors"
@@ -455,6 +579,26 @@ class Auditor(Base):
     )
     qualification_records = relationship(
         "AuditorQualification",
+        back_populates="auditor",
+        cascade="all, delete-orphan",
+    )
+    career_records = relationship(
+        "AuditorCareer",
+        back_populates="auditor",
+        cascade="all, delete-orphan",
+    )
+    iaf_qualifications = relationship(
+        "AuditorIafQualification",
+        back_populates="auditor",
+        cascade="all, delete-orphan",
+    )
+    iaf_applications = relationship(
+        "AuditApplication",
+        back_populates="auditor",
+        cascade="all, delete-orphan",
+    )
+    assignments = relationship(
+        "AuditAssignment",
         back_populates="auditor",
         cascade="all, delete-orphan",
     )
