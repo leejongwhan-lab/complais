@@ -3,10 +3,20 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, SmallInteger, String, Text, BigInteger
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base
+from app.core.database import Base
 
 
 
@@ -230,3 +240,4 @@ class StandardProcesses(Base):
     esg_tags: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     sort_order: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+

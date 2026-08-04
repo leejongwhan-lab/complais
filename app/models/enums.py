@@ -2,6 +2,27 @@
 
 import enum
 
+
+class ApprovalStatus(str, enum.Enum):
+    PENDING = "PENDING"     # 승인 대기
+    APPROVED = "APPROVED"   # 승인 완료
+    REJECTED = "REJECTED"   # 반려
+    EXPIRED = "EXPIRED"     # 만료
+
+
+class CompanyStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"       # 정상
+    SUSPENDED = "SUSPENDED" # 휴업
+    CLOSED = "CLOSED"       # 폐업
+    CANCELLED = "CANCELLED" # 인증취소
+
+
+class IncomeType(str, enum.Enum):
+    BUSINESS_3_3 = "BUSINESS_3_3" # 3.3% 사업소득
+    OTHER_INCOME = "OTHER_INCOME" # 기타소득
+    TAX_INVOICE = "TAX_INVOICE"   # 세금계산서
+
+
 class AuditAssignmentsRole(str, enum.Enum):
     LEAD = "lead"
     AUDITOR = "auditor"

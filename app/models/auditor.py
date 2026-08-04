@@ -3,10 +3,23 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, SmallInteger, String, Text, BigInteger
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base
+from app.core.database import Base
 
 
 
@@ -180,35 +193,43 @@ class AuditorConflictHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
-class AuditorConsultingExperiences(Base):
+class AuditorConsultingExperience(Base):
+    """Maps to live auditor_consulting_experiences table."""
     __tablename__ = "auditor_consulting_experiences"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    auditor_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    company_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    company_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    ksic_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
-    iaf_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, comment="KSIC→IAF 자동변환")
-    standard_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, comment="컨설팅 표준")
-    start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    consulting_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="자문 일수")
-    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    auditor_id = Column(Integer, ForeignKey("auditors.id"), nullable=False)
+    company_name = Column(String(200), nullable=False)
+    company_id = Column(Integer, nullable=True)
+    ksic_code = Column(String(10), nullable=True)
+    iaf_code = Column(String(10), nullable=True)
+    standard_code = Column(String(20), nullable=True)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)
+    consulting_days = Column(Integer, nullable=True)
+    is_verified = Column(Boolean, nullable=False, default=False)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False)
+
+    auditor = relationship("Auditor", back_populates="consultings")
 
 
-class AuditorEducations(Base):
+class AuditorEducation(Base):
+    """Maps to live auditor_educations table."""
     __tablename__ = "auditor_educations"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    auditor_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    degree: Mapped[str] = mapped_column(String(50), nullable=False)
-    school_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    major: Mapped[str] = mapped_column(String(200), nullable=False, comment="전공학과")
-    entered_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True, comment="입학·시작일")
-    graduated_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    mapped_iaf_codes: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="JSON 배열 — 자동 매핑 결과")
-    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, comment="CB 확인 여부")
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    auditor_id = Column(Integer, ForeignKey("auditors.id"), nullable=False)
+    degree = Column(String(50), nullable=False)
+    school_name = Column(String(200), nullable=False)
+    major = Column(String(200), nullable=False)
+    entered_at = Column(Date, nullable=True)
+    graduated_at = Column(Date, nullable=True)
+    mapped_iaf_codes = Column(Text, nullable=True)
+    is_verified = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False)
+
+    auditor = relationship("Auditor", back_populates="educations")
 
 
 class AuditorEnvCompetency(Base):
@@ -229,18 +250,23 @@ class AuditorEnvCompetency(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
-class AuditorExternalCerts(Base):
+class AuditorExternalCert(Base):
+    """Maps to live auditor_external_certs (column names aliased for API schema)."""
     __tablename__ = "auditor_external_certs"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    auditor_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    qual_org: Mapped[str] = mapped_column(String(50), nullable=False, comment="자격기관 이니셜 (KAR/KFQ/ITS 등)")
-    qual_no: Mapped[str] = mapped_column(String(100), nullable=False, comment="자격증 번호 (원본 그대로)")
-    standard_code: Mapped[str] = mapped_column(String(20), nullable=False, comment="QMS/EMS/OHSMS 등")
-    grade: Mapped[str] = mapped_column(String(50), nullable=False)
-    granted_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    expires_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    auditor_id = Column(Integer, ForeignKey("auditors.id"), nullable=False)
+    # API schema: cert_name / issuer / cert_no / issued_date / expiry_date
+    cert_name = Column("standard_code", String(20), nullable=False)
+    issuer = Column("qual_org", String(50), nullable=False)
+    cert_no = Column("qual_no", String(100), nullable=False)
+    issued_date = Column("granted_at", Date, nullable=True)
+    expiry_date = Column("expires_at", Date, nullable=True)
+    grade = Column(String(50), nullable=False)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False)
+
+    auditor = relationship("Auditor", back_populates="external_certs")
 
 
 class AuditorGradeRequirements(Base):
@@ -263,20 +289,20 @@ class AuditorGradeRequirements(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
-class AuditorQualifications(Base):
+class AuditorQualification(Base):
+    """심사원 보유 표준 및 IAF 코드 자격 (승인 워크플로우).
+    Note: table may not exist on legacy DB yet — used by approval APIs.
+    """
     __tablename__ = "auditor_qualifications"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    auditor_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    cb_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="자격 관리 CB")
-    standard_code: Mapped[str] = mapped_column(String(20), nullable=False, comment="QMS/EMS/OHSMS/EnMS/BCMS/ISMS/IATF")
-    grade: Mapped[str] = mapped_column(String(50), nullable=False)
-    pcaa_seq: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="플랫폼 일련번호 (전체 통합)")
-    pcaa_no: Mapped[Optional[str]] = mapped_column(String(30), nullable=True, comment="SMI-Q-10001 형식 (cb_initial+standard+seq)")
-    granted_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    expires_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    auditor_id = Column(Integer, ForeignKey("auditors.id", ondelete="CASCADE"), nullable=False)
+    standard = Column(String(20), nullable=False)
+    sub_code = Column(String(10), ForeignKey("iaf_codes.sub_code"), nullable=False)
+    approval_status = Column(String(20), default="PENDING")
+    approved_by = Column(String(50), nullable=True)
+
+    auditor = relationship("Auditor", back_populates="qualification_records")
 
 
 class AuditorScopeGrants(Base):
@@ -361,56 +387,75 @@ class AuditorWitnessRecords(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
-class AuditorWorkExperiences(Base):
-    __tablename__ = "auditor_work_experiences"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    auditor_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    company_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    company_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="complais 등록 기업이면 연결")
-    ksic_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, comment="KSIC 코드")
-    iaf_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, comment="KSIC→IAF 자동변환 결과")
-    nace_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
-    position: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="직위/직책")
-    department: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="부서")
-    start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, comment="NULL이면 현재 재직 중")
-    is_current: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    work_years: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True, comment="근무 연수 (자동계산)")
-    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    biz_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, comment="사업자등록번호 (IAF 자동 조회용)")
+class AuditorWorkExperience(Base):
+    """Maps to live auditor_careers table (API 'careers' collection)."""
+    __tablename__ = "auditor_careers"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    auditor_id = Column(Integer, ForeignKey("auditors.id"), nullable=False)
+    company_name = Column("company", String(200), nullable=False)
+    position = Column("role", String(100), nullable=True)
+    ksic_code = Column("industry_code", String(10), nullable=True)
+    iaf_code = Column("iaf_codes", String(200), nullable=True)
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
+    is_current = Column(Boolean, nullable=True, default=False)
+    note = Column("description", Text, nullable=True)
+    created_at = Column(DateTime, nullable=True)
+
+    auditor = relationship("Auditor", back_populates="careers")
 
 
-class Auditors(Base):
+class Auditor(Base):
+    """인증심사원 — columns aligned to live MySQL `auditors` table."""
     __tablename__ = "auditors"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    complais_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, comment="ComplAIs 개인번호 (YYYYMMDD-NNN)")
-    user_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    name_en: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    email: Mapped[str] = mapped_column(String(200), nullable=False)
-    phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    grade: Mapped[str] = mapped_column(String(50), nullable=False)
-    employment_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    is_freelance: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    primary_cb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="주 소속 CB")
-    registration_no: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    iaf_codes: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    status: Mapped[str] = mapped_column(String(50), nullable=False)
-    contract_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    daily_rate: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
-    fee_ratio: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
-    bank_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    account_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    account_holder: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    intro: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    monthly_fee: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    birth_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    gender: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    detail_address: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    profile_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cb_id = Column(Integer, nullable=True)
+    name = Column(String(50), nullable=False)
+    email = Column(String(100), nullable=True, index=True)
+    phone = Column(String(20), nullable=True)
+    birth_date = Column(Date, nullable=True)
+    gender = Column(String(10), nullable=True)
+    address = Column(String(500), nullable=True)
+
+    grade = Column(String(30), nullable=True)
+    status = Column(String(20), nullable=True)
+    profile_status = Column(String(20), nullable=True)
+
+    daily_rate = Column(Float, nullable=True)
+    fee_ratio = Column(Float, nullable=True)
+    monthly_fee = Column(Float, nullable=True)
+
+    # DB column is kar_no; expose as auditor_no for API schema
+    auditor_no = Column("kar_no", String(50), nullable=True)
+
+    # TEXT column on auditors (not the qualification relationship)
+    qualifications_text = Column("qualifications", Text, nullable=True)
+
+    educations = relationship(
+        "AuditorEducation",
+        back_populates="auditor",
+        cascade="all, delete-orphan",
+    )
+    careers = relationship(
+        "AuditorWorkExperience",
+        back_populates="auditor",
+        cascade="all, delete-orphan",
+    )
+    consultings = relationship(
+        "AuditorConsultingExperience",
+        back_populates="auditor",
+        cascade="all, delete-orphan",
+    )
+    external_certs = relationship(
+        "AuditorExternalCert",
+        back_populates="auditor",
+        cascade="all, delete-orphan",
+    )
+    qualification_records = relationship(
+        "AuditorQualification",
+        back_populates="auditor",
+        cascade="all, delete-orphan",
+    )
+

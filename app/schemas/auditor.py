@@ -5,7 +5,39 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import AuditorAnnualEvaluationsGrade, AuditorApprovalHistoryActionType, AuditorApprovalHistoryFromGrade, AuditorApprovalHistoryResult, AuditorApprovalHistoryToGrade, AuditorAuditActivitiesActivityType, AuditorCbMembershipsApplyGrade, AuditorCbMembershipsApprovedGrade, AuditorCbMembershipsEmploymentType, AuditorCbMembershipsFeeMethod, AuditorCbMembershipsStatus, AuditorConflictHistoryConflictType, AuditorEducationsDegree, AuditorEnvCompetencyEnvGrade, AuditorExternalCertsGrade, AuditorGradeRequirementsFromGrade, AuditorGradeRequirementsToGrade, AuditorQualificationsGrade, AuditorScopeGrantsGrantType, AuditorScopeRequestsRequestType, AuditorScopeRequestsStatus, AuditorScopeRequestsTargetGrade, AuditorSettlementsStatus, AuditorWitnessRecordsAuditType, AuditorWitnessRecordsResult, AuditorsEmploymentType, AuditorsGender, AuditorsGrade, AuditorsProfileStatus, AuditorsStatus
+from app.models.enums import (
+    ApprovalStatus,
+    AuditorAnnualEvaluationsGrade,
+    AuditorApprovalHistoryActionType,
+    AuditorApprovalHistoryFromGrade,
+    AuditorApprovalHistoryResult,
+    AuditorApprovalHistoryToGrade,
+    AuditorAuditActivitiesActivityType,
+    AuditorCbMembershipsApplyGrade,
+    AuditorCbMembershipsApprovedGrade,
+    AuditorCbMembershipsEmploymentType,
+    AuditorCbMembershipsFeeMethod,
+    AuditorCbMembershipsStatus,
+    AuditorConflictHistoryConflictType,
+    AuditorEducationsDegree,
+    AuditorEnvCompetencyEnvGrade,
+    AuditorExternalCertsGrade,
+    AuditorGradeRequirementsFromGrade,
+    AuditorGradeRequirementsToGrade,
+    AuditorQualificationsGrade,
+    AuditorScopeGrantsGrantType,
+    AuditorScopeRequestsRequestType,
+    AuditorScopeRequestsStatus,
+    AuditorScopeRequestsTargetGrade,
+    AuditorSettlementsStatus,
+    AuditorWitnessRecordsAuditType,
+    AuditorWitnessRecordsResult,
+    AuditorsEmploymentType,
+    AuditorsGender,
+    AuditorsGrade,
+    AuditorsProfileStatus,
+    AuditorsStatus,
+)
 
 
 class AuditorAnnualEvaluationsBase(BaseModel):
@@ -960,3 +992,36 @@ class AuditorsResponse(AuditorsBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- Qualification approval workflow ---
+
+class QualificationApplyRequest(BaseModel):
+    """심사원 자격 신청."""
+    standard: str
+    sub_code: str
+
+
+class QualificationApproveAction(BaseModel):
+    """인증기관 자격 승인/반려."""
+    action: ApprovalStatus  # APPROVED 또는 REJECTED
+
+
+class QualificationResponse(BaseModel):
+    id: int
+    auditor_id: int
+    standard: str
+    sub_code: str
+    approval_status: str
+    approved_by: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Re-export profile/detail schemas (canonical definitions in auditor_profile.py)
+from app.schemas.auditor_profile import (  # noqa: E402
+    AuditorDetailResponse,
+    ConsultingExperienceSchema,
+    EducationSchema,
+    ExternalCertSchema,
+    WorkExperienceSchema,
+)
