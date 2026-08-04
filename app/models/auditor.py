@@ -398,19 +398,26 @@ class AuditorWitnessRecords(Base):
 
 
 class AuditorWorkExperience(Base):
-    """Maps to live auditor_careers table (API 'careers' collection)."""
-    __tablename__ = "auditor_careers"
+    """Maps to live auditor_work_experiences table (API 'careers' collection).
+
+    주의: 과거 __tablename__이 실제와 다른 `auditor_careers`로 잘못 지정되어 있었고
+    (`alembic revision --autogenerate` 검토 중 발견: 실제 테이블은 6건의 실데이터를 가진
+    `auditor_work_experiences`이며 `auditor_careers`는 아예 존재하지 않음), 컬럼 별칭 또한
+    실제 컬럼명(company_name/position/ksic_code/iaf_code/note)과 다른 레거시 별칭
+    (company/role/industry_code/iaf_codes/description)을 가리키고 있어 함께 수정함.
+    """
+    __tablename__ = "auditor_work_experiences"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     auditor_id = Column(Integer, ForeignKey("auditors.id"), nullable=False)
-    company_name = Column("company", String(200), nullable=False)
-    position = Column("role", String(100), nullable=True)
-    ksic_code = Column("industry_code", String(10), nullable=True)
-    iaf_code = Column("iaf_codes", String(200), nullable=True)
-    start_date = Column(Date, nullable=True)
+    company_name = Column(String(200), nullable=False)
+    position = Column(String(100), nullable=True)
+    ksic_code = Column(String(10), nullable=True)
+    iaf_code = Column(String(10), nullable=True)
+    start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)
-    is_current = Column(Boolean, nullable=True, default=False)
-    note = Column("description", Text, nullable=True)
+    is_current = Column(Boolean, nullable=False, default=False)
+    note = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=True)
 
     auditor = relationship("Auditor", back_populates="careers")
@@ -599,6 +606,16 @@ class Auditor(Base):
     )
     assignments = relationship(
         "AuditAssignment",
+        back_populates="auditor",
+        cascade="all, delete-orphan",
+    )
+    audit_notes = relationship(
+        "AuditNote",
+        back_populates="auditor",
+        cascade="all, delete-orphan",
+    )
+    audit_ncrs = relationship(
+        "AuditNCR",
         back_populates="auditor",
         cascade="all, delete-orphan",
     )

@@ -107,6 +107,8 @@ class Contract(Base):
 
     application = relationship("AuditApplication", back_populates="contracts")
     assignments = relationship("AuditAssignment", back_populates="contract")
+    notes = relationship("AuditNote", back_populates="contract", cascade="all, delete-orphan")
+    ncrs = relationship("AuditNCR", back_populates="contract", cascade="all, delete-orphan")
 
 
 class AuditAssignment(Base):

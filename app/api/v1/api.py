@@ -5,6 +5,7 @@ from app.api.v1 import approval
 from app.api.v1.endpoints import (
     assignments,
     auditors,
+    cert_contracts,
     certification_applications,
     companies,
     contracts,
@@ -21,4 +22,5 @@ api_router.include_router(md_reviews.router)
 api_router.include_router(contracts.router)
 api_router.include_router(assignments.router)
 api_router.include_router(auditors.router)
+api_router.include_router(cert_contracts.router)
 
