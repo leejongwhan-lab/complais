@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = False
     DATABASE_URL: str = "mysql+pymysql://root:password@localhost:3306/complais?charset=utf8mb4"
+    SECRET_KEY: str = "YOUR_SUPER_SECRET_KEY_CHANGE_THIS"
 
     @property
     def database_url(self) -> str:

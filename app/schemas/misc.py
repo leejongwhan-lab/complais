@@ -18,6 +18,7 @@ class KarCpdRecordsBase(BaseModel):
     status: KarCpdRecordsStatus
     review_note: Optional[str] = None
     created_at: datetime
+    is_fulfilled: Optional[bool] = Field(default=None, description="CPD 이수 요건 충족 여부")
 
 
 class KarCpdRecordsCreate(KarCpdRecordsBase):
@@ -34,6 +35,7 @@ class KarCpdRecordsUpdate(BaseModel):
     status: Optional[KarCpdRecordsStatus] = None
     review_note: Optional[str] = None
     created_at: Optional[datetime] = None
+    is_fulfilled: Optional[bool] = None
 
 
 class KarCpdRecordsResponse(KarCpdRecordsBase):
@@ -51,8 +53,9 @@ class KarQualificationsBase(BaseModel):
     standard: str
     grade: Optional[KarQualificationsGrade] = None
     status: KarQualificationsStatus
-    issued_at: Optional[date] = None
-    expires_at: Optional[date] = None
+    issued_at: Optional[date] = Field(default=None, description="최초 취득일 (initial_date)")
+    renewal_date: Optional[date] = None
+    expires_at: Optional[date] = Field(default=None, description="만료일 (expire_date)")
     created_at: datetime
     iaf_codes: Optional[str] = Field(default=None, description="IAF 코드 (콤마구분)")
     mdqms_areas: Optional[str] = Field(default=None, description="ISO 13485 기술영역")
@@ -73,6 +76,7 @@ class KarQualificationsUpdate(BaseModel):
     grade: Optional[KarQualificationsGrade] = None
     status: Optional[KarQualificationsStatus] = None
     issued_at: Optional[date] = None
+    renewal_date: Optional[date] = None
     expires_at: Optional[date] = None
     created_at: Optional[datetime] = None
     iaf_codes: Optional[str] = None

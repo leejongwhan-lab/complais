@@ -1,9 +1,11 @@
 """ORM model exports."""
+from app.models.admin import *  # noqa: F403
 from app.models.audit import *  # noqa: F403
 from app.models.audit_md import *  # noqa: F403
 from app.models.audit_note import *  # noqa: F403
 from app.models.auditor import *  # noqa: F403
 from app.models.auth import *  # noqa: F403
+from app.models.backoffice import *  # noqa: F403
 from app.models.cb import *  # noqa: F403
 from app.models.cert_application import *  # noqa: F403
 from app.models.certification import *  # noqa: F403

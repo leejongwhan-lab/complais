@@ -494,6 +494,17 @@ class CertificationBodiesBase(BaseModel):
     max_consecutive: int
     impartiality_cycle_months: int
     reg_no: Optional[str] = None
+    accreditation_region: Optional[str] = None
+    accreditation_country: Optional[str] = None
+    accreditation_body: Optional[str] = Field(default=None, description="KAB 등 인정기구")
+    stamp_url: Optional[str] = None
+    accreditation_no: Optional[str] = None
+    accredited_standards: Optional[str] = None
+    iaf_scopes: Optional[str] = None
+    expire_date: Optional[str] = None
+    status: Optional[str] = Field(default="정상", description="정상/정지/취소")
+    evaluation_score: Optional[Decimal] = None
+    tax_email: Optional[str] = None
 
 
 class CertificationBodiesCreate(CertificationBodiesBase):
@@ -533,10 +544,55 @@ class CertificationBodiesUpdate(BaseModel):
     max_consecutive: Optional[int] = None
     impartiality_cycle_months: Optional[int] = None
     reg_no: Optional[str] = None
+    accreditation_region: Optional[str] = None
+    accreditation_country: Optional[str] = None
+    accreditation_body: Optional[str] = None
+    stamp_url: Optional[str] = None
+    accreditation_no: Optional[str] = None
+    accredited_standards: Optional[str] = None
+    iaf_scopes: Optional[str] = None
+    expire_date: Optional[str] = None
+    status: Optional[str] = None
+    evaluation_score: Optional[Decimal] = None
+    tax_email: Optional[str] = None
 
 
 class CertificationBodiesResponse(CertificationBodiesBase):
     id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CBStaffBase(BaseModel):
+    cb_id: int
+    emp_no: Optional[str] = None
+    name: str
+    position: Optional[str] = None
+    department: Optional[str] = None
+    mobile: Optional[str] = None
+    email: Optional[str] = None
+    task_type: Optional[str] = None
+    role_level: Optional[str] = None
+
+
+class CBStaffCreate(CBStaffBase):
+    pass
+
+
+class CBStaffUpdate(BaseModel):
+    cb_id: Optional[int] = None
+    emp_no: Optional[str] = None
+    name: Optional[str] = None
+    position: Optional[str] = None
+    department: Optional[str] = None
+    mobile: Optional[str] = None
+    email: Optional[str] = None
+    task_type: Optional[str] = None
+    role_level: Optional[str] = None
+
+
+class CBStaffResponse(CBStaffBase):
+    id: int
+    created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)

@@ -446,6 +446,8 @@ class AuditorConsultingExperiencesBase(BaseModel):
     auditor_id: int
     company_name: str
     company_id: Optional[int] = None
+    biz_no: Optional[str] = Field(default=None, description="자문 기업 사업자등록번호 (이해상충 검증용)")
+    consulting_type: Optional[str] = Field(default=None, description="자문 유형")
     ksic_code: Optional[str] = None
     iaf_code: Optional[str] = Field(default=None, description="KSIC→IAF 자동변환")
     standard_code: Optional[str] = Field(default=None, description="컨설팅 표준")
@@ -465,6 +467,8 @@ class AuditorConsultingExperiencesUpdate(BaseModel):
     auditor_id: Optional[int] = None
     company_name: Optional[str] = None
     company_id: Optional[int] = None
+    biz_no: Optional[str] = None
+    consulting_type: Optional[str] = None
     ksic_code: Optional[str] = None
     iaf_code: Optional[str] = None
     standard_code: Optional[str] = None
@@ -1014,6 +1018,34 @@ class QualificationResponse(BaseModel):
     sub_code: str
     approval_status: str
     approved_by: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AuditorExperienceRecordBase(BaseModel):
+    auditor_id: int
+    period_year: int = Field(description="통계 연도")
+    initial_count: int = 0
+    surveillance_count: int = 0
+    renewal_count: int = 0
+    total_audit_days: int = 0
+
+
+class AuditorExperienceRecordCreate(AuditorExperienceRecordBase):
+    pass
+
+
+class AuditorExperienceRecordUpdate(BaseModel):
+    auditor_id: Optional[int] = None
+    period_year: Optional[int] = None
+    initial_count: Optional[int] = None
+    surveillance_count: Optional[int] = None
+    renewal_count: Optional[int] = None
+    total_audit_days: Optional[int] = None
+
+
+class AuditorExperienceRecordResponse(AuditorExperienceRecordBase):
+    id: int
+    created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 

@@ -234,3 +234,16 @@ class CertificationBodies(Base):
     max_consecutive: Mapped[int] = mapped_column(Integer, nullable=False)
     impartiality_cycle_months: Mapped[int] = mapped_column(Integer, nullable=False)
     reg_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # --- 백오피스 마스터 확장 컬럼 (인정 정보, 평가, 세금계산서) ---
+    accreditation_region: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    accreditation_country: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    accreditation_body: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="KAB 등 인정기구")
+    stamp_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    accreditation_no: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    accredited_standards: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    iaf_scopes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    expire_date: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, comment="정상/정지/취소")
+    evaluation_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    tax_email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)

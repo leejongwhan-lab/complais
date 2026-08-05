@@ -9,9 +9,9 @@ from app.schemas.auditor import AuditorDetailResponse
 router = APIRouter(prefix="/auditors", tags=["Auditors"])
 
 
-@router.get("/{auditor_id}", response_model=AuditorDetailResponse)
+@router.get("/{auditor_id}/detail", response_model=AuditorDetailResponse)
 def get_auditor_detail(auditor_id: int, db: Session = Depends(get_db)):
-    # joinedload를 제거하고 기본 쿼리로 안전하게 조회
+    """학력·경력·자문·외부자격 포함 상세 조회 (백오피스 마스터 CRUD와 경로 충돌 방지)."""
     auditor = db.query(Auditor).filter(Auditor.id == auditor_id).first()
 
     if not auditor:

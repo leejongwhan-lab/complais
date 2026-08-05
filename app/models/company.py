@@ -3,7 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, SmallInteger, String, Text, BigInteger
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, Text, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -36,6 +36,16 @@ class Companies(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    # --- 백오피스 마스터 확장 컬럼 (개인/법인 구분, MD 산출용 인원, 세금계산서 담당자) ---
+    entity_type: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, comment="개인/법인")
+    headcount_regular: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="정규직 인원")
+    headcount_non_regular: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="비정규직 인원")
+    headcount_outsourced: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="외주 인원")
+    headcount_certified: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="표준별 유효인원")
+    status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, comment="정상/휴업/폐업/인증취소")
+    tax_contact_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="세금계산서 담당자명")
+    tax_email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="세금계산서 수신 이메일")
 
 
 class CompanyBranches(Base):
@@ -101,14 +111,16 @@ class CompanyProcesses(Base):
 
 
 class CompanySites(Base):
+    """추가 사업장 (Multi-site, company_id -> companies.id FK)."""
     __tablename__ = "company_sites"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    company_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    company_id: Mapped[int] = mapped_column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
     site_name: Mapped[str] = mapped_column(String(200), nullable=False)
     address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     biz_no: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
     employee_count: Mapped[int] = mapped_column(Integer, nullable=False)
     is_main: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    work_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="사업장 업무 형태/업종")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 

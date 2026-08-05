@@ -202,6 +202,8 @@ class AuditorConsultingExperience(Base):
     auditor_id = Column(Integer, ForeignKey("auditors.id"), nullable=False)
     company_name = Column(String(200), nullable=False)
     company_id = Column(Integer, nullable=True)
+    biz_no = Column(String(20), nullable=True, comment="자문 기업 사업자등록번호 (이해상충 검증용)")
+    consulting_type = Column(String(50), nullable=True, comment="자문 유형")
     ksic_code = Column(String(10), nullable=True)
     iaf_code = Column(String(10), nullable=True)
     standard_code = Column(String(20), nullable=True)
@@ -541,28 +543,49 @@ class Auditor(Base):
     """인증심사원 — columns aligned to live MySQL `auditors` table."""
     __tablename__ = "auditors"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    cb_id = Column(Integer, nullable=True)
+    id = Column(MySQLInteger(unsigned=True), primary_key=True, autoincrement=True)
+    complais_no = Column(String(50), nullable=True, comment="ComplAIs 개인번호")
+    user_id = Column(Integer, nullable=True)
     name = Column(String(50), nullable=False)
+    name_en = Column(String(100), nullable=True)
     email = Column(String(100), nullable=True, index=True)
     phone = Column(String(20), nullable=True)
+    grade = Column(String(30), nullable=True)
+    employment_type = Column(String(50), nullable=True)
+    is_freelance = Column(Boolean, nullable=True)
+    primary_cb_id = Column(Integer, nullable=True, comment="주 소속 CB")
+    registration_no = Column(String(50), nullable=True)
+    iaf_codes = Column(String(200), nullable=True)
+    is_active = Column(Boolean, nullable=True)
+    status = Column(String(20), nullable=True)
+    contract_type = Column(String(50), nullable=True)
+    daily_rate = Column(Float, nullable=True)
+    fee_ratio = Column(Float, nullable=True)
+    bank_name = Column(String(50), nullable=True)
+    account_no = Column(String(50), nullable=True)
+    account_holder = Column(String(50), nullable=True)
+    intro = Column(Text, nullable=True)
+    monthly_fee = Column(Float, nullable=True)
+    created_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
     birth_date = Column(Date, nullable=True)
     gender = Column(String(10), nullable=True)
     address = Column(String(500), nullable=True)
-
-    grade = Column(String(30), nullable=True)
-    status = Column(String(20), nullable=True)
+    detail_address = Column(String(500), nullable=True)
     profile_status = Column(String(20), nullable=True)
 
-    daily_rate = Column(Float, nullable=True)
-    fee_ratio = Column(Float, nullable=True)
-    monthly_fee = Column(Float, nullable=True)
-
-    # DB column is kar_no; expose as auditor_no for API schema
-    auditor_no = Column("kar_no", String(50), nullable=True)
-
-    # TEXT column on auditors (not the qualification relationship)
-    qualifications_text = Column("qualifications", Text, nullable=True)
+    # --- 백오피스 마스터 확장 컬럼 ---
+    rrn_hash = Column(String(255), nullable=True, comment="주민등록번호 암호화 Hash")
+    income_type = Column(String(50), nullable=True, comment="3.3% 사업소득/기타소득/법인사업자")
+    education_level = Column(String(50), nullable=True)
+    school_name = Column(String(100), nullable=True)
+    major = Column(String(100), nullable=True)
+    career_summary = Column(Text, nullable=True)
+    total_working_days = Column(Integer, nullable=True)
+    cb_affiliation = Column(String(100), nullable=True)
+    commission_type = Column(String(20), nullable=True, comment="퍼센트/건별")
+    security_pledge_agreed = Column(Boolean, nullable=True, default=False)
+    subcontract_agreed = Column(Boolean, nullable=True, default=False)
 
     educations = relationship(
         "AuditorEducation",

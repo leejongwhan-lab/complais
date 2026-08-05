@@ -32,10 +32,47 @@ class CompaniesBase(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    entity_type: Optional[str] = Field(default=None, description="개인/법인")
+    headcount_regular: Optional[int] = None
+    headcount_non_regular: Optional[int] = None
+    headcount_outsourced: Optional[int] = None
+    headcount_certified: Optional[int] = None
+    status: Optional[str] = Field(default="정상", description="정상/휴업/폐업/인증취소")
+    tax_contact_name: Optional[str] = None
+    tax_email: Optional[str] = None
 
 
-class CompaniesCreate(CompaniesBase):
-    pass
+class CompaniesCreate(BaseModel):
+    """기업 신규 등록 — 서버가 created_at/updated_at 및 채번(id)을 설정한다."""
+    company_no: Optional[int] = None
+    cert_no: Optional[str] = None
+    name: str
+    name_en: Optional[str] = None
+    biz_no: Optional[str] = None
+    corp_no: Optional[str] = None
+    ceo_name: Optional[str] = None
+    biz_type: Optional[str] = None
+    biz_class: Optional[str] = None
+    address: Optional[str] = None
+    detail_address: Optional[str] = None
+    address_en: Optional[str] = None
+    tel: Optional[str] = None
+    email: Optional[str] = None
+    website: Optional[str] = None
+    iaf_code: Optional[str] = None
+    ksic_code: Optional[str] = None
+    employee_count: int = 0
+    scope_kr: Optional[str] = None
+    scope_en: Optional[str] = None
+    is_active: bool = True
+    entity_type: Optional[str] = None
+    headcount_regular: Optional[int] = None
+    headcount_non_regular: Optional[int] = None
+    headcount_outsourced: Optional[int] = None
+    headcount_certified: Optional[int] = None
+    status: Optional[str] = "정상"
+    tax_contact_name: Optional[str] = None
+    tax_email: Optional[str] = None
 
 
 class CompaniesUpdate(BaseModel):
@@ -62,6 +99,14 @@ class CompaniesUpdate(BaseModel):
     is_active: Optional[bool] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    entity_type: Optional[str] = None
+    headcount_regular: Optional[int] = None
+    headcount_non_regular: Optional[int] = None
+    headcount_outsourced: Optional[int] = None
+    headcount_certified: Optional[int] = None
+    status: Optional[str] = None
+    tax_contact_name: Optional[str] = None
+    tax_email: Optional[str] = None
 
 
 class CompaniesResponse(CompaniesBase):
@@ -232,6 +277,7 @@ class CompanySitesBase(BaseModel):
     biz_no: Optional[str] = None
     employee_count: int
     is_main: bool
+    work_type: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -247,6 +293,7 @@ class CompanySitesUpdate(BaseModel):
     biz_no: Optional[str] = None
     employee_count: Optional[int] = None
     is_main: Optional[bool] = None
+    work_type: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -289,6 +336,65 @@ class CompanySuppliersUpdate(BaseModel):
 
 
 class CompanySuppliersResponse(CompanySuppliersBase):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CompanyStaffBase(BaseModel):
+    company_id: int
+    staff_name: str
+    department: Optional[str] = None
+    position: Optional[str] = None
+    mobile: Optional[str] = None
+    email: Optional[str] = None
+
+
+class CompanyStaffCreate(CompanyStaffBase):
+    pass
+
+
+class CompanyStaffUpdate(BaseModel):
+    company_id: Optional[int] = None
+    staff_name: Optional[str] = None
+    department: Optional[str] = None
+    position: Optional[str] = None
+    mobile: Optional[str] = None
+    email: Optional[str] = None
+
+
+class CompanyStaffResponse(CompanyStaffBase):
+    id: int
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CompanyAuditHistoryBase(BaseModel):
+    company_id: int
+    initial_cert_date: Optional[date] = None
+    surveillance_1_date: Optional[date] = None
+    surveillance_2_date: Optional[date] = None
+    renewal_date: Optional[date] = None
+    manager_auditor: Optional[str] = None
+    transfer_history: Optional[str] = None
+
+
+class CompanyAuditHistoryCreate(CompanyAuditHistoryBase):
+    pass
+
+
+class CompanyAuditHistoryUpdate(BaseModel):
+    company_id: Optional[int] = None
+    initial_cert_date: Optional[date] = None
+    surveillance_1_date: Optional[date] = None
+    surveillance_2_date: Optional[date] = None
+    renewal_date: Optional[date] = None
+    manager_auditor: Optional[str] = None
+    transfer_history: Optional[str] = None
+
+
+class CompanyAuditHistoryResponse(CompanyAuditHistoryBase):
     id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

@@ -3,17 +3,19 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, SmallInteger, String, Text, BigInteger
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, Text, BigInteger
+from sqlalchemy.dialects.mysql import INTEGER as MySQLInteger
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 
 
 class KarCpdRecords(Base):
+    """심사원 CPD(지속적 전문성 개발) 활동 기록."""
     __tablename__ = "kar_cpd_records"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    auditor_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    auditor_id: Mapped[int] = mapped_column(MySQLInteger(unsigned=True), ForeignKey("auditors.id", ondelete="CASCADE"), nullable=False)
     kar_qual_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     activity_date: Mapped[date] = mapped_column(Date, nullable=False)
     activity_type: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -22,25 +24,41 @@ class KarCpdRecords(Base):
     status: Mapped[str] = mapped_column(String(50), nullable=False)
     review_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    is_fulfilled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, comment="CPD 이수 요건 충족 여부")
+
+    auditor = relationship("Auditor", backref="cpd_records")
 
 
 class KarQualifications(Base):
+    """심사원 보유자격 (표준/등급/등록기관/자격번호/만료일).
+
+    주의: 라이브 DB에 auditors에 없는 auditor_id를 참조하는 고아 행이 있어
+    DB FK는 추가하지 않았다. relationship은 primaryjoin으로 연결한다.
+    """
     __tablename__ = "kar_qualifications"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    auditor_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    auditor_id: Mapped[int] = mapped_column(MySQLInteger(unsigned=True), nullable=False)
     qualification_body_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    custom_body_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    cert_doc_no: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    custom_body_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, comment="등록기관명 (registry_body)")
+    cert_doc_no: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="자격번호 (reg_no)")
     kar_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="KAR 자격번호")
     standard: Mapped[str] = mapped_column(String(100), nullable=False)
     grade: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False)
-    issued_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    expires_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    issued_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True, comment="최초 취득일 (initial_date)")
+    renewal_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, comment="갱신일")
+    expires_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True, comment="만료일 (expire_date)")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     iaf_codes: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, comment="IAF 코드 (콤마구분)")
     mdqms_areas: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, comment="ISO 13485 기술영역")
     nace_codes: Mapped[Optional[str]] = mapped_column(String(300), nullable=True, comment="NACE Division 코드 (콤마구분)")
+
+    auditor = relationship(
+        "Auditor",
+        primaryjoin="KarQualifications.auditor_id==Auditor.id",
+        foreign_keys=[auditor_id],
+        backref="licenses",
+    )
 
 
 class KarRenewalRequests(Base):
