@@ -3,28 +3,35 @@
 CB 인정서/인정 범위 승인·반려, 플랫폼 동적 계산식(MD/탄소배출량/ESG 지수 등) 수정 등
 플랫폼 운영자만 접근 가능한 전역 관리 기능을 다룬다.
 
-CB(인증원) 단위 데이터 격리 대상이 아니므로 `require_cb_scope` 대신 `require_platform_admin`으로
-role == "platform_admin" 사용자만 접근을 허용한다.
+CB(인증원) 단위 데이터 격리 대상이 아니므로 `get_current_admin_user`(JWT + platform_admin)
+로 접근을 제한한다.
 """
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import CurrentUser, require_platform_admin
+from app.core.security import CurrentUser, get_current_admin_user
 from app.models.admin import (
     CBAccreditation,
     CBAccreditationStatus,
     CBAccreditedScope,
     CBContract,
+    CBTier,
     PlatformCalculationRule,
 )
-from app.models.cb import CertificationBodies
+from app.models.auditor import Auditor
+from app.models.cb import CertificationBodies, CbAccreditationScopes
+from app.models.company import Companies
+from app.models.certification_body import CbAccreditationScope, CbStandardAccreditation
 from app.models.standard import StandardMaster
 from app.schemas.admin import (
     AccreditationActionResponse,
     AccreditationRejectRequest,
+    AdminDashboardStats,
     CalculationRuleUpdateResponse,
     CBAccreditationRecordCreate,
     CBAccreditationRecordListResponse,
@@ -35,6 +42,7 @@ from app.schemas.admin import (
     CBContractResponse,
     PlatformCalculationRuleUpdate,
 )
+from app.services.cb_billing import ensure_default_cb_contract
 
 router = APIRouter(prefix="/admin", tags=["Platform Admin"])
 
@@ -68,18 +76,87 @@ def _assert_standard_master_exists(db: Session, standard_master_id: int) -> None
         )
 
 
+def _scope_count_for_cb(db: Session, cb_id: int) -> int:
+    """활성 Scope 수 — cb_scope_matrix 우선, 없으면 레거시 cb_accreditation_scopes."""
+    matrix_count = (
+        db.query(func.count(CbAccreditationScope.id))
+        .filter(
+            CbAccreditationScope.cb_id == cb_id,
+            CbAccreditationScope.is_active.is_(True),
+        )
+        .scalar()
+        or 0
+    )
+    if matrix_count:
+        return int(matrix_count)
+
+    legacy_rows = (
+        db.query(CbAccreditationScopes.iaf_codes)
+        .filter(
+            CbAccreditationScopes.cb_id == cb_id,
+            CbAccreditationScopes.is_active.is_(True),
+        )
+        .all()
+    )
+    total = 0
+    for (iaf_codes,) in legacy_rows:
+        total += len([x for x in (iaf_codes or "").split(",") if x.strip()])
+    return total
+
+
+def _held_summary_for_cb(db: Session, cb_id: int) -> tuple[int, list[str], str]:
+    """표준별 인정(AB/인정번호) 보유 요약 — cb_standard_accreditations."""
+    rows = (
+        db.query(CbStandardAccreditation.standard_code, CbStandardAccreditation.ab_code)
+        .filter(
+            CbStandardAccreditation.cb_id == cb_id,
+            CbStandardAccreditation.is_active.is_(True),
+        )
+        .all()
+    )
+    standards: list[str] = []
+    abs_: set[str] = set()
+    for std, ab in rows:
+        if std and std not in standards:
+            standards.append(std)
+        if ab:
+            abs_.add(ab)
+    return len(standards), standards, ", ".join(sorted(abs_))
+
+
+# 0. 대시보드 통계
+@router.get("/stats", response_model=AdminDashboardStats)
+def get_admin_stats(
+    db: Session = Depends(get_db),
+    admin: CurrentUser = Depends(get_current_admin_user),
+) -> AdminDashboardStats:
+    """플랫폼 현황 카드용 집계."""
+    return AdminDashboardStats(
+        cb_count=db.query(func.count(CertificationBodies.id)).scalar() or 0,
+        company_count=db.query(func.count(Companies.id)).scalar() or 0,
+        auditor_count=db.query(func.count(Auditor.id)).scalar() or 0,
+        pending_accreditation_count=(
+            db.query(func.count(CBAccreditation.id))
+            .filter(CBAccreditation.status == CBAccreditationStatus.PENDING.value)
+            .scalar()
+            or 0
+        ),
+    )
+
+
 # 1. CB 인정서 및 인정 범위 승인/반려 API
 @router.patch("/accreditations/{acc_id}/approve", response_model=AccreditationActionResponse)
 def approve_cb_accreditation(
     acc_id: int,
     db: Session = Depends(get_db),
-    admin: CurrentUser = Depends(require_platform_admin),
+    admin: CurrentUser = Depends(get_current_admin_user),
 ) -> AccreditationActionResponse:
     """CB 인정서를 승인하고, 하위 인정 범위(scopes)를 모두 승인 처리합니다."""
     accreditation = _get_accreditation_or_404(db, acc_id)
 
     accreditation.status = CBAccreditationStatus.APPROVED.value
     accreditation.reject_reason = None
+    accreditation.approved_at = datetime.utcnow()
     db.query(CBAccreditedScope).filter(CBAccreditedScope.cb_accreditation_id == acc_id).update({"is_approved": True})
     db.commit()
     db.refresh(accreditation)
@@ -92,7 +169,7 @@ def reject_cb_accreditation(
     acc_id: int,
     payload: AccreditationRejectRequest,
     db: Session = Depends(get_db),
-    admin: CurrentUser = Depends(require_platform_admin),
+    admin: CurrentUser = Depends(get_current_admin_user),
 ) -> AccreditationActionResponse:
     """CB 인정서를 반려하고, 하위 인정 범위(scopes)를 모두 미승인 처리합니다."""
     accreditation = _get_accreditation_or_404(db, acc_id)
@@ -113,30 +190,85 @@ def list_cb_contracts(
     limit: int = 100,
     cb_id: Optional[int] = None,
     contract_year: Optional[int] = None,
+    ensure_missing: bool = Query(True, description="계약 없는 CB에 당해 기본 계약 자동 생성"),
     db: Session = Depends(get_db),
-    admin: CurrentUser = Depends(require_platform_admin),
+    admin: CurrentUser = Depends(get_current_admin_user),
 ) -> List[CBContractListResponse]:
-    """CB 연간 계약 목록을 인증기관명과 함께 조회합니다."""
-    query = db.query(CBContract, CertificationBodies.name).join(
-        CertificationBodies, CBContract.cb_id == CertificationBodies.id
-    )
-    if cb_id is not None:
-        query = query.filter(CBContract.cb_id == cb_id)
-    if contract_year is not None:
-        query = query.filter(CBContract.contract_year == contract_year)
-    rows = query.order_by(CBContract.id.desc()).offset(skip).limit(limit).all()
+    """인증기관 현황 + 연간 과금 계약을 함께 조회합니다.
 
-    return [
-        CBContractListResponse(**CBContractResponse.model_validate(contract).model_dump(), cb_name=cb_name)
-        for contract, cb_name in rows
-    ]
+    - certification_bodies 기준으로 목록을 구성하고
+    - 누락된 당해 연도 계약은 기본값으로 자동 생성(ensure_missing=true)합니다.
+    """
+    year = contract_year or datetime.utcnow().year
+    cb_query = db.query(CertificationBodies)
+    if cb_id is not None:
+        cb_query = cb_query.filter(CertificationBodies.id == cb_id)
+    cbs = cb_query.order_by(CertificationBodies.id.desc()).offset(skip).limit(limit).all()
+
+    created = False
+    if ensure_missing:
+        for cb in cbs:
+            before = (
+                db.query(CBContract.id)
+                .filter(CBContract.cb_id == cb.id, CBContract.contract_year == year)
+                .first()
+            )
+            ensure_default_cb_contract(db, cb, year=year)
+            if before is None:
+                created = True
+        if created:
+            db.commit()
+
+    results: List[CBContractListResponse] = []
+    for cb in cbs:
+        contract = (
+            db.query(CBContract)
+            .filter(CBContract.cb_id == cb.id, CBContract.contract_year == year)
+            .order_by(CBContract.id.desc())
+            .first()
+        )
+        if contract is None:
+            # ensure_missing=false 인 경우 최신 계약 폴백
+            contract = (
+                db.query(CBContract)
+                .filter(CBContract.cb_id == cb.id)
+                .order_by(CBContract.contract_year.desc(), CBContract.id.desc())
+                .first()
+            )
+        if contract is None:
+            continue
+
+        held_cnt, held_stds, ab_sum = _held_summary_for_cb(db, cb.id)
+        results.append(
+            CBContractListResponse(
+                id=contract.id,
+                cb_id=cb.id,
+                cb_name=cb.name,
+                cb_code=cb.code,
+                cb_status=cb.status or ("정상" if cb.is_active else "정지"),
+                scope_count=_scope_count_for_cb(db, cb.id),
+                held_standard_count=held_cnt,
+                held_standards=held_stds,
+                ab_summary=ab_sum,
+                accreditation_body=cb.accreditation_body,
+                contract_year=contract.contract_year,
+                tier=contract.tier or CBTier.MEDIUM.value,
+                annual_base_fee=contract.annual_base_fee,
+                price_per_md=contract.price_per_md,
+                contract_start_date=contract.contract_start_date,
+                contract_end_date=contract.contract_end_date,
+                is_active=bool(contract.is_active),
+                created_at=contract.created_at,
+            )
+        )
+    return results
 
 
 @router.post("/cb-contracts", response_model=CBContractResponse, status_code=status.HTTP_201_CREATED)
 def create_cb_contract(
     payload: CBContractCreate,
     db: Session = Depends(get_db),
-    admin: CurrentUser = Depends(require_platform_admin),
+    admin: CurrentUser = Depends(get_current_admin_user),
 ) -> CBContract:
     """CB 연간 계약(과금 정책)을 등록합니다."""
     _assert_cb_exists(db, payload.cb_id)
@@ -158,7 +290,7 @@ def list_cb_accreditations(
     # 실제 쿼리 파라미터 키는 alias로 "status"를 그대로 사용한다 (?status=PENDING).
     status_filter: Optional[str] = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
-    admin: CurrentUser = Depends(require_platform_admin),
+    admin: CurrentUser = Depends(get_current_admin_user),
 ) -> List[CBAccreditationRecordListResponse]:
     """CB 인정서 목록을 인증기관명 및 인정 범위(scopes)와 함께 조회합니다."""
     query = db.query(CBAccreditation, CertificationBodies.name).join(
@@ -191,7 +323,7 @@ def list_cb_accreditations(
 def create_cb_accreditation(
     payload: CBAccreditationRecordCreate,
     db: Session = Depends(get_db),
-    admin: CurrentUser = Depends(require_platform_admin),
+    admin: CurrentUser = Depends(get_current_admin_user),
 ) -> CBAccreditation:
     """CB 인정서를 등록하고, 신청한 인정 범위(scopes)를 함께 생성합니다 (초기 상태 PENDING)."""
     _assert_cb_exists(db, payload.cb_id)
@@ -228,7 +360,7 @@ def update_calculation_rule(
     rule_code: str,
     payload: PlatformCalculationRuleUpdate,
     db: Session = Depends(get_db),
-    admin: CurrentUser = Depends(require_platform_admin),
+    admin: CurrentUser = Depends(get_current_admin_user),
 ) -> CalculationRuleUpdateResponse:
     """플랫폼 계산식(수식 표현/변수 테이블)을 동적으로 수정합니다."""
     rule = _get_rule_or_404(db, rule_code)

@@ -50,8 +50,18 @@ def list_auditors(
     status_filter: Optional[str] = Query(None, alias="status", description="활성/휴면/정지"),
     primary_cb_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_cb_scope),
 ) -> List[Auditor]:
-    """심사원 마스터 목록/검색 조회."""
+    """심사원 마스터 목록 — 플랫폼 관리자 전용.
+
+    CB 관리자는 GET /cb/auditors 를 사용해야 하며(세션 cb_id 격리),
+    이 엔드포인트로 전체 Identity 목록을 조회할 수 없다.
+    """
+    if not is_platform_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="전체 심사원 목록은 플랫폼 관리자만 조회할 수 있습니다. CB는 /cb/auditors 를 사용하세요.",
+        )
     query = db.query(Auditor)
     if q:
         like = f"%{q}%"

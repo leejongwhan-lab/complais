@@ -77,3 +77,11 @@ class Users(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False)
+    # 소속(CB/기업) 승인 상태
+    membership_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="approved", comment="approved, pending, rejected"
+    )
+    approved_by: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, comment="승인해 준 대표계정 user_id"
+    )
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>인증기관 회원가입 - complAIs</title>
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <style>
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      margin: 0;
+      background: var(--bg-secondary, #f5f7fb);
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 24px 0;
+    }
+    .register-card {
+      width: min(560px, 92vw);
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+    }
+    .brand-wrap {
+      margin: 0 0 16px;
+      padding: 8px 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      border-radius: 10px;
+    }
+    .brand-wrap .brand-logo { height: 34px; }
+    h1 { margin: 0 0 8px; font-size: 1.4rem; }
+    p { margin: 0 0 20px; color: #64748b; font-size: 0.95rem; }
+    .mb-3 { margin-bottom: 16px; }
+    .form-label { display: block; margin: 0 0 6px; font-weight: 700; }
+    .form-control, select.form-control {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid #d0d7e2;
+      border-radius: 8px;
+      background: #fff;
+    }
+    .input-group { display: flex; gap: 8px; }
+    .input-group .form-control { flex: 1; }
+    .btn {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #d0d7e2;
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-secondary { background: #475569; color: #fff; border-color: #475569; }
+    .btn-primary {
+      width: 100%;
+      margin-top: 8px;
+      border: 0;
+      background: #2563eb;
+      color: #fff;
+      padding: 12px;
+    }
+    .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+    .alert {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.92rem;
+    }
+    .alert-success {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .alert-success.show { display: flex; }
+    .btn-close {
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      color: #047857;
+    }
+    .error { color: #dc2626; margin-top: 12px; min-height: 1.2em; }
+    .links { margin-top: 16px; text-align: center; font-size: 0.9rem; }
+    .links a { color: #2563eb; text-decoration: none; }
+    .hint { margin-top: 6px; font-size: 0.85rem; color: #64748b; }
+    .role-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .role-tabs button {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #d0d7e2;
+      background: #fff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .role-tabs button.active {
+      background: #eff6ff;
+      border-color: #2563eb;
+      color: #1d4ed8;
+    }
+    .panel { display: none; }
+    .panel.show { display: block; }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);
+      display: none; align-items: center; justify-content: center; z-index: 1000; padding: 24px;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal-dialog {
+      width: min(720px, 100%); max-height: 80vh; background: #fff; border-radius: 12px;
+      overflow: hidden; display: flex; flex-direction: column;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+    }
+    .modal-header, .modal-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid #e2e8f0;
+    }
+    .modal-footer { border-bottom: 0; border-top: 1px solid #e2e8f0; justify-content: flex-end; }
+    .modal-title { margin: 0; font-size: 1.05rem; font-weight: 700; }
+    .modal-body { overflow: auto; padding: 0; }
+    .list-group { list-style: none; margin: 0; padding: 0; }
+    .list-group-item {
+      width: 100%; text-align: left; border: 0; border-bottom: 1px solid #eef2f7;
+      background: #fff; padding: 14px 18px; cursor: pointer;
+    }
+    .list-group-item:hover { background: #f8fafc; }
+    .list-group-item strong { display: block; margin-bottom: 4px; }
+    .list-group-item small { display: block; color: #64748b; margin-top: 2px; }
+    .text-primary { color: #2563eb; }
+  </style>
+  <script src="/static/js/validation.js"></script>
+</head>
+<body>
+  <div class="register-card">
+    <div class="brand-wrap">
+      <img src="/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
+    </div>
+    <h1 id="page-title">인증기관 회원가입</h1>
+    <p id="page-desc">가입 유형에 맞게 정보를 입력하세요.</p>
+
+    <!-- CB 대표 -->
+    <form id="admin-form" class="panel">
+      <div class="mb-3">
+        <label class="form-label" for="cb-name">기관명</label>
+        <input type="text" id="cb-name" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="cb-type">기관 유형</label>
+        <select id="cb-type" class="form-control">
+          <option value="certification" selected>인증기관</option>
+          <option value="education">교육기관</option>
+          <option value="consulting">컨설팅</option>
+          <option value="other">기타</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="cb-code">기관 코드</label>
+        <input type="text" id="cb-code" class="form-control" placeholder="예: KAB_CB_01" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="cb-initial">기관 이니셜</label>
+        <input type="text" id="cb-initial" class="form-control" placeholder="예: KAB">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="cb-biz-no">사업자번호</label>
+        <input type="text" id="cb-biz-no" class="form-control" placeholder="선택">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="cb-reg-no">법인등록번호</label>
+        <input type="text" id="cb-reg-no" class="form-control" placeholder="선택">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="cb-ceo-name">대표자명</label>
+        <input type="text" id="cb-ceo-name" class="form-control" placeholder="선택">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="cb-address">주소</label>
+        <input type="text" id="cb-address" class="form-control" placeholder="선택">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="admin-name">대표 관리자명</label>
+        <input type="text" id="admin-name" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="admin-phone">연락처</label>
+        <input type="text" id="admin-phone" class="form-control" placeholder="선택">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="admin-email">이메일</label>
+        <input type="email" id="admin-email" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="admin-password">비밀번호</label>
+        <input type="password" id="admin-password" class="form-control" required>
+      </div>
+      <button type="submit" class="btn btn-primary">인증기관 대표 가입</button>
+      <div class="error" id="admin-error"></div>
+    </form>
+
+    <!-- CB 직원 / 심사원 -->
+    <div id="staff-wrap" class="panel">
+      <p class="hint" style="margin-bottom:14px;">
+        심사원은 CB 직원 가입이 아니라
+        <a href="/auditor_register.html" style="color:#2563eb;">개인 Identity 가입</a> 후
+        심사원 포털에서 소속을 신청합니다.
+      </p>
+
+      <form id="staff-form">
+        <div class="mb-3">
+          <label class="form-label" for="cb-keyword">소속 인증기관 검색</label>
+          <div class="input-group">
+            <input
+              type="text"
+              id="cb-keyword"
+              class="form-control"
+              placeholder="기관명 또는 코드"
+              onkeyup="if(event.key==='Enter'){event.preventDefault();searchCb();}"
+            >
+            <button type="button" class="btn btn-secondary" onclick="searchCb()">검색</button>
+          </div>
+          <input type="hidden" id="selected-cb-id">
+          <div id="selected-cb-badge" class="alert alert-success">
+            <span id="selected-cb-text"></span>
+            <button type="button" class="btn-close" onclick="resetCbSelection()" aria-label="선택 해제">×</button>
+          </div>
+          <div class="hint">기관명/코드 일부로 검색 후 선택하세요. (대표 승인 필요)</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="staff-name">이름</label>
+          <input type="text" id="staff-name" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="staff-email">이메일</label>
+          <input type="email" id="staff-email" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="staff-password">비밀번호</label>
+          <input type="password" id="staff-password" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="staff-phone">연락처</label>
+          <input type="text" id="staff-phone" class="form-control" placeholder="선택">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="staff-role">역할</label>
+          <select id="staff-role" class="form-control">
+            <option value="cb_staff">CB 직원</option>
+            <option value="cb_manager">CB 매니저</option>
+            <option value="cb_reviewer">CB 검토자</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary" id="staff-submit" disabled>가입 신청</button>
+        <div class="error" id="staff-error"></div>
+      </form>
+    </div>
+
+    <div class="links">
+      <a href="/signup.html">← 가입 유형 선택</a> ·
+      이미 계정이 있으신가요? <a href="/login.html">로그인</a>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="cbSearchResultModal" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <h5 class="modal-title">인증기관 선택</h5>
+        <button type="button" class="btn-close" data-modal-close aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="list-group" id="cb-search-result-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" data-modal-close>닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (window.ComplaisValidation) {
+      ComplaisValidation.bindField(document.getElementById("cb-biz-no"), "biz");
+      ComplaisValidation.bindField(document.getElementById("admin-phone"), "phone");
+      ComplaisValidation.bindField(document.getElementById("admin-email"), "email");
+      ComplaisValidation.bindField(document.getElementById("staff-phone"), "phone");
+      ComplaisValidation.bindField(document.getElementById("staff-email"), "email");
+    }
+    const API_BASE = "/api/v1";
+    const params = new URLSearchParams(window.location.search);
+    const signupType = (params.get("type") || "admin").toLowerCase() === "staff" ? "staff" : "admin";
+
+    const adminForm = document.getElementById("admin-form");
+    const staffWrap = document.getElementById("staff-wrap");
+
+    if (signupType === "admin") {
+      document.getElementById("page-title").textContent = "인증기관(CB) 대표 가입";
+      document.getElementById("page-desc").textContent =
+        "신규 인증기관을 등록하고 대표 관리자 계정을 생성합니다.";
+      document.title = "인증기관 대표 가입 - complAIs";
+      adminForm.classList.add("show");
+    } else {
+      document.getElementById("page-title").textContent = "CB 직원 가입";
+      document.getElementById("page-desc").textContent =
+        "기존 인증기관 소속으로 가입 신청합니다. CB 대표 승인 후 이용할 수 있습니다.";
+      document.title = "CB 직원 가입 - complAIs";
+      staffWrap.classList.add("show");
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text ?? "";
+      return div.innerHTML;
+    }
+
+    function openCbModal() {
+      const modal = document.getElementById("cbSearchResultModal");
+      modal.classList.add("show");
+      modal.setAttribute("aria-hidden", "false");
+    }
+    function closeCbModal() {
+      const modal = document.getElementById("cbSearchResultModal");
+      modal.classList.remove("show");
+      modal.setAttribute("aria-hidden", "true");
+    }
+
+    async function searchCb() {
+      const keyword = document.getElementById("cb-keyword").value.trim();
+      const errorEl = document.getElementById("staff-error");
+      errorEl.textContent = "";
+      if (!keyword || keyword.length < 2) {
+        alert("검색어를 2자 이상 입력해주세요.");
+        return;
+      }
+      try {
+        const res = await fetch(
+          `${API_BASE}/cb-entities?q=${encodeURIComponent(keyword)}&limit=30`,
+        );
+        const list = await res.json().catch(() => []);
+        if (!res.ok) {
+          throw new Error(list.detail || `검색 실패 (HTTP ${res.status})`);
+        }
+        if (!list.length) {
+          alert("등록된 인증기관이 없습니다.");
+          return;
+        }
+        if (list.length === 1) {
+          selectCb(list[0].id, list[0].name, list[0].code);
+          return;
+        }
+        document.getElementById("cb-search-result-list").innerHTML = list
+          .map(
+            (item) => `
+      <button type="button" class="list-group-item"
+              onclick="selectCb(${Number(item.id)}, '${escapeHtml(item.name).replace(/'/g, "&#39;")}', '${escapeHtml(item.code || "").replace(/'/g, "&#39;")}')">
+        <strong class="text-primary">${escapeHtml(item.name)}</strong>
+        <small>코드: ${escapeHtml(item.code || "-")}</small>
+        <small>${escapeHtml(item.address || "주소 정보 없음")}</small>
+      </button>`,
+          )
+          .join("");
+        openCbModal();
+      } catch (err) {
+        errorEl.textContent = err.message || "인증기관 검색에 실패했습니다.";
+      }
+    }
+
+    function selectCb(id, name, code) {
+      document.getElementById("selected-cb-id").value = id;
+      document.getElementById("selected-cb-text").innerText = `선택된 기관: ${name} (${code || "-"})`;
+      document.getElementById("selected-cb-badge").classList.add("show");
+      document.getElementById("cb-keyword").value = name;
+      document.getElementById("staff-submit").disabled = !id;
+      closeCbModal();
+    }
+
+    function resetCbSelection() {
+      document.getElementById("selected-cb-id").value = "";
+      document.getElementById("selected-cb-text").innerText = "";
+      document.getElementById("selected-cb-badge").classList.remove("show");
+      document.getElementById("cb-keyword").value = "";
+      document.getElementById("staff-submit").disabled = true;
+    }
+
+    document.querySelectorAll("[data-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", closeCbModal);
+    });
+    document.getElementById("cbSearchResultModal").addEventListener("click", (e) => {
+      if (e.target.id === "cbSearchResultModal") closeCbModal();
+    });
+
+    async function submitCbSignup(payload, errorEl) {
+      const res = await fetch(`${API_BASE}/auth/register/cb`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = data.detail;
+        throw new Error(
+          typeof detail === "string" ? detail : detail?.[0]?.msg || `가입 실패 (HTTP ${res.status})`,
+        );
+      }
+      alert(data.message || "가입 신청이 완료되었습니다.");
+      window.location.href = "/login.html";
+    }
+
+    adminForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById("admin-error");
+      errorEl.textContent = "";
+      if (window.ComplaisValidation) {
+        const v = ComplaisValidation.validateFields([
+          { el: document.getElementById("cb-biz-no"), kind: "biz" },
+          { el: document.getElementById("admin-phone"), kind: "phone" },
+          { el: document.getElementById("admin-email"), kind: "email", required: true },
+        ]);
+        if (!v.ok) { errorEl.textContent = v.message; return; }
+      }
+      const payload = {
+        signup_type: "admin",
+        email: document.getElementById("admin-email").value.trim(),
+        password: document.getElementById("admin-password").value,
+        name: document.getElementById("admin-name").value.trim(),
+        phone: document.getElementById("admin-phone").value.trim() || null,
+        cb_name: document.getElementById("cb-name").value.trim(),
+        cb_type: document.getElementById("cb-type").value,
+        cb_code: document.getElementById("cb-code").value.trim(),
+        cb_initial: document.getElementById("cb-initial").value.trim() || null,
+        biz_no: document.getElementById("cb-biz-no").value.trim() || null,
+        reg_no: document.getElementById("cb-reg-no").value.trim() || null,
+        ceo_name: document.getElementById("cb-ceo-name").value.trim() || null,
+        address: document.getElementById("cb-address").value.trim() || null,
+      };
+      try {
+        await submitCbSignup(payload, errorEl);
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    });
+
+    document.getElementById("staff-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById("staff-error");
+      errorEl.textContent = "";
+      const cbId = Number(document.getElementById("selected-cb-id").value);
+      if (!cbId) {
+        errorEl.textContent = "소속 인증기관을 먼저 검색·선택해 주세요.";
+        return;
+      }
+      if (window.ComplaisValidation) {
+        const v = ComplaisValidation.validateFields([
+          { el: document.getElementById("staff-phone"), kind: "phone" },
+          { el: document.getElementById("staff-email"), kind: "email", required: true },
+        ]);
+        if (!v.ok) { errorEl.textContent = v.message; return; }
+      }
+
+      const payload = {
+        signup_type: "staff",
+        email: document.getElementById("staff-email").value.trim(),
+        password: document.getElementById("staff-password").value,
+        name: document.getElementById("staff-name").value.trim(),
+        phone: document.getElementById("staff-phone").value.trim() || null,
+        selected_cb_id: cbId,
+        requested_role: document.getElementById("staff-role").value,
+      };
+      try {
+        await submitCbSignup(payload, errorEl);
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    });
+
+    window.searchCb = searchCb;
+    window.selectCb = selectCb;
+    window.resetCbSelection = resetCbSelection;
+  </script>
+</body>
+</html>

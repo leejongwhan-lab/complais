@@ -1,9 +1,9 @@
 """Pydantic DTO schemas — auto-generated from 20260721_complais_DB_Backup.sql."""
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from app.models.enums import CompanyDocumentsAccessLevel, CompanyDocumentsStatus, CompanySuppliersRelation, CompanySuppliersStatus
 
@@ -43,17 +43,26 @@ class CompaniesBase(BaseModel):
 
 
 class CompaniesCreate(BaseModel):
-    """기업 신규 등록 — 서버가 created_at/updated_at 및 채번(id)을 설정한다."""
+    """기업 신규 등록 — 서버가 created_at/updated_at 및 채번(id)을 설정한다.
+
+    프론트 별칭도 허용한다.
+    - company_name_kr → name, company_name_en → name_en
+    - biz_reg_num → biz_no, business_type → biz_type, business_item → biz_class
+    - address_kr → address
+    - ksic_codes/iaf_codes(배열) → ksic_code/iaf_code(콤마 구분 문자열)
+    """
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
     company_no: Optional[int] = None
     cert_no: Optional[str] = None
-    name: str
-    name_en: Optional[str] = None
-    biz_no: Optional[str] = None
+    name: str = Field(validation_alias=AliasChoices("name", "company_name_kr"))
+    name_en: Optional[str] = Field(default=None, validation_alias=AliasChoices("name_en", "company_name_en"))
+    biz_no: Optional[str] = Field(default=None, validation_alias=AliasChoices("biz_no", "biz_reg_num"))
     corp_no: Optional[str] = None
     ceo_name: Optional[str] = None
-    biz_type: Optional[str] = None
-    biz_class: Optional[str] = None
-    address: Optional[str] = None
+    biz_type: Optional[str] = Field(default=None, validation_alias=AliasChoices("biz_type", "business_type"))
+    biz_class: Optional[str] = Field(default=None, validation_alias=AliasChoices("biz_class", "business_item"))
+    address: Optional[str] = Field(default=None, validation_alias=AliasChoices("address", "address_kr"))
     detail_address: Optional[str] = None
     address_en: Optional[str] = None
     tel: Optional[str] = None
@@ -61,6 +70,8 @@ class CompaniesCreate(BaseModel):
     website: Optional[str] = None
     iaf_code: Optional[str] = None
     ksic_code: Optional[str] = None
+    ksic_codes: Optional[List[str]] = None
+    iaf_codes: Optional[List[str]] = None
     employee_count: int = 0
     scope_kr: Optional[str] = None
     scope_en: Optional[str] = None
@@ -73,6 +84,14 @@ class CompaniesCreate(BaseModel):
     status: Optional[str] = "정상"
     tax_contact_name: Optional[str] = None
     tax_email: Optional[str] = None
+
+    @model_validator(mode="after")
+    def flatten_code_arrays(self) -> "CompaniesCreate":
+        if self.ksic_codes:
+            self.ksic_code = ",".join(self.ksic_codes)
+        if self.iaf_codes:
+            self.iaf_code = ",".join(self.iaf_codes)
+        return self
 
 
 class CompaniesUpdate(BaseModel):
@@ -345,8 +364,10 @@ class CompanySuppliersResponse(CompanySuppliersBase):
 class CompanyStaffBase(BaseModel):
     company_id: int
     staff_name: str
+    role: Optional[str] = None
     department: Optional[str] = None
     position: Optional[str] = None
+    phone: Optional[str] = None
     mobile: Optional[str] = None
     email: Optional[str] = None
 
@@ -358,8 +379,10 @@ class CompanyStaffCreate(CompanyStaffBase):
 class CompanyStaffUpdate(BaseModel):
     company_id: Optional[int] = None
     staff_name: Optional[str] = None
+    role: Optional[str] = None
     department: Optional[str] = None
     position: Optional[str] = None
+    phone: Optional[str] = None
     mobile: Optional[str] = None
     email: Optional[str] = None
 
@@ -395,6 +418,32 @@ class CompanyAuditHistoryUpdate(BaseModel):
 
 
 class CompanyAuditHistoryResponse(CompanyAuditHistoryBase):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CompanyDepartmentsBase(BaseModel):
+    company_id: int
+    name: str
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class CompanyDepartmentsCreate(BaseModel):
+    name: str
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class CompanyDepartmentsUpdate(BaseModel):
+    name: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class CompanyDepartmentsResponse(CompanyDepartmentsBase):
     id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

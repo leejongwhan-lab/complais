@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>기업 회원가입 - complAIs</title>
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <style>
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      margin: 0;
+      background: var(--bg-secondary, #f5f7fb);
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .register-card {
+      width: min(520px, 92vw);
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+    }
+    .brand-wrap {
+      margin: 0 0 16px;
+      padding: 8px 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      border-radius: 10px;
+    }
+    .brand-wrap .brand-logo { height: 34px; }
+    h1 { margin: 0 0 8px; font-size: 1.4rem; }
+    p { margin: 0 0 20px; color: #64748b; font-size: 0.95rem; }
+    .mb-3 { margin-bottom: 16px; }
+    .form-label { display: block; margin: 0 0 6px; font-weight: 700; }
+    .form-control {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid #d0d7e2;
+      border-radius: 8px;
+    }
+    .input-group { display: flex; gap: 8px; }
+    .input-group .form-control { flex: 1; }
+    .btn {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #d0d7e2;
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-secondary { background: #475569; color: #fff; border-color: #475569; }
+    .btn-primary {
+      width: 100%;
+      margin-top: 8px;
+      border: 0;
+      background: #2563eb;
+      color: #fff;
+      padding: 12px;
+    }
+    .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+    .alert {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.92rem;
+    }
+    .alert-success {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .alert-success.show { display: flex; }
+    .btn-close {
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      color: #047857;
+    }
+    .error { color: #dc2626; margin-top: 12px; min-height: 1.2em; }
+    .links { margin-top: 16px; text-align: center; font-size: 0.9rem; }
+    .links a { color: #2563eb; text-decoration: none; }
+    .hint { margin-top: 6px; font-size: 0.85rem; color: #64748b; }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);
+      display: none; align-items: center; justify-content: center; z-index: 1000; padding: 24px;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal-dialog {
+      width: min(720px, 100%); max-height: 80vh; background: #fff; border-radius: 12px;
+      overflow: hidden; display: flex; flex-direction: column;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+    }
+    .modal-header, .modal-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid #e2e8f0;
+    }
+    .modal-footer { border-bottom: 0; border-top: 1px solid #e2e8f0; justify-content: flex-end; }
+    .modal-title { margin: 0; font-size: 1.05rem; font-weight: 700; }
+    .modal-body { overflow: auto; padding: 0; }
+    .list-group { list-style: none; margin: 0; padding: 0; }
+    .list-group-item {
+      width: 100%; text-align: left; border: 0; border-bottom: 1px solid #eef2f7;
+      background: #fff; padding: 14px 18px; cursor: pointer;
+    }
+    .list-group-item:hover { background: #f8fafc; }
+    .list-group-item strong { display: block; margin-bottom: 4px; }
+    .list-group-item small { display: block; color: #64748b; margin-top: 2px; }
+    .text-primary { color: #2563eb; }
+  </style>
+  <script src="/static/js/validation.js"></script>
+</head>
+<body>
+  <form class="register-card" id="register-form">
+    <div class="brand-wrap">
+      <img src="/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
+    </div>
+    <h1 id="page-title">기업 회원가입</h1>
+    <p id="page-desc">소속 기업을 검색·선택한 뒤 계정을 생성합니다.</p>
+
+    <div class="mb-3">
+      <label class="form-label" for="company-keyword">소속 기업 검색</label>
+      <div class="input-group">
+        <input
+          type="text"
+          id="company-keyword"
+          class="form-control"
+          placeholder="기업명 또는 사업자번호 입력"
+          onkeyup="if(event.key==='Enter'){event.preventDefault();searchCompany();}"
+        >
+        <button type="button" class="btn btn-secondary" onclick="searchCompany()">검색</button>
+      </div>
+      <input type="hidden" id="selected-company-id" name="company_id">
+      <div id="selected-company-badge" class="alert alert-success mt-2">
+        <span id="selected-company-text"></span>
+        <button type="button" class="btn-close" onclick="resetCompanySelection()" aria-label="선택 해제">×</button>
+      </div>
+      <div class="hint">2글자 이상 입력 후 검색하세요. 결과가 여러 건이면 목록에서 선택합니다.</div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label" for="user-name">담당자명</label>
+      <input type="text" id="user-name" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="email">이메일 계정</label>
+      <input type="email" id="email" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="password">비밀번호</label>
+      <input type="password" id="password" class="form-control" required>
+    </div>
+    <div class="mb-3" id="phone-wrap" style="display:none;">
+      <label class="form-label" for="phone">연락처</label>
+      <input type="text" id="phone" class="form-control" placeholder="선택">
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100" id="submit-btn" disabled>회원가입</button>
+    <div class="error" id="error"></div>
+    <div class="links">
+      <a href="/signup.html">← 가입 유형 선택</a> ·
+      이미 계정이 있으신가요? <a href="/login.html">로그인</a>
+    </div>
+  </form>
+
+  <div class="modal-backdrop" id="companySearchResultModal" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <h5 class="modal-title">기업 선택</h5>
+        <button type="button" class="btn-close" data-modal-close aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="list-group" id="search-result-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" data-modal-close">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "/api/v1";
+    const params = new URLSearchParams(window.location.search);
+    const signupType = (params.get("type") || "admin").toLowerCase() === "staff" ? "staff" : "admin";
+    const isStaff = signupType === "staff";
+
+    document.getElementById("page-title").textContent = isStaff
+      ? "기업 임직원 회원가입"
+      : "기업 대표 / 관리자 회원가입";
+    document.getElementById("page-desc").textContent = isStaff
+      ? "기존 등록 기업 소속으로 가입합니다. 대표 관리자 승인 후 이용할 수 있습니다."
+      : "소속 기업을 검색·선택한 뒤 계정을 생성합니다.";
+    document.getElementById("phone-wrap").style.display = isStaff ? "block" : "none";
+    document.title = isStaff ? "기업 임직원 회원가입 - complAIs" : "기업 대표 회원가입 - complAIs";
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text ?? "";
+      return div.innerHTML;
+    }
+
+    function openSearchModal() {
+      const modal = document.getElementById("companySearchResultModal");
+      modal.classList.add("show");
+      modal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeSearchModal() {
+      const modal = document.getElementById("companySearchResultModal");
+      modal.classList.remove("show");
+      modal.setAttribute("aria-hidden", "true");
+    }
+
+    async function searchCompany() {
+      const keyword = document.getElementById("company-keyword").value.trim();
+      const errorEl = document.getElementById("error");
+      errorEl.textContent = "";
+
+      if (!keyword || keyword.length < 2) {
+        alert("검색어를 2자 이상 입력해주세요.");
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_BASE}/companies/search?keyword=${encodeURIComponent(keyword)}`,
+        );
+        if (response.status === 404) {
+          alert("등록된 기업이 없습니다.");
+          return;
+        }
+        const list = await response.json().catch(() => []);
+        if (!response.ok) {
+          throw new Error(list.detail || `검색 실패 (HTTP ${response.status})`);
+        }
+        if (list.length === 1) {
+          selectCompany(list[0].id, list[0].name, list[0].biz_no);
+        } else {
+          const resultListHtml = list
+            .map(
+              (item) => `
+      <button type="button" class="list-group-item"
+              onclick="selectCompany(${Number(item.id)}, '${escapeHtml(item.name).replace(/'/g, "&#39;")}', '${escapeHtml(item.biz_no || "").replace(/'/g, "&#39;")}')">
+        <strong class="text-primary">${escapeHtml(item.name)}</strong>
+        <small>사업자번호: ${escapeHtml(item.biz_no || "-")}</small>
+        <small>${escapeHtml(item.address_kr || "주소 정보 없음")}</small>
+      </button>`,
+            )
+            .join("");
+          document.getElementById("search-result-list").innerHTML = resultListHtml;
+          openSearchModal();
+        }
+      } catch (err) {
+        errorEl.textContent = err.message || "기업 검색에 실패했습니다.";
+      }
+    }
+
+    function selectCompany(id, name, bizNo) {
+      document.getElementById("selected-company-id").value = id;
+      document.getElementById("selected-company-text").innerText =
+        `선택된 기업: ${name} (${bizNo || "-"})`;
+      document.getElementById("selected-company-badge").classList.add("show");
+      document.getElementById("company-keyword").value = name;
+      document.getElementById("submit-btn").disabled = !id;
+      closeSearchModal();
+    }
+
+    function resetCompanySelection() {
+      document.getElementById("selected-company-id").value = "";
+      document.getElementById("selected-company-text").innerText = "";
+      document.getElementById("selected-company-badge").classList.remove("show");
+      document.getElementById("company-keyword").value = "";
+      document.getElementById("submit-btn").disabled = true;
+    }
+
+    document.querySelectorAll("[data-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", closeSearchModal);
+    });
+    document.getElementById("companySearchResultModal").addEventListener("click", (e) => {
+      if (e.target.id === "companySearchResultModal") closeSearchModal();
+    });
+
+    document.getElementById("register-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      if (window.ComplaisValidation) {
+        const v = ComplaisValidation.validateFields([
+          { el: document.getElementById("email"), kind: "email", required: true },
+        ]);
+        if (!v.ok) {
+          const err = document.getElementById("form-error") || document.getElementById("error");
+          if (err) err.textContent = v.message; else alert(v.message);
+          return;
+        }
+      }
+      const errorEl = document.getElementById("error");
+      errorEl.textContent = "";
+
+      const companyId = Number(document.getElementById("selected-company-id").value);
+      if (!companyId) {
+        errorEl.textContent = "소속 기업을 먼저 검색·선택해 주세요.";
+        return;
+      }
+
+      const endpoint = isStaff
+        ? `${API_BASE}/auth/register/client-staff`
+        : `${API_BASE}/auth/register/client-admin`;
+
+      const payload = {
+        email: document.getElementById("email").value.trim(),
+        password: document.getElementById("password").value,
+        user_name: document.getElementById("user-name").value.trim(),
+        company_id: companyId,
+      };
+      if (isStaff) {
+        const phone = document.getElementById("phone").value.trim();
+        if (phone) payload.phone = phone;
+      }
+
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.detail || `회원가입 실패 (HTTP ${res.status})`);
+        }
+        alert(`${data.message}\n기업: ${data.company_name || ""}`);
+        window.location.href = "/login.html";
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    });
+
+    window.searchCompany = searchCompany;
+    window.selectCompany = selectCompany;
+    window.resetCompanySelection = resetCompanySelection;
+  </script>
+</body>
+</html>

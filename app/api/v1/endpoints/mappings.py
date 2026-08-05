@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import CurrentUser, get_current_user
-from app.models.master_data import IafCode, KsicCode, Major
+from app.models.master_data import KsicCode, Major
+from app.services.iaf_recommendation import resolve_iaf_from_ksic, resolve_iaf_from_major
 
 router = APIRouter(prefix="/mappings", tags=["Mappings"])
 
@@ -25,9 +26,10 @@ class KsicIafResponse(BaseModel):
     ksic_name: Optional[str]
     iaf_code: str
     iaf_name_ko: str
-    qms_complexity: Optional[str]
-    ems_complexity: Optional[str]
-    ohsms_complexity: Optional[str]
+    qms_complexity: Optional[str] = None
+    ems_complexity: Optional[str] = None
+    ohsms_complexity: Optional[str] = None
+    iaf_codes: List[str] = []
 
     class Config:
         from_attributes = True
@@ -35,11 +37,11 @@ class KsicIafResponse(BaseModel):
 
 class MajorIafRecommendation(BaseModel):
     iaf_code: str
-    degree_level: str
-    is_mandatory: bool
-    extra_exp_years: int
-    requires_committee: bool
-    notes: Optional[str]
+    degree_level: str = "BACHELOR_4Y"
+    is_mandatory: bool = True
+    extra_exp_years: int = 0
+    requires_committee: bool = False
+    notes: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -67,9 +69,16 @@ def lookup_ksic_mapping(
     if len(clean_code) < 2:
         raise HTTPException(status_code=400, detail="KSIC 코드는 최소 2자리 이상이어야 합니다.")
 
+    hints = resolve_iaf_from_ksic(db, ksic_code)
+    if not hints:
+        raise HTTPException(
+            status_code=404,
+            detail=f"KSIC 코드 '{ksic_code}'에 매핑된 IAF 코드를 찾을 수 없습니다.",
+        )
+
+    # 복잡도 필드는 매핑 테이블에서 첫 매칭 KSIC 행 조회
     ksic_obj = None
     mapping = None
-    # 5자리, 4자리, 3자리 순서로 매핑 조회 (기존 client_signup.php 백엔드 로직 충실 계승)
     for length in range(min(5, len(clean_code)), 2, -1):
         sub_code = clean_code[:length]
         ksic_obj = db.query(KsicCode).filter(KsicCode.code == sub_code).first()
@@ -77,22 +86,17 @@ def lookup_ksic_mapping(
             mapping = ksic_obj.iaf_mappings[0]
             break
 
-    if not mapping:
-        raise HTTPException(
-            status_code=404,
-            detail=f"KSIC 코드 '{ksic_code}'에 매핑된 IAF 코드를 찾을 수 없습니다.",
-        )
-
-    iaf_obj = mapping.iaf
+    primary = hints[0]
     return KsicIafResponse(
         ok=True,
-        ksic_code=ksic_obj.code,
-        ksic_name=ksic_obj.name_ko,
-        iaf_code=iaf_obj.code,
-        iaf_name_ko=iaf_obj.name_ko,
-        qms_complexity=mapping.qms_complexity,
-        ems_complexity=mapping.ems_complexity,
-        ohsms_complexity=mapping.ohsms_complexity,
+        ksic_code=ksic_obj.code if ksic_obj else clean_code,
+        ksic_name=ksic_obj.name_ko if ksic_obj else None,
+        iaf_code=primary.iaf_code,
+        iaf_name_ko=primary.industry_name_ko,
+        qms_complexity=mapping.qms_complexity if mapping else None,
+        ems_complexity=mapping.ems_complexity if mapping else None,
+        ohsms_complexity=mapping.ohsms_complexity if mapping else None,
+        iaf_codes=[h.iaf_code for h in hints],
     )
 
 
@@ -107,26 +111,32 @@ def recommend_iaf_by_major(
     부여 가능한 추천 IAF 코드 목록 및 단서조항(추가 경력 필요년수 등)을 반환합니다.
     """
     clean_major = major_name.strip()
-    majors = db.query(Major).filter(Major.name.like(f"%{clean_major}%")).all()
-
-    recommendations: List[MajorIafRecommendation] = []
-    for major in majors:
-        for mapping in major.iaf_mappings:
-            recommendations.append(
-                MajorIafRecommendation(
-                    iaf_code=mapping.iaf.code,
-                    degree_level=mapping.degree_level,
-                    is_mandatory=mapping.is_mandatory,
-                    extra_exp_years=mapping.extra_exp_years,
-                    requires_committee=mapping.requires_committee,
-                    notes=mapping.notes,
-                )
-            )
-
-    if not recommendations:
+    hints = resolve_iaf_from_major(db, clean_major)
+    if not hints:
         raise HTTPException(
             status_code=404,
             detail=f"전공명 '{major_name}'에 해당하는 추천 IAF 코드가 없습니다.",
+        )
+
+    # degree_level / is_mandatory 는 매핑 원본에서 보강
+    major_rows = db.query(Major).filter(Major.name.like(f"%{clean_major}%")).all()
+    by_code = {}
+    for major in major_rows:
+        for mapping in major.iaf_mappings:
+            by_code[mapping.iaf.code] = mapping
+
+    recommendations: List[MajorIafRecommendation] = []
+    for h in hints:
+        m = by_code.get(h.iaf_code)
+        recommendations.append(
+            MajorIafRecommendation(
+                iaf_code=h.iaf_code,
+                degree_level=m.degree_level if m else "BACHELOR_4Y",
+                is_mandatory=m.is_mandatory if m else True,
+                extra_exp_years=h.extra_exp_years,
+                requires_committee=h.requires_committee,
+                notes=h.notes,
+            )
         )
 
     return MajorIafResponse(ok=True, major_name=clean_major, recommendations=recommendations)

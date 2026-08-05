@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<title>CB 제안검토 — MD 가감/입회</title>
+<style>
+body{font-family:Pretendard,sans-serif;margin:24px;background:#f5f6f8}
+.card{background:#fff;padding:20px;max-width:900px;border:1px solid #e5e7eb}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid #eee;padding:8px;text-align:left}
+input,select{padding:6px;margin:4px 0}
+button{padding:8px 12px;background:#185fa5;color:#fff;border:0;cursor:pointer;margin-right:6px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>CB 제안검토</h2>
+  <button onclick="loadList()">목록 새로고침</button>
+  <table><thead><tr><th>ID</th><th>기업</th><th>유형</th><th>기본MD</th><th>상태</th><th>검토</th></tr></thead><tbody id="tb"></tbody></table>
+  <div id="panel" style="margin-top:16px;display:none">
+    <h3>신청 #<span id="aid"></span></h3>
+    <div>가감비율(%) <input id="ratio" type="number" step="0.01" value="0"/></div>
+    <div>사유 <input id="reason" style="width:60%"/></div>
+    <div>입회
+      <select id="wit">
+        <option value="NONE">없음</option>
+        <option value="KAB_WITNESS">KAB 입회</option>
+        <option value="INTERNAL_WITNESS">내부 입회</option>
+      </select>
+      심사원명 <input id="witname"/>
+    </div>
+    <div>상태
+      <select id="st">
+        <option>REVIEWING</option>
+        <option>PROPOSED</option>
+        <option>CONTRACTED</option>
+      </select>
+    </div>
+    <button onclick="saveReview()">저장</button>
+    <pre id="out"></pre>
+  </div>
+</div>
+<script src="/static/js/cb_md_review.js"></script>
+<script>
+let current=null;
+function baseOf(r){
+  const t=(r.audit_type||'').toUpperCase();
+  if(t.startsWith('SURV')) return +r.base_surveillance_md;
+  if(t.includes('RECERT')) return +r.base_recertification_md;
+  return (+r.base_stage1_md)+(+r.base_stage2_md);
+}
+async function loadList(){
+  const rows=await ComplaisCbMdReview.list();
+  const tb=document.getElementById('tb'); tb.innerHTML='';
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${r.application_id}</td><td>${r.enterprise_id}</td><td>${r.audit_type}</td><td>${baseOf(r).toFixed(1)}</td><td>${r.status}</td><td><button onclick='openReview(${JSON.stringify(r)})'>열기</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+function openReview(r){
+  current=r; document.getElementById('panel').style.display='block';
+  document.getElementById('aid').textContent=r.application_id;
+  document.getElementById('ratio').value=r.cb_adjustment_ratio||0;
+  document.getElementById('reason').value=r.cb_adjustment_reason||'';
+  document.getElementById('wit').value=r.witness_type||'NONE';
+  document.getElementById('witname').value=r.witness_auditor_name||'';
+  document.getElementById('st').value=r.status==='SUBMITTED'?'REVIEWING':r.status;
+}
+async function saveReview(){
+  const body={
+    cb_adjustment_ratio:+document.getElementById('ratio').value,
+    cb_adjustment_reason:document.getElementById('reason').value,
+    witness_type:document.getElementById('wit').value,
+    witness_auditor_name:document.getElementById('witname').value,
+    status:document.getElementById('st').value,
+  };
+  try{
+    const out=await ComplaisCbMdReview.review(current.application_id, body);
+    document.getElementById('out').textContent=JSON.stringify(out,null,2);
+    loadList();
+  }catch(e){ document.getElementById('out').textContent=String(e); }
+}
+loadList().catch(e=>document.getElementById('out').textContent=String(e));
+</script>
+</body>
+</html>

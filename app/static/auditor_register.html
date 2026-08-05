@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>심사원 개인 가입 - complAIs</title>
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <style>
+    body {
+      min-height: 100vh; display: grid; place-items: center; margin: 0;
+      background: var(--bg-secondary, #f5f7fb);
+      font-family: system-ui, -apple-system, sans-serif; padding: 24px 0;
+    }
+    .card {
+      width: min(520px, 92vw); background: #fff; border-radius: 12px;
+      padding: 28px; box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+    }
+    .brand-wrap { display: flex; justify-content: center; margin-bottom: 16px; }
+    .brand-wrap .brand-logo { height: 34px; }
+    h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    p { margin: 0 0 18px; color: #64748b; font-size: 0.95rem; }
+    .mb-3 { margin-bottom: 14px; }
+    label { display: block; margin: 0 0 6px; font-weight: 700; }
+    input, select {
+      width: 100%; box-sizing: border-box; padding: 10px 12px;
+      border: 1px solid #d0d7e2; border-radius: 8px;
+    }
+    button {
+      width: 100%; margin-top: 8px; padding: 12px; border: 0; border-radius: 8px;
+      background: #2563eb; color: #fff; font-weight: 700; cursor: pointer;
+    }
+    .error { color: #dc2626; margin-top: 12px; min-height: 1.2em; }
+    .links { margin-top: 16px; text-align: center; font-size: 0.9rem; }
+    .links a { color: #2563eb; text-decoration: none; }
+    .hint { font-size: 0.85rem; color: #64748b; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <form class="card" id="form">
+    <div class="brand-wrap">
+      <img src="/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
+    </div>
+    <h1>심사원 개인 회원가입</h1>
+    <p>특정 인증기관(CB)에 종속되지 않는 개인 Identity로 가입합니다. 소속/자격은 로그인 후 신청합니다.</p>
+
+    <div class="mb-3">
+      <label for="name">성명</label>
+      <input id="name" required />
+    </div>
+    <div class="mb-3">
+      <label for="email">이메일</label>
+      <input id="email" type="email" required />
+    </div>
+    <div class="mb-3">
+      <label for="password">비밀번호</label>
+      <input id="password" type="password" required />
+    </div>
+    <div class="mb-3">
+      <label for="phone">연락처</label>
+      <input id="phone" required />
+    </div>
+    <div class="mb-3">
+      <label for="birth_date">생년월일</label>
+      <input id="birth_date" type="date" />
+    </div>
+    <div class="mb-3">
+      <label for="apply_grade">희망 등급(프로필)</label>
+      <select id="apply_grade">
+        <option value="trainee">심사원보</option>
+        <option value="auditor" selected>심사원</option>
+        <option value="lead_auditor">선임심사원</option>
+        <option value="verified_auditor">검증심사원</option>
+      </select>
+      <div class="hint">CB 승인 등급과 별개입니다. 실제 자격은 CB 승인 후 부여됩니다.</div>
+    </div>
+
+    <button type="submit">개인 계정 생성</button>
+    <div class="error" id="error"></div>
+    <div class="links">
+      <a href="/signup.html">← 가입 유형 선택</a> ·
+      <a href="/login.html">로그인</a>
+    </div>
+  </form>
+  <script>
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById("error");
+      errorEl.textContent = "";
+      const payload = {
+        name: document.getElementById("name").value.trim(),
+        email: document.getElementById("email").value.trim(),
+        password: document.getElementById("password").value,
+        phone: document.getElementById("phone").value.trim(),
+        birth_date: document.getElementById("birth_date").value || null,
+        apply_grade: document.getElementById("apply_grade").value,
+        address: "미입력",
+        detail_address: "미입력",
+      };
+      try {
+        const res = await fetch("/api/v1/auth/register/auditor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `가입 실패 (HTTP ${res.status})`);
+        alert(data.message || "가입이 완료되었습니다.");
+        window.location.href = "/login.html";
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    });
+  </script>
+</body>
+</html>

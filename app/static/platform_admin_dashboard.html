@@ -2,13 +2,29 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>ComplAIs — 플랫폼 관리자</title>
-    <!-- 디자인 토큰 및 컴포넌트 CSS 체이닝 적용 -->
-    <link rel="stylesheet" href="components_v3.css">
+    <title>complAIs — 플랫폼 관리자</title>
+    <link rel="stylesheet" href="/static/css/main.css">
     <style>
         body { display: flex; min-height: 100vh; background-color: var(--gray-line-1); margin: 0; }
         .admin-sidebar { width: 240px; background: #ffffff; border-right: 1px solid var(--gray-line-2); padding: 20px 16px; }
         .admin-main { flex: 1; padding: 32px; }
+        .sidebar-menu { list-style: none; padding: 0; margin: 0; }
+        .sidebar-menu-item {
+            display: block;
+            padding: 10px 12px;
+            margin-bottom: 4px;
+            border-radius: 8px;
+            color: var(--font-secondary);
+            font: var(--font-body-small);
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .sidebar-menu-item:hover { background: var(--gray-line-1); }
+        .sidebar-menu-item.active {
+            background: rgba(99, 102, 241, 0.12);
+            color: var(--primary-purple);
+            font-weight: var(--font-weight-semibold);
+        }
         .grid-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
         .card { background: #fff; padding: 20px; border-radius: 12px; border: 1px solid var(--gray-line-2); }
         .card-title { font: var(--font-caption); color: var(--font-secondary); }
@@ -16,61 +32,735 @@
         .data-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
         .data-table th, .data-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--gray-line-2); font: var(--font-body-small); }
         .data-table th { background: var(--gray-line-1); font-weight: var(--font-weight-semibold); color: var(--font-secondary); }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .search-row { display: flex; gap: 8px; margin-bottom: 16px; max-width: 480px; }
+        .search-row input {
+            flex: 1; padding: 10px 12px; border: 1px solid var(--gray-line-2); border-radius: 8px;
+            font: var(--font-body-small);
+        }
+        .search-row button {
+            padding: 10px 16px; border: 1px solid var(--gray-line-2); border-radius: 8px;
+            background: #fff; cursor: pointer; font: var(--font-body-small);
+        }
+        .search-row button:hover { background: var(--gray-line-1); }
+        .count-badge {
+            display: inline-block; padding: 6px 12px; border-radius: 999px;
+            background: rgba(99, 102, 241, 0.12); color: var(--primary-purple);
+            font: var(--font-body-small); font-weight: var(--font-weight-semibold);
+        }
+        .pagination { display: flex; justify-content: center; gap: 6px; margin-top: 16px; flex-wrap: wrap; }
+        .pagination button {
+            min-width: 36px; padding: 8px 10px; border: 1px solid var(--gray-line-2);
+            border-radius: 8px; background: #fff; cursor: pointer; font: var(--font-body-small);
+        }
+        .pagination button.active {
+            background: var(--primary-purple); color: #fff; border-color: var(--primary-purple);
+        }
+        .pagination button:disabled { opacity: 0.45; cursor: not-allowed; }
+        .status-chip {
+            display: inline-block; padding: 4px 10px; border-radius: 999px;
+            background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 12px;
+        }
+        .fw-bold { font-weight: var(--font-weight-semibold); }
+        .text-start { text-align: left; }
+        .text-truncate {
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            display: inline-block; vertical-align: bottom;
+        }
+        .badge {
+            display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 12px;
+        }
+        .badge.bg-light.text-dark {
+            background: var(--gray-line-1); color: var(--font-primary);
+        }
+        .badge.bg-success {
+            background: rgba(16, 185, 129, 0.14); color: #059669;
+        }
+        .badge.bg-info-subtle {
+            background: rgba(14, 165, 233, 0.14); color: #0284c7;
+        }
+        .badge.bg-success-subtle {
+            background: rgba(16, 185, 129, 0.14); color: #059669;
+        }
+        .badge.bg-warning {
+            background: rgba(245, 158, 11, 0.16); color: #b45309;
+        }
+        .membership-card-header {
+            display: flex; justify-content: space-between; align-items: center; gap: 8px;
+        }
+        .membership-card-header h6 { margin: 0; }
+        .table-responsive { overflow-x: auto; }
+        .text-nowrap { white-space: nowrap; }
+        .btn-detail {
+            padding: 6px 10px; border: 1px solid var(--gray-line-2); border-radius: 8px;
+            background: #fff; cursor: pointer; font: var(--font-body-small);
+        }
+        .btn-detail:hover { background: var(--gray-line-1); }
+        .modal-backdrop {
+            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);
+            display: none; align-items: center; justify-content: center; z-index: 1000; padding: 24px;
+        }
+        .modal-backdrop.show { display: flex; }
+        .modal-dialog {
+            width: min(980px, 100%); max-height: 92vh; background: #fff; border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2); display: flex; flex-direction: column; overflow: hidden;
+        }
+        .modal-dialog.company-org-modal { width: min(1040px, 100%); }
+        .org-section { margin-bottom: 18px; }
+        .org-section-title {
+            margin: 0 0 10px; font: var(--font-body-small); font-weight: var(--font-weight-semibold);
+            color: var(--font-primary);
+        }
+        .org-grid {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px;
+        }
+        .org-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 14px; }
+        .org-field { display: flex; flex-direction: column; gap: 4px; }
+        .org-field.full { grid-column: 1 / -1; }
+        .org-field label { font: var(--font-caption); color: var(--font-secondary); }
+        .org-field input, .org-field select, .org-field textarea {
+            padding: 8px 10px; border: 1px solid var(--gray-line-2); border-radius: 8px;
+            font: var(--font-body-small); background: #fff;
+        }
+        .org-field textarea { resize: vertical; min-height: 64px; }
+        .org-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+        .btn-primary-admin {
+            padding: 8px 14px; border: 1px solid var(--primary-purple); border-radius: 8px;
+            background: var(--primary-purple); color: #fff; cursor: pointer; font: var(--font-body-small);
+        }
+        .btn-primary-admin:disabled { opacity: 0.55; cursor: not-allowed; }
+        .org-msg { font: var(--font-caption); color: var(--font-secondary); min-height: 1.2em; margin-top: 8px; }
+        .org-msg.ok { color: #059669; }
+        .org-msg.err { color: var(--sec-red, #dc2626); }
+        .org-table { width: 100%; border-collapse: collapse; font: var(--font-body-small); margin-top: 8px; }
+        .org-table th, .org-table td { border: 1px solid var(--gray-line-2); padding: 8px; vertical-align: middle; }
+        .org-table th { background: var(--gray-line-1); color: var(--font-secondary); text-align: left; white-space: nowrap; }
+        .org-table input, .org-table select {
+            width: 100%; padding: 6px 8px; border: 1px solid var(--gray-line-2); border-radius: 6px;
+            font: var(--font-body-small); box-sizing: border-box;
+        }
+        .dept-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+        .dept-tag {
+            display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+            border: 1px solid var(--gray-line-2); border-radius: 8px; background: #fff;
+            font: var(--font-body-small);
+        }
+        .dept-tag button {
+            border: 0; background: transparent; cursor: pointer; color: var(--font-secondary); font-size: 14px; line-height: 1;
+        }
+        .org-inline-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .org-empty { color: var(--font-tertiary); font: var(--font-body-small); padding: 12px 0; }
+        .modal-header, .modal-footer {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 20px; border-bottom: 1px solid var(--gray-line-2);
+        }
+        .modal-footer { border-bottom: 0; border-top: 1px solid var(--gray-line-2); justify-content: flex-end; gap: 8px; }
+        .modal-title { margin: 0; font: var(--font-h3); }
+        .modal-body { padding: 16px 20px; overflow: auto; }
+        .btn-close {
+            border: 0; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; color: var(--font-secondary);
+        }
+        .nav-tabs { display: flex; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; border-bottom: 1px solid var(--gray-line-2); }
+        .nav-tabs .nav-link {
+            border: 0; background: transparent; padding: 10px 12px; cursor: pointer;
+            color: var(--font-secondary); border-bottom: 2px solid transparent; font: var(--font-body-small);
+        }
+        .nav-tabs .nav-link.active {
+            color: var(--primary-purple); border-bottom-color: var(--primary-purple); font-weight: var(--font-weight-semibold);
+        }
+        .detail-tab-pane { display: none; }
+        .detail-tab-pane.active { display: block; }
+        .detail-table { width: 100%; border-collapse: collapse; font: var(--font-body-small); }
+        .detail-table th, .detail-table td { border: 1px solid var(--gray-line-2); padding: 10px 12px; vertical-align: middle; }
+        .detail-table th { background: var(--gray-line-1); width: 20%; color: var(--font-secondary); text-align: left; }
+        .placeholder-box {
+            padding: 28px; text-align: center; border: 1px solid var(--gray-line-2);
+            border-radius: 10px; background: var(--gray-line-1); color: var(--font-secondary);
+        }
+        .btn-secondary {
+            padding: 8px 14px; border: 1px solid var(--gray-line-2); border-radius: 8px;
+            background: #fff; cursor: pointer; font: var(--font-body-small);
+        }
+        .badge.bg-secondary { background: #e2e8f0; color: #475569; margin-left: 4px; }
+        .badge.bg-primary-subtle.text-primary {
+            background: rgba(37, 99, 235, 0.12); color: #2563eb;
+        }
+        .badge.bg-secondary-subtle.text-secondary {
+            background: #e2e8f0; color: #475569;
+        }
+        .text-decoration-none { text-decoration: none; color: var(--primary-purple); }
+        .text-primary { color: var(--primary-purple); }
+        .fw-semibold { font-weight: var(--font-weight-semibold); }
+        .membership-card {
+            border: 1px solid var(--gray-line-2); border-radius: 10px;
+            padding: 14px 16px; margin-bottom: 10px; background: #fff;
+        }
+        .membership-card h6 { margin: 0 0 8px; font: var(--font-body-small); font-weight: var(--font-weight-semibold); }
+        .membership-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--font-secondary); font: var(--font-caption); }
+        .history-item {
+            border-bottom: 1px solid var(--gray-line-2); padding: 10px 0;
+            font: var(--font-body-small);
+        }
+        .history-item:last-child { border-bottom: 0; }
+        .history-item strong { display: block; margin-bottom: 4px; }
+        .history-item small { color: var(--font-secondary); }
+        .scope-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 10px; border-radius: 999px; cursor: pointer;
+            background: rgba(37, 99, 235, 0.12); color: #1d4ed8;
+            font-size: 12px; font-weight: var(--font-weight-semibold);
+            border: 1px solid rgba(37, 99, 235, 0.25);
+        }
+        .scope-badge:hover { background: rgba(37, 99, 235, 0.2); }
+        .btn-primary {
+            padding: 8px 14px; border: 0; border-radius: 8px;
+            background: var(--primary-purple, #6366f1); color: #fff; cursor: pointer;
+            font: var(--font-body-small); font-weight: var(--font-weight-semibold);
+        }
+        .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+        .cb-field-grid {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px;
+        }
+        @media (max-width: 720px) { .cb-field-grid { grid-template-columns: 1fr; } }
+        .cb-field label {
+            display: block; font: var(--font-caption); color: var(--font-secondary);
+            margin-bottom: 5px; font-weight: var(--font-weight-semibold);
+        }
+        .cb-field input, .cb-field select {
+            width: 100%; box-sizing: border-box; padding: 9px 11px;
+            border: 1px solid var(--gray-line-2); border-radius: 8px; font: var(--font-body-small);
+        }
+        .cb-matrix-wrap {
+            overflow: auto; border: 1px solid var(--gray-line-2); border-radius: 10px; max-height: 380px;
+        }
+        .cb-matrix { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .cb-matrix th, .cb-matrix td {
+            padding: 5px; text-align: center; white-space: nowrap; border-bottom: 1px solid var(--gray-line-2);
+        }
+        .cb-matrix th.std { text-align: left; min-width: 96px; background: var(--gray-line-1); position: sticky; left: 0; }
+        .cb-modal-error { color: #dc2626; margin-top: 10px; font: var(--font-body-small); min-height: 1.2em; }
+        .modal-dialog.lg { width: min(980px, 100%); }
     </style>
 </head>
 <body>
 
-    <!-- 사이드바 -->
     <aside class="admin-sidebar">
-        <h2 style="font: var(--font-h3); color: var(--primary-purple);">ComplAIs</h2>
+        <div class="brand-lockup" style="margin-bottom: 14px; padding: 6px 4px; background: #fff; border-radius: 8px;">
+          <img src="/brand/complais-logo.png" alt="complAIs" class="brand-logo brand-logo-md" />
+        </div>
         <span class="badge badge-purple" style="margin-bottom: 24px;">PLATFORM ADMIN</span>
         <nav>
-            <ul style="list-style: none; padding: 0; line-height: 2.2; font: var(--font-body-small);">
-                <li><strong>📊 대시보드</strong></li>
-                <li>🏛️ 인증기관(CB) 현황 & 과금</li>
-                <li>🏭 기업 현황</li>
-                <li>🔍 인증심사원 마스터</li>
-                <li>🧾 인정범위 승인 요청</li>
-                <li>⚙️ 산출 지침(MD/탄소) 관리</li>
+            <ul class="sidebar-menu">
+                <li><a href="#" class="sidebar-menu-item active" data-tab="dashboard">대시보드</a></li>
+                <li><a href="#" class="sidebar-menu-item" data-tab="cb-contracts">인증기관(CB) 통합 관리</a></li>
+                <li><a href="#" class="sidebar-menu-item" data-tab="md-applications">기업 인증신청 MD 검토</a></li>
+                <li><a href="#" class="sidebar-menu-item" data-tab="companies">기업 현황</a></li>
+                <li><a href="#" class="sidebar-menu-item" data-tab="auditors">인증심사원 마스터</a></li>
+                <li><a href="#" class="sidebar-menu-item" data-tab="accreditations">인정범위 승인 요청</a></li>
+                <li><a href="#" class="sidebar-menu-item" data-tab="calc-rules">산출 지침(MD/탄소) 관리</a></li>
             </ul>
         </nav>
     </aside>
 
-    <!-- 메인 콘텐츠 -->
     <main class="admin-main">
         <h1 style="font: var(--font-h1);">플랫폼 현황 및 통합 관리</h1>
-        
-        <!-- 현황 요약 타일 -->
-        <div class="grid-cards">
-            <div class="card"><div class="card-title">인증기관(CB)</div><div class="card-value">12 개소</div></div>
-            <div class="card"><div class="card-title">등록 기업</div><div class="card-value">1,480 개사</div></div>
-            <div class="card"><div class="card-title">등록 심사원</div><div class="card-value">342 명</div></div>
-            <div class="card"><div class="card-title">인정범위 검토대기</div><div class="card-value" style="color: var(--sec-red);">3 건</div></div>
-        </div>
 
-        <!-- 인정서 승인 요청 관리 테이블 -->
-        <div class="card">
-            <h3 style="font: var(--font-h3); margin-bottom: 16px;">인증기관 인정범위(Accreditation Scope) 승인 요청</h3>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>인증기관명</th>
-                        <th>인정기구</th>
-                        <th>신청 ISO 표준 / 코드</th>
-                        <th>인정서 파일</th>
-                        <th>상태</th>
-                        <th>관리</th>
-                    </tr>
-                </thead>
-                <tbody id="accreditation-tbody">
-                    <tr>
-                        <td colspan="6" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <section id="tab-dashboard" class="tab-panel active">
+            <div class="grid-cards">
+                <div class="card"><div class="card-title">인증기관(CB)</div><div class="card-value" id="stat-cb">-</div></div>
+                <div class="card"><div class="card-title">등록 기업</div><div class="card-value" id="stat-companies">-</div></div>
+                <div class="card"><div class="card-title">등록 심사원</div><div class="card-value" id="stat-auditors">-</div></div>
+                <div class="card"><div class="card-title">인정범위 검토대기</div><div class="card-value" id="stat-pending" style="color: var(--sec-red);">-</div></div>
+            </div>
+            <div class="card">
+                <p style="color: var(--font-secondary); margin: 0;">좌측 메뉴에서 관리 항목을 선택하세요.</p>
+            </div>
+        </section>
+
+        <section id="tab-cb-contracts" class="tab-panel">
+            <div class="card">
+                <div class="panel-header" style="margin-bottom: 12px;">
+                    <div>
+                        <h3 style="font: var(--font-h3); margin: 0 0 6px;">인증기관(CB) 통합 관리</h3>
+                        <p style="color: var(--font-secondary); margin: 0; font-size: 0.92rem;">
+                            법인정보 · 보유 ISO 표준(인정기관/인정번호) · 표준별 인증수행범위 · 과금 계약을 DB에서 관리합니다.
+                        </p>
+                    </div>
+                    <a class="btn-detail" href="/admin_cb.html" style="text-decoration:none;">엑셀/ODS 시딩</a>
+                </div>
+                <div class="table-responsive">
+                <table class="data-table text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>코드</th>
+                            <th>인증기관명</th>
+                            <th>상태</th>
+                            <th>보유 표준 / 인정기관</th>
+                            <th>계약연도</th>
+                            <th>티어</th>
+                            <th>기본료</th>
+                            <th>MD단가</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cb-contracts-tbody">
+                        <tr><td colspan="10" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td></tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-companies" class="tab-panel">
+            <div class="panel-header">
+                <h3 style="font: var(--font-h3); margin: 0;">기업 현황</h3>
+                <span class="count-badge">총 <span id="total-count">0</span>개 기업</span>
+            </div>
+
+            <div class="search-row">
+                <input type="text" id="search-keyword" placeholder="기업명 또는 사업자번호 검색" onkeyup="if(event.key==='Enter') fetchCompanies()">
+                <button type="button" id="search-companies-btn" onclick="fetchCompanies()">검색</button>
+            </div>
+
+            <div class="card table-responsive" style="padding: 0;">
+                <table class="data-table text-nowrap" style="text-align: center;">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">ID</th>
+                            <th>기업명</th>
+                            <th>사업자등록번호</th>
+                            <th>법인(개인)</th>
+                            <th>대표자명</th>
+                            <th style="max-width: 300px;">주소</th>
+                            <th>홈페이지</th>
+                            <th style="width: 80px;">상세</th>
+                        </tr>
+                    </thead>
+                    <tbody id="company-table-body">
+                        <tr><td colspan="8" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="pagination"></div>
+        </section>
+
+        <section id="tab-auditors" class="tab-panel">
+            <div class="panel-header">
+                <h3 style="font: var(--font-h3); margin: 0;">심사원 현황</h3>
+                <span class="count-badge">총 <span id="auditor-total-count">0</span>명</span>
+            </div>
+
+            <div class="search-row">
+                <input
+                  type="text"
+                  id="auditor-search-keyword"
+                  placeholder="성명, 이메일, 연락처 검색"
+                  onkeyup="if(event.key==='Enter') fetchAuditors()"
+                >
+                <button type="button" id="search-auditors-btn" onclick="fetchAuditors()">검색</button>
+            </div>
+
+            <div class="card table-responsive" style="padding: 0;">
+                <table class="data-table text-nowrap" style="text-align: center;">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">ID</th>
+                            <th>심사원명</th>
+                            <th>이메일</th>
+                            <th>연락처</th>
+                            <th>현재 등급</th>
+                            <th>근무형태</th>
+                            <th>프리랜서</th>
+                            <th style="width: 80px;">상세</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditor-table-body">
+                        <tr><td colspan="8" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="auditor-pagination"></div>
+        </section>
+
+        <section id="tab-accreditations" class="tab-panel">
+            <div class="card">
+                <h3 style="font: var(--font-h3); margin-bottom: 16px;">인증기관 인정범위(Accreditation Scope) 승인 요청</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>인증기관명</th>
+                            <th>인정기구</th>
+                            <th>신청 ISO 표준 / 코드</th>
+                            <th>인정서 파일</th>
+                            <th>상태</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="accreditation-tbody">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="tab-calc-rules" class="tab-panel">
+            <div class="card"><p style="color: var(--font-secondary); margin: 0;">산출 지침 관리 탭 (연결 예정)</p></div>
+        </section>
     </main>
 
+    <div class="modal-backdrop" id="cbDetailScopeModal" aria-hidden="true">
+      <div class="modal-dialog lg" role="dialog" aria-modal="true" aria-labelledby="cb-scope-modal-title">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title fw-bold" id="cb-scope-modal-title">상세 및 Scope 관리</h5>
+            <div class="muted" id="cb-scope-modal-sub" style="color: var(--font-secondary); font: var(--font-caption); margin-top: 4px;"></div>
+          </div>
+          <button type="button" class="btn-close" data-cb-scope-close aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <ul class="nav-tabs" role="tablist">
+            <li role="presentation">
+              <button class="nav-link active fw-semibold" type="button" data-cb-scope-tab="cb-basic">기본 정보</button>
+            </li>
+            <li role="presentation">
+              <button class="nav-link fw-semibold" type="button" data-cb-scope-tab="cb-std-acc">보유 표준 (15)</button>
+            </li>
+            <li role="presentation">
+              <button class="nav-link fw-semibold" type="button" data-cb-scope-tab="cb-scopes">인증수행범위</button>
+            </li>
+          </ul>
+
+          <div id="cb-basic" class="detail-tab-pane active" role="tabpanel">
+            <div class="cb-field-grid">
+              <div class="cb-field"><label>기관 코드 *</label><input id="cb-f-code" /></div>
+              <div class="cb-field"><label>기관명 *</label><input id="cb-f-name" /></div>
+              <div class="cb-field"><label>영문명</label><input id="cb-f-name-en" /></div>
+              <div class="cb-field"><label>사업자번호</label><input id="cb-f-biz" placeholder="000-00-00000" data-validate="biz" inputmode="numeric" maxlength="12" autocomplete="off" /></div>
+              <div class="cb-field"><label>대표자</label><input id="cb-f-ceo" /></div>
+              <div class="cb-field"><label>이메일</label><input id="cb-f-email" data-validate="email" autocomplete="email" /></div>
+              <div class="cb-field"><label>웹사이트</label><input id="cb-f-web" /></div>
+              <div class="cb-field"><label>전화번호</label><input id="cb-f-tel" placeholder="02-1234-5678" data-validate="phone" inputmode="tel" maxlength="13" /></div>
+              <div class="cb-field"><label>상태</label>
+                <select id="cb-f-status">
+                  <option value="active">active</option>
+                  <option value="suspended">suspended</option>
+                  <option value="inactive">inactive</option>
+                </select>
+              </div>
+              <div class="cb-field" style="grid-column:1/-1;"><label>주소</label><input id="cb-f-address" /></div>
+              <div class="cb-field"><label>계약연도</label><input id="cb-f-year" type="number" /></div>
+              <div class="cb-field"><label>티어</label>
+                <select id="cb-f-tier">
+                  <option value="SMALL">SMALL</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="LARGE">LARGE</option>
+                </select>
+              </div>
+              <div class="cb-field"><label>기본료</label><input id="cb-f-base-fee" type="number" step="1" /></div>
+              <div class="cb-field"><label>MD단가</label><input id="cb-f-md" type="number" step="1" /></div>
+            </div>
+          </div>
+
+          <div id="cb-std-acc" class="detail-tab-pane" role="tabpanel">
+            <p style="margin:0 0 10px; color: var(--font-secondary); font: var(--font-body-small);">
+              15개 ISO 표준별 보유 여부 · 인정기관 · 인정번호를 DB(<code>cb_standard_accreditations</code>)에 저장합니다. 기업 포털에는 AB/인정번호가 표시되지 않습니다.
+            </p>
+            <div style="overflow:auto; max-height:420px;">
+              <table class="data-table" id="cb-std-acc-table">
+                <thead>
+                  <tr>
+                    <th style="width:7%;">보유</th>
+                    <th style="width:26%;">ISO 표준</th>
+                    <th style="width:28%;">인정기관</th>
+                    <th style="width:22%;">인정번호</th>
+                    <th>인증수행범위</th>
+                  </tr>
+                </thead>
+                <tbody id="cb-std-acc-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="cb-scopes" class="detail-tab-pane" role="tabpanel">
+            <p style="margin:0 0 10px; color: var(--font-secondary); font: var(--font-body-small);">
+              표준별 인증수행범위: <strong>IAF 01–39는 9001/14001/45001만</strong>, 그 외는 MDQMS·FSMS·NQMS·BCMS 전용 코드(또는 코드 없음). (<code>cb_scope_matrix</code>)
+            </p>
+            <div id="cb-scope-matrix"></div>
+          </div>
+          <div class="cb-modal-error" id="cb-scope-modal-error"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" data-cb-scope-close>취소</button>
+          <button type="button" class="btn-primary" id="cb-scope-save">저장</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="auditorDetailModal" aria-hidden="true">
+      <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-auditor-title">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="modal-auditor-title">심사원 상세 정보</h5>
+          <button type="button" class="btn-close" data-auditor-modal-close aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <ul class="nav-tabs" id="auditorDetailTab" role="tablist">
+            <li role="presentation">
+              <button class="nav-link active fw-semibold" type="button" data-auditor-detail-tab="aud-basic-info">기본 정보</button>
+            </li>
+            <li role="presentation">
+              <button class="nav-link fw-semibold" type="button" data-auditor-detail-tab="aud-qual-info">자격 &amp; 소속 CB</button>
+            </li>
+            <li role="presentation">
+              <button class="nav-link fw-semibold" type="button" data-auditor-detail-tab="aud-history-info">학력 &amp; 실무경력</button>
+            </li>
+          </ul>
+
+          <div id="auditorDetailTabContent">
+            <!-- 1. 기본 정보 -->
+            <div class="detail-tab-pane active" id="aud-basic-info" role="tabpanel">
+              <table class="detail-table">
+                <tbody>
+                  <tr>
+                    <th style="width: 20%;">ID</th>
+                    <td id="a-id"></td>
+                    <th style="width: 20%;">상태</th>
+                    <td id="a-status"></td>
+                  </tr>
+                  <tr>
+                    <th>성명</th>
+                    <td id="a-name"></td>
+                    <th>이메일</th>
+                    <td id="a-email"></td>
+                  </tr>
+                  <tr>
+                    <th>연락처</th>
+                    <td id="a-phone"></td>
+                    <th>생년월일 / 성별</th>
+                    <td id="a-birth-gender"></td>
+                  </tr>
+                  <tr>
+                    <th>근무형태</th>
+                    <td id="a-emp-type"></td>
+                    <th>프리랜서 여부</th>
+                    <td id="a-freelance"></td>
+                  </tr>
+                  <tr>
+                    <th>주소</th>
+                    <td colspan="3" id="a-address"></td>
+                  </tr>
+                  <tr>
+                    <th>정산 계좌</th>
+                    <td colspan="3" id="a-bank-account"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 2. 자격 & 소속 CB -->
+            <div class="detail-tab-pane" id="aud-qual-info" role="tabpanel">
+              <div id="cb-membership-list">
+                <div class="placeholder-box">소속 CB 정보를 불러오는 중...</div>
+              </div>
+            </div>
+
+            <!-- 3. 학력 & 실무경력 -->
+            <div class="detail-tab-pane" id="aud-history-info" role="tabpanel">
+              <h6 class="fw-bold text-primary" style="margin: 0 0 8px;">학력 사항</h6>
+              <div id="aud-edu-list" style="margin-bottom: 16px;"></div>
+
+              <h6 class="fw-bold text-primary" style="margin: 0 0 8px;">실무 경력</h6>
+              <div id="aud-career-list"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" data-auditor-modal-close>닫기</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="companyDetailModal" aria-hidden="true">
+      <div class="modal-dialog company-org-modal" role="dialog" aria-modal="true" aria-labelledby="modal-company-title">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="modal-company-title">기업 상세 정보</h5>
+          <button type="button" class="btn-close" data-modal-close aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <ul class="nav-tabs" id="companyDetailTab" role="tablist">
+            <li role="presentation">
+              <button class="nav-link active" type="button" data-detail-tab="basic-info">기본정보</button>
+            </li>
+            <li role="presentation">
+              <button class="nav-link" type="button" data-detail-tab="headcount-info">인원(연도)</button>
+            </li>
+            <li role="presentation">
+              <button class="nav-link" type="button" data-detail-tab="sites-info">추가사업장</button>
+            </li>
+            <li role="presentation">
+              <button class="nav-link" type="button" data-detail-tab="org-info">부서·담당자</button>
+            </li>
+            <li role="presentation">
+              <button class="nav-link" type="button" data-detail-tab="cert-info">
+                인증 정보 <span class="badge bg-secondary">연동 예정</span>
+              </button>
+            </li>
+            <li role="presentation">
+              <button class="nav-link" type="button" data-detail-tab="esg-info">
+                ESG 정보 <span class="badge bg-secondary">연동 예정</span>
+              </button>
+            </li>
+          </ul>
+
+          <div id="companyDetailTabContent">
+            <div class="detail-tab-pane active" id="basic-info" role="tabpanel">
+              <form id="admin-company-basic-form" autocomplete="off">
+                <input type="hidden" id="ac-id" name="id" />
+                <div class="org-section">
+                  <h3 class="org-section-title">기본 정보</h3>
+                  <div class="org-grid">
+                    <div class="org-field"><label>ID</label><input id="ac-id-display" disabled /></div>
+                    <div class="org-field">
+                      <label for="ac-status">상태</label>
+                      <select id="ac-status" name="status">
+                        <option value="정상">정상</option>
+                        <option value="휴업">휴업</option>
+                        <option value="폐업">폐업</option>
+                        <option value="인증취소">인증취소</option>
+                      </select>
+                    </div>
+                    <div class="org-field"><label for="ac-name">기업명(국문)</label><input id="ac-name" name="name" required /></div>
+                    <div class="org-field"><label for="ac-name_en">기업명(영문)</label><input id="ac-name_en" name="name_en" /></div>
+                    <div class="org-field"><label for="ac-biz_no">사업자등록번호</label><input id="ac-biz_no" name="biz_no" placeholder="000-00-00000" /></div>
+                    <div class="org-field">
+                      <label for="ac-entity_type">법인/개인</label>
+                      <select id="ac-entity_type" name="entity_type">
+                        <option value="">선택</option>
+                        <option value="개인">개인</option>
+                        <option value="법인">법인</option>
+                      </select>
+                    </div>
+                    <div class="org-field"><label for="ac-corp_no">법인등록번호</label><input id="ac-corp_no" name="corp_no" /></div>
+                    <div class="org-field"><label for="ac-ceo_name">대표자명</label><input id="ac-ceo_name" name="ceo_name" /></div>
+                    <div class="org-field"><label for="ac-biz_type">업태</label><input id="ac-biz_type" name="biz_type" /></div>
+                    <div class="org-field"><label for="ac-biz_class">업종</label><input id="ac-biz_class" name="biz_class" /></div>
+                    <div class="org-field"><label for="ac-ksic_code">KSIC 코드</label><input id="ac-ksic_code" name="ksic_code" /></div>
+                    <div class="org-field"><label for="ac-iaf_code">IAF 코드</label><input id="ac-iaf_code" name="iaf_code" /></div>
+                    <div class="org-field"><label for="ac-tel">대표 전화</label><input id="ac-tel" name="tel" /></div>
+                    <div class="org-field"><label for="ac-email">대표 이메일</label><input id="ac-email" name="email" type="email" /></div>
+                    <div class="org-field full"><label for="ac-website">홈페이지</label><input id="ac-website" name="website" /></div>
+                    <div class="org-field full"><label for="ac-address">주소</label><input id="ac-address" name="address" /></div>
+                    <div class="org-field full"><label for="ac-detail_address">상세주소</label><input id="ac-detail_address" name="detail_address" /></div>
+                    <div class="org-field full"><label for="ac-address_en">영문 주소</label><input id="ac-address_en" name="address_en" /></div>
+                    <div class="org-field full"><label for="ac-scope_kr">인증 수행 범위(국문)</label><textarea id="ac-scope_kr" name="scope_kr" rows="2"></textarea></div>
+                    <div class="org-field full"><label for="ac-scope_en">인증 수행 범위(영문)</label><textarea id="ac-scope_en" name="scope_en" rows="2"></textarea></div>
+                  </div>
+                  <div class="org-actions">
+                    <button type="submit" class="btn-primary-admin" id="ac-basic-save">기본정보 저장</button>
+                  </div>
+                  <div class="org-msg" id="ac-basic-msg"></div>
+                </div>
+              </form>
+            </div>
+
+            <div class="detail-tab-pane" id="headcount-info" role="tabpanel">
+              <form id="admin-company-headcount-form" autocomplete="off">
+                <div class="org-section">
+                  <h3 class="org-section-title">인원 현황</h3>
+                  <div class="org-grid-3">
+                    <div class="org-field">
+                      <label for="ac-headcount_year">기준 연도</label>
+                      <select id="ac-headcount_year" name="headcount_year"></select>
+                    </div>
+                    <div class="org-field"><label for="ac-employee_count">총 인원</label><input id="ac-employee_count" name="employee_count" type="number" min="0" /></div>
+                    <div class="org-field"><label for="ac-headcount_outsourced">외주</label><input id="ac-headcount_outsourced" name="headcount_outsourced" type="number" min="0" /></div>
+                    <div class="org-field"><label for="ac-headcount_regular">정규직</label><input id="ac-headcount_regular" name="headcount_regular" type="number" min="0" /></div>
+                    <div class="org-field"><label for="ac-headcount_non_regular">비정규직</label><input id="ac-headcount_non_regular" name="headcount_non_regular" type="number" min="0" /></div>
+                  </div>
+                  <div class="org-actions">
+                    <button type="submit" class="btn-primary-admin" id="ac-headcount-save">인원 저장</button>
+                  </div>
+                  <div class="org-msg" id="ac-headcount-msg"></div>
+                </div>
+              </form>
+            </div>
+
+            <div class="detail-tab-pane" id="sites-info" role="tabpanel">
+              <div class="org-section">
+                <h3 class="org-section-title">추가사업장</h3>
+                <div id="ac-site-list" class="org-empty">불러오는 중...</div>
+                <div class="org-actions">
+                  <button type="button" class="btn-secondary" id="ac-site-add">사업장 추가</button>
+                  <button type="button" class="btn-primary-admin" id="ac-site-save">사업장 저장</button>
+                </div>
+                <div class="org-msg" id="ac-site-msg"></div>
+              </div>
+            </div>
+
+            <div class="detail-tab-pane" id="org-info" role="tabpanel">
+              <div class="org-section">
+                <h3 class="org-section-title">부서</h3>
+                <div class="org-inline-row">
+                  <input id="ac-dept-input" placeholder="부서명 입력" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--gray-line-2);border-radius:8px;font:var(--font-body-small);" />
+                  <button type="button" class="btn-secondary" id="ac-dept-add">등록</button>
+                  <button type="button" class="btn-primary-admin" id="ac-dept-save">부서 저장</button>
+                </div>
+                <div class="dept-tags" id="ac-dept-tags"></div>
+                <div class="org-msg" id="ac-dept-msg"></div>
+              </div>
+              <div class="org-section">
+                <h3 class="org-section-title">담당자</h3>
+                <div style="overflow:auto;">
+                  <table class="org-table" id="ac-staff-table">
+                    <thead>
+                      <tr>
+                        <th>권한/역할</th>
+                        <th>성명</th>
+                        <th>부서</th>
+                        <th>직책</th>
+                        <th>전화</th>
+                        <th>휴대전화</th>
+                        <th>이메일</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="ac-staff-body"></tbody>
+                  </table>
+                </div>
+                <div class="org-actions">
+                  <button type="button" class="btn-secondary" id="ac-staff-add">담당자 추가</button>
+                  <button type="button" class="btn-primary-admin" id="ac-staff-save">담당자 저장</button>
+                </div>
+                <div class="org-msg" id="ac-staff-msg"></div>
+              </div>
+            </div>
+
+            <div class="detail-tab-pane" id="cert-info" role="tabpanel">
+              <div class="placeholder-box">
+                <p style="margin: 0;">ISO 9001 / 14001 / 45001 등 ISO 인증 수집 데이터 연동 예정 영역입니다.</p>
+              </div>
+            </div>
+
+            <div class="detail-tab-pane" id="esg-info" role="tabpanel">
+              <div class="placeholder-box">
+                <p style="margin: 0;">ESG 진단 지표 및 심사 리포트 데이터 연동 예정 영역입니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" data-modal-close>닫기</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/js/validation.js"></script>
     <script src="admin.js"></script>
 </body>
 </html>

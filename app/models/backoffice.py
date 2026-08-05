@@ -16,17 +16,20 @@ from app.core.database import Base
 
 
 class CompanyStaff(Base):
-    """기업 담당 직원 (최대 5명)."""
+    """기업 담당자/직원 (부서·권한 포함)."""
     __tablename__ = "company_staff_members"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     company_id = Column(MySQLInteger(unsigned=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
     staff_name = Column(String(50), nullable=False)
+    role = Column(String(50), nullable=True, comment="권한(인증담당/품질담당 등)")
     department = Column(String(100), nullable=True)
     position = Column(String(50), nullable=True)
+    phone = Column(String(30), nullable=True, comment="유선전화")
     mobile = Column(String(20), nullable=True)
     email = Column(String(100), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
 
     company = relationship("Companies", backref="staff_members")
 

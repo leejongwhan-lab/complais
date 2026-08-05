@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>심사원 포털 - complAIs</title>
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <style>
+    body {
+      min-height: 100vh; margin: 0; background: var(--bg-secondary, #f5f7fb);
+      font-family: system-ui, -apple-system, sans-serif; padding: 24px 16px 40px;
+    }
+    .wrap { width: min(880px, 100%); margin: 0 auto; }
+    .brand-wrap {
+      display: flex; justify-content: center; margin-bottom: 16px;
+      padding: 8px; background: #fff; border-radius: 10px;
+    }
+    .brand-wrap .brand-logo { height: 34px; }
+    .card {
+      background: #fff; border-radius: 12px; padding: 24px;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08); margin-bottom: 16px;
+    }
+    h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    h2 { margin: 0 0 12px; font-size: 1.1rem; }
+    h3 { margin: 0 0 10px; font-size: 1rem; }
+    .lead { margin: 0 0 16px; color: #64748b; font-size: 0.95rem; }
+    .meta { font-size: 0.92rem; color: #334155; line-height: 1.6; margin-bottom: 12px; }
+    .input-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .input-group input, .field input, .field select {
+      flex: 1; min-width: 160px; padding: 10px 12px;
+      border: 1px solid #d0d7e2; border-radius: 8px; font-size: 0.95rem;
+    }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 6px; }
+    button, .btn {
+      padding: 10px 14px; border-radius: 8px; border: 0; cursor: pointer; font-weight: 700;
+      background: #2563eb; color: #fff;
+    }
+    button.ghost { background: #fff; color: #2563eb; border: 1px solid #bfdbfe; }
+    button.danger { background: #fff; color: #b91c1c; border: 1px solid #fecaca; }
+    .list { margin-top: 14px; }
+    .item {
+      border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+      display: flex; justify-content: space-between; gap: 12px; align-items: center;
+    }
+    .item strong { display: block; }
+    .item small { color: #64748b; }
+    .error { color: #dc2626; margin-top: 10px; font-size: 0.9rem; }
+    .hint { color: #64748b; font-size: 0.82rem; margin-top: 6px; }
+    .badge {
+      display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+      background: #eff6ff; color: #1d4ed8; margin: 2px 4px 2px 0;
+    }
+    .badge.ok { background: #ecfdf5; color: #047857; }
+    .badge.wait { background: #fff7ed; color: #c2410c; }
+    .badge.no { background: #fef2f2; color: #b91c1c; }
+    .badge.soft { background: #f1f5f9; color: #475569; }
+    .badge.major { background: #fef3c7; color: #b45309; }
+    .selected-company {
+      margin-top: 8px; padding: 10px 12px; background: #f8fafc; border-radius: 8px;
+      border: 1px solid #e2e8f0; font-size: 0.9rem;
+    }
+    .iaf-box {
+      margin-top: 8px; padding: 10px 12px; background: #f8fafc; border-radius: 8px;
+      border: 1px dashed #cbd5e1; min-height: 36px;
+    }
+    .scope-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    .scope-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+    }
+    .scope-item label { flex: 1; cursor: pointer; font-size: 0.92rem; line-height: 1.45; }
+    .scope-item small { color: #64748b; display: block; }
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);
+      z-index: 50; align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal {
+      width: min(560px, 100%); max-height: 90vh; overflow: auto;
+      background: #fff; border-radius: 14px; padding: 22px 22px 18px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+    }
+    .modal-actions {
+      display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;
+      padding-top: 14px; border-top: 1px solid #e2e8f0;
+    }
+    .company-hit {
+      border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px;
+      margin-bottom: 6px; cursor: pointer;
+    }
+    .company-hit:hover { border-color: #93c5fd; background: #f8fbff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand-wrap">
+      <img src="/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
+    </div>
+
+    <div class="card">
+      <h1>심사원 포털</h1>
+      <p class="lead">개인 Identity로 로그인했습니다. 원하는 인증기관(CB)에 소속/자격을 신청하세요.</p>
+      <div class="meta" id="session-meta"></div>
+      <button type="button" class="ghost" id="logout-btn">로그아웃</button>
+    </div>
+
+    <div class="card">
+      <h2>인증기관(CB) 검색 · 소속 신청</h2>
+      <div class="input-group">
+        <input id="cb-keyword" placeholder="기관명 또는 코드 (2자 이상)"
+               onkeyup="if(event.key==='Enter')searchCb()" />
+        <button type="button" onclick="searchCb()">검색</button>
+      </div>
+      <div class="list" id="cb-search-results"></div>
+      <div class="error" id="search-error"></div>
+    </div>
+
+    <div class="card">
+      <h2>내 소속 / 신청 현황</h2>
+      <div class="list" id="my-memberships">불러오는 중…</div>
+      <div class="error" id="mine-error"></div>
+    </div>
+  </div>
+
+  <!-- CB 소속/자격 신청 모달 -->
+  <div class="modal-backdrop" id="applyModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-labelledby="apply-title">
+      <h2 id="apply-title">CB 소속 / 자격 신청</h2>
+      <p class="lead" id="apply-cb-name">—</p>
+
+      <div class="field">
+        <label for="apply-grade">신청 등급</label>
+        <select id="apply-grade">
+          <option value="trainee">심사원보</option>
+          <option value="auditor" selected>심사원</option>
+          <option value="lead_auditor">선임심사원</option>
+          <option value="verified_auditor">검증심사원</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="apply-major">학력 / 전공</label>
+        <input id="apply-major" placeholder="예: 화학공학과, 컴퓨터공학" />
+        <div class="iaf-box" id="major-iaf-badges">
+          <span class="hint">전공 입력 후 추천 IAF가 표시됩니다.</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>경력 기업</label>
+        <div class="input-group">
+          <input id="company-keyword" placeholder="기업명 또는 사업자번호 (2자 이상)"
+                 onkeyup="if(event.key==='Enter')searchCompany()" />
+          <button type="button" class="ghost" onclick="searchCompany()">기업 검색</button>
+        </div>
+        <div id="company-search-results" class="list"></div>
+        <div id="selected-company" class="selected-company" style="display:none;"></div>
+        <div class="error" id="company-error"></div>
+      </div>
+
+      <div class="field">
+        <label>CB 자격 신청 Scope (IAF)</label>
+        <p class="hint">학력·경력에서 자동 도출된 코드가 기본 선택됩니다. 필요 시 체크를 조정하세요.</p>
+        <div class="scope-list" id="scope-checkboxes">
+          <span class="hint">전공 또는 기업을 입력하면 Scope가 채워집니다.</span>
+        </div>
+      </div>
+
+      <div class="error" id="apply-error"></div>
+      <div class="modal-actions">
+        <button type="button" class="ghost" id="apply-cancel">취소</button>
+        <button type="button" id="apply-submit">자격 신청</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = "/api/v1";
+    const token = localStorage.getItem("access_token");
+    const role = localStorage.getItem("role") || "";
+
+    if (!token || role !== "auditor") {
+      alert(role && role !== "auditor" ? "심사원 포털 접근 권한이 없습니다." : "로그인이 필요합니다.");
+      window.location.href = "/login.html";
+    }
+
+    const state = {
+      cbId: null,
+      cbName: "",
+      companyId: null,
+      companyName: "",
+      ksicCode: "",
+      companyIaf: [],
+      majorIaf: [],
+      allIaf: {}, // code -> item
+    };
+
+    document.getElementById("session-meta").innerHTML = [
+      `이름: ${localStorage.getItem("user_name") || "-"}`,
+      `역할: auditor (Identity)`,
+      `users.cb_id: ${localStorage.getItem("cb_id") || "NULL (정상)"}`,
+    ].join("<br>");
+
+    document.getElementById("logout-btn").addEventListener("click", () => {
+      ["access_token","user_id","user_name","role","cb_id","company_id","client_company_id","membership_status"]
+        .forEach((k) => localStorage.removeItem(k));
+      window.location.href = "/login.html";
+    });
+
+    function statusBadge(st) {
+      if (st === "approved") return `<span class="badge ok">승인</span>`;
+      if (st === "rejected") return `<span class="badge no">거절</span>`;
+      if (st === "requested" || st === "under_review" || st === "pending")
+        return `<span class="badge wait">대기</span>`;
+      return `<span class="badge">${st || "-"}</span>`;
+    }
+
+    function iafLabel(item) {
+      const name = item.industry_name_ko || item.name_en || "";
+      return `IAF ${item.iaf_code}${name ? ` (${name})` : ""}`;
+    }
+
+    async function loadMine() {
+      const el = document.getElementById("my-memberships");
+      const err = document.getElementById("mine-error");
+      err.textContent = "";
+      try {
+        const res = await fetch(`${API}/auditor/memberships/mine`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => []);
+        if (!res.ok) throw new Error(data.detail || `조회 실패 (${res.status})`);
+        if (!data.length) {
+          el.innerHTML = "<p class='lead'>아직 신청한 소속이 없습니다.</p>";
+          return;
+        }
+        el.innerHTML = data.map((m) => {
+          const req = (m.requested_iaf_codes || []).map((c) => `<span class="badge soft">IAF ${c}</span>`).join("");
+          return `
+          <div class="item">
+            <div>
+              <strong>${m.cb_name || ("CB #" + m.cb_id)}</strong>
+              <small>${m.cb_code || ""} · 신청등급: ${m.apply_grade || "-"} · 승인등급: ${m.approved_grade || "-"}</small>
+              ${m.major || m.company_name ? `<small style="display:block;margin-top:4px;">전공: ${m.major || "-"} · 경력: ${m.company_name || "-"}</small>` : ""}
+              ${req ? `<div style="margin-top:6px;">신청 IAF: ${req}</div>` : ""}
+              ${m.approved_iaf_codes ? `<div style="margin-top:4px;"><span class="badge ok">승인 IAF: ${m.approved_iaf_codes}</span></div>` : ""}
+            </div>
+            ${statusBadge(m.status)}
+          </div>`;
+        }).join("");
+      } catch (e) {
+        err.textContent = e.message;
+        el.textContent = "";
+      }
+    }
+
+    async function searchCb() {
+      const keyword = document.getElementById("cb-keyword").value.trim();
+      const err = document.getElementById("search-error");
+      const box = document.getElementById("cb-search-results");
+      err.textContent = "";
+      box.innerHTML = "";
+      if (keyword.length < 2) {
+        err.textContent = "검색어를 2자 이상 입력하세요.";
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/cb-entities?q=${encodeURIComponent(keyword)}&limit=20`);
+        const list = await res.json().catch(() => []);
+        if (!res.ok) throw new Error(list.detail || `검색 실패 (${res.status})`);
+        if (!list.length) {
+          box.innerHTML = "<p class='lead'>검색 결과가 없습니다.</p>";
+          return;
+        }
+        box.innerHTML = list.map((cb) => `
+          <div class="item">
+            <div>
+              <strong>${cb.name}</strong>
+              <small>${cb.code || ""} · ${cb.address || "주소 없음"}</small>
+            </div>
+            <button type="button" onclick='openApplyModal(${cb.id}, ${JSON.stringify(cb.name)})'>소속 신청</button>
+          </div>`).join("");
+      } catch (e) {
+        err.textContent = e.message;
+      }
+    }
+
+    function openApplyModal(cbId, cbName) {
+      state.cbId = cbId;
+      state.cbName = cbName;
+      state.companyId = null;
+      state.companyName = "";
+      state.ksicCode = "";
+      state.companyIaf = [];
+      state.majorIaf = [];
+      state.allIaf = {};
+      document.getElementById("apply-cb-name").textContent = cbName;
+      document.getElementById("apply-grade").value = "auditor";
+      document.getElementById("apply-major").value = "";
+      document.getElementById("company-keyword").value = "";
+      document.getElementById("company-search-results").innerHTML = "";
+      document.getElementById("selected-company").style.display = "none";
+      document.getElementById("selected-company").innerHTML = "";
+      document.getElementById("company-error").textContent = "";
+      document.getElementById("apply-error").textContent = "";
+      document.getElementById("major-iaf-badges").innerHTML =
+        '<span class="hint">전공 입력 후 추천 IAF가 표시됩니다.</span>';
+      document.getElementById("scope-checkboxes").innerHTML =
+        '<span class="hint">전공 또는 기업을 입력하면 Scope가 채워집니다.</span>';
+      document.getElementById("applyModal").classList.add("show");
+      document.getElementById("applyModal").setAttribute("aria-hidden", "false");
+    }
+
+    function closeApplyModal() {
+      document.getElementById("applyModal").classList.remove("show");
+      document.getElementById("applyModal").setAttribute("aria-hidden", "true");
+    }
+
+    document.getElementById("apply-cancel").addEventListener("click", closeApplyModal);
+    document.getElementById("applyModal").addEventListener("click", (e) => {
+      if (e.target.id === "applyModal") closeApplyModal();
+    });
+
+    let majorTimer = null;
+    document.getElementById("apply-major").addEventListener("input", () => {
+      clearTimeout(majorTimer);
+      majorTimer = setTimeout(refreshMajorRecommend, 400);
+    });
+
+    async function refreshMajorRecommend() {
+      const major = document.getElementById("apply-major").value.trim();
+      const box = document.getElementById("major-iaf-badges");
+      if (major.length < 2) {
+        state.majorIaf = [];
+        box.innerHTML = '<span class="hint">전공 입력 후 추천 IAF가 표시됩니다.</span>';
+        await refreshCombinedScopes();
+        return;
+      }
+      try {
+        const params = new URLSearchParams({ major });
+        const res = await fetch(`${API}/meta/recommend-iaf?${params}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          state.majorIaf = [];
+          box.innerHTML = `<span class="hint">${data.detail || "전공 추천 결과가 없습니다."}</span>`;
+          await refreshCombinedScopes();
+          return;
+        }
+        state.majorIaf = (data.recommendations || []).filter((r) => r.source === "major");
+        if (!state.majorIaf.length) {
+          // company 없이 호출했으므로 전부 major 출처
+          state.majorIaf = data.recommendations || [];
+        }
+        if (!state.majorIaf.length) {
+          box.innerHTML = '<span class="hint">전공 추천 IAF가 없습니다.</span>';
+        } else {
+          const codes = state.majorIaf.map((r) => `IAF ${r.iaf_code}`).join(", ");
+          box.innerHTML = `<span class="badge major">전공 추천 IAF: ${codes}</span>`;
+        }
+        await refreshCombinedScopes();
+      } catch (e) {
+        box.innerHTML = `<span class="hint">${e.message}</span>`;
+      }
+    }
+
+    async function searchCompany() {
+      const q = document.getElementById("company-keyword").value.trim();
+      const err = document.getElementById("company-error");
+      const box = document.getElementById("company-search-results");
+      err.textContent = "";
+      box.innerHTML = "";
+      if (q.length < 2) {
+        err.textContent = "검색어를 2자 이상 입력하세요.";
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/companies/search?q=${encodeURIComponent(q)}`);
+        const list = await res.json().catch(() => []);
+        if (!res.ok) throw new Error(list.detail || `검색 실패 (${res.status})`);
+        if (!list.length) {
+          box.innerHTML = "<p class='hint'>검색 결과가 없습니다.</p>";
+          return;
+        }
+        window._companyCache = {};
+        box.innerHTML = list.map((c) => {
+          window._companyCache[c.id] = c;
+          const badges = (c.mapped_iaf_codes || [])
+            .map((i) => `<span class="badge">IAF ${i.iaf_code}</span>`)
+            .join(" ");
+          return `
+            <div class="company-hit" onclick="selectCompanyById(${c.id})">
+              <strong>${c.name}</strong>
+              <small style="display:block;color:#64748b;">${c.biz_no || "-"} · KSIC ${c.ksic_code || "-"}</small>
+              <div style="margin-top:6px;">${badges || '<span class="hint">매핑 IAF 없음</span>'}</div>
+            </div>`;
+        }).join("");
+      } catch (e) {
+        err.textContent = typeof e.message === "string" ? e.message : "검색 실패";
+      }
+    }
+
+    function selectCompanyById(companyId) {
+      const company = (window._companyCache || {})[companyId];
+      if (!company) return;
+      selectCompany(company);
+    }
+
+    function selectCompany(company) {
+      state.companyId = company.id;
+      state.companyName = company.name;
+      state.ksicCode = company.ksic_code || "";
+      state.companyIaf = company.mapped_iaf_codes || [];
+      document.getElementById("company-search-results").innerHTML = "";
+      document.getElementById("company-keyword").value = company.name;
+
+      const badges = state.companyIaf.length
+        ? state.companyIaf.map((i) =>
+            `<span class="badge">매핑된 IAF: IAF ${i.iaf_code}${i.industry_name_ko || i.name_en ? ` (${i.name_en || i.industry_name_ko})` : ""}</span>`
+          ).join(" ")
+        : '<span class="hint">매핑된 IAF 없음</span>';
+
+      const el = document.getElementById("selected-company");
+      el.style.display = "block";
+      el.innerHTML = `
+        <strong>${company.name}</strong>
+        <small style="display:block;color:#64748b;margin:4px 0;">사업자번호 ${company.biz_no || "-"} · KSIC ${company.ksic_code || "-"}</small>
+        <div>${badges}</div>
+        <button type="button" class="danger" style="margin-top:8px;padding:6px 10px;font-size:0.8rem;" onclick="clearCompany()">선택 해제</button>
+      `;
+      refreshCombinedScopes();
+    }
+
+    function clearCompany() {
+      state.companyId = null;
+      state.companyName = "";
+      state.ksicCode = "";
+      state.companyIaf = [];
+      document.getElementById("selected-company").style.display = "none";
+      document.getElementById("selected-company").innerHTML = "";
+      document.getElementById("company-keyword").value = "";
+      refreshCombinedScopes();
+    }
+
+    async function refreshCombinedScopes() {
+      const box = document.getElementById("scope-checkboxes");
+      const major = document.getElementById("apply-major").value.trim();
+      const params = new URLSearchParams();
+      if (major.length >= 2) params.set("major", major);
+      if (state.companyId) params.set("company_id", String(state.companyId));
+
+      if (![...params.keys()].length) {
+        // 로컬 배지 데이터만으로 구성
+        mergeLocalScopes(box);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API}/meta/recommend-iaf?${params}`);
+        const data = await res.json().catch(() => ({}));
+        const list = res.ok ? (data.recommendations || []) : [];
+        if (!list.length) {
+          mergeLocalScopes(box);
+          return;
+        }
+        state.allIaf = {};
+        list.forEach((r) => { state.allIaf[r.iaf_code] = r; });
+        renderScopeCheckboxes(box, list, true);
+      } catch {
+        mergeLocalScopes(box);
+      }
+    }
+
+    function mergeLocalScopes(box) {
+      const map = {};
+      [...state.majorIaf, ...state.companyIaf].forEach((r) => {
+        map[r.iaf_code] = {
+          iaf_code: r.iaf_code,
+          iaf_code_id: r.iaf_code_id,
+          industry_name_ko: r.industry_name_ko,
+          name_en: r.name_en,
+          source: r.source || "local",
+        };
+      });
+      const list = Object.values(map);
+      state.allIaf = {};
+      list.forEach((r) => { state.allIaf[r.iaf_code] = r; });
+      if (!list.length) {
+        box.innerHTML = '<span class="hint">전공 또는 기업을 입력하면 Scope가 채워집니다.</span>';
+        return;
+      }
+      renderScopeCheckboxes(box, list, true);
+    }
+
+    function renderScopeCheckboxes(box, list, checkedDefault) {
+      const prevChecked = new Set(
+        [...document.querySelectorAll("#scope-checkboxes input[type=checkbox]:checked")]
+          .map((el) => el.value)
+      );
+      box.innerHTML = list.map((r) => {
+        const checked = prevChecked.size
+          ? prevChecked.has(r.iaf_code)
+          : checkedDefault;
+        const src =
+          r.source === "major" ? "전공"
+          : r.source === "company_ksic" || r.source === "company_iaf" ? "경력"
+          : "추천";
+        return `
+          <div class="scope-item">
+            <input type="checkbox" id="iaf-${r.iaf_code}" value="${r.iaf_code}" ${checked ? "checked" : ""} />
+            <label for="iaf-${r.iaf_code}">
+              <strong>IAF ${r.iaf_code}</strong> — ${r.industry_name_ko || r.name_en || ""}
+              <small>출처: ${src}${r.extra_exp_years ? ` · 추가경력 ${r.extra_exp_years}년` : ""}${r.requires_committee ? " · 위원회 심의" : ""}</small>
+            </label>
+          </div>`;
+      }).join("");
+    }
+
+    document.getElementById("apply-submit").addEventListener("click", async () => {
+      const err = document.getElementById("apply-error");
+      err.textContent = "";
+      const major = document.getElementById("apply-major").value.trim();
+      const grade = document.getElementById("apply-grade").value;
+      const requested = [...document.querySelectorAll("#scope-checkboxes input[type=checkbox]:checked")]
+        .map((el) => el.value);
+
+      if (!state.cbId) {
+        err.textContent = "신청할 CB가 없습니다.";
+        return;
+      }
+      if (!requested.length) {
+        err.textContent = "신청할 IAF Scope를 1개 이상 선택하세요.";
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API}/auditor/memberships/request`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            cb_id: state.cbId,
+            apply_grade: grade,
+            employment_type: "parttime",
+            major: major || null,
+            company_id: state.companyId,
+            company_name: state.companyName || null,
+            ksic_code: state.ksicCode || null,
+            requested_iaf_codes: requested,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const detail = data.detail;
+          throw new Error(typeof detail === "string" ? detail : `신청 실패 (${res.status})`);
+        }
+        alert(data.message || "신청이 접수되었습니다.");
+        closeApplyModal();
+        loadMine();
+      } catch (e) {
+        err.textContent = e.message;
+      }
+    });
+
+    window.searchCb = searchCb;
+    window.openApplyModal = openApplyModal;
+    window.searchCompany = searchCompany;
+    window.selectCompanyById = selectCompanyById;
+    window.clearCompany = clearCompany;
+    loadMine();
+  </script>
+</body>
+</html>

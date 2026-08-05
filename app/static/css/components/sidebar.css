@@ -1,0 +1,163 @@
+/* ComplAIs — 사이드바 공통 컴포넌트 (어드민 포털과 동일 비주얼)
+ * URL: /static/css/components/sidebar.css
+ */
+:root {
+  --sidebar-w: 240px;
+  --sidebar-bg: #ffffff;
+  --sidebar-text: var(--font-secondary, #666);
+  --sidebar-text-strong: var(--font-primary, #222);
+  --sidebar-hover: var(--gray-line-1, #f7f7f3);
+  --sidebar-active-bg: rgba(99, 102, 241, 0.12);
+  --sidebar-active-text: var(--primary-purple, #6366f1);
+  --sidebar-border: var(--gray-line-2, #eee);
+}
+
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  box-sizing: border-box;
+  border-right: 1px solid var(--sidebar-border);
+}
+
+.sidebar-brand {
+  margin-bottom: 10px;
+  padding: 6px 4px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.sidebar-badge-role {
+  display: inline-block;
+  margin-bottom: 16px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold, 600);
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary-purple, #6366f1);
+  letter-spacing: 0.02em;
+}
+
+.sidebar-profile {
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: var(--gray-line-1, #f7f7f3);
+  border: 1px solid var(--sidebar-border);
+}
+
+.sidebar-profile-name {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--sidebar-text-strong);
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.sidebar-profile-label {
+  margin: 0 0 4px;
+  font-size: 0.68rem;
+  color: var(--font-tertiary, #999);
+  letter-spacing: 0.02em;
+}
+
+.sidebar-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+  min-height: 1.2em;
+}
+
+.sidebar-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: var(--font-weight-semibold, 600);
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary-purple, #6366f1);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+}
+
+.sidebar-badge.other {
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.sidebar-badge.empty {
+  background: transparent;
+  color: var(--font-tertiary, #999);
+  border-style: dashed;
+  font-weight: 500;
+}
+
+.side-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--sidebar-text);
+  font: var(--font-body-small, 14px/1.45 inherit);
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.side-link:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text-strong);
+}
+
+.side-link.active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-text);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.side-foot {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--sidebar-border);
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+  }
+}
+
+
+.side-group { margin: 10px 0 4px; }
+.side-group-label {
+  display: block;
+  padding: 8px 12px 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--font-tertiary, #999);
+  text-transform: none;
+}
+.side-link.nested { padding-left: 18px; }
+.sidebar-profile-code {
+  margin: -4px 0 8px;
+  font-size: 0.75rem;
+  color: var(--font-tertiary, #999);
+}

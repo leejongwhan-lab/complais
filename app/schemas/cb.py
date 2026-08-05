@@ -470,9 +470,12 @@ class CertificationBodiesBase(BaseModel):
     accreditation: Optional[str] = None
     address: Optional[str] = None
     tel: Optional[str] = None
+    phone: Optional[str] = None
     email: Optional[str] = None
     website: Optional[str] = None
     logo_path: Optional[str] = None
+    intro: Optional[str] = None
+    owner_user_id: Optional[int] = None
     is_active: bool
     activated_at: Optional[datetime] = None
     created_at: datetime
@@ -520,9 +523,12 @@ class CertificationBodiesUpdate(BaseModel):
     accreditation: Optional[str] = None
     address: Optional[str] = None
     tel: Optional[str] = None
+    phone: Optional[str] = None
     email: Optional[str] = None
     website: Optional[str] = None
     logo_path: Optional[str] = None
+    intro: Optional[str] = None
+    owner_user_id: Optional[int] = None
     is_active: Optional[bool] = None
     activated_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
@@ -555,6 +561,35 @@ class CertificationBodiesUpdate(BaseModel):
     status: Optional[str] = None
     evaluation_score: Optional[Decimal] = None
     tax_email: Optional[str] = None
+
+
+class CbOperationalRulesBase(BaseModel):
+    doc_rule_contract: Optional[str] = "CB-QE-{YYMMDD}-{SEQ3}"
+    doc_rule_report: Optional[str] = None
+    doc_rule_ncr: Optional[str] = None
+    fee_per_md: int = 0
+    fee_travel: int = 0
+    fee_cert: int = 0
+    max_consecutive_audits: int = 3
+    impartiality_cycle_months: int = 12
+
+
+class CbOperationalRulesUpdate(BaseModel):
+    doc_rule_contract: Optional[str] = None
+    doc_rule_report: Optional[str] = None
+    doc_rule_ncr: Optional[str] = None
+    fee_per_md: Optional[int] = None
+    fee_travel: Optional[int] = None
+    fee_cert: Optional[int] = None
+    max_consecutive_audits: Optional[int] = None
+    impartiality_cycle_months: Optional[int] = None
+
+
+class CbOperationalRulesResponse(CbOperationalRulesBase):
+    cb_id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CertificationBodiesResponse(CertificationBodiesBase):

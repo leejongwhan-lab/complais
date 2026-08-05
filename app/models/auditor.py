@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     Column,
@@ -111,6 +112,26 @@ class AuditorCbMemberships(Base):
     daily_rate: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     cert_standards: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     kar_no: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # CB별 전속 자격/평가 관리
+    qualification_granted_at: Mapped[Optional[date]] = mapped_column(
+        Date, nullable=True, comment="자격 부여일"
+    )
+    qualification_expires_at: Mapped[Optional[date]] = mapped_column(
+        Date, nullable=True, comment="자격 갱신/만료일"
+    )
+    knowledge_eval_score: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, comment="지식/규격 평가 점수"
+    )
+    cpd_hours_completed: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, comment="당해년도 CPD 이수 시간"
+    )
+    conflict_of_interest_cleared: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, comment="이해상충 선언 완료 여부"
+    )
+    extra_metadata: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True, comment="가변 JSON 메타데이터"
+    )
 
 
 class AuditorClientConfirmations(Base):
