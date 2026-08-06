@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ComplAIs - Auditor Assignment</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 p-8">
+  <div class="max-w-5xl mx-auto space-y-6">
+
+    <div class="flex justify-between items-center gap-4 flex-wrap">
+      <a href="/cb-portal/dashboard" class="text-sm font-semibold text-slate-500 hover:text-slate-800">← 대시보드로 돌아가기</a>
+      <h1 class="text-xl font-bold">심사팀 일괄 배정 (Auditor Assignment) <span id="app-id-label" class="text-slate-400 font-medium text-base"></span></h1>
+    </div>
+
+    <form id="assign-form" onsubmit="submitAssignment(event)" class="space-y-6">
+
+      <!-- Audit Schedule & Basic Info -->
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">심사 시작일</label>
+          <input type="date" name="audit_start" required class="w-full border rounded p-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">심사 종료일</label>
+          <input type="date" name="audit_end" required class="w-full border rounded p-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">심사 구분</label>
+          <select name="audit_type" class="w-full border rounded p-2 text-sm">
+            <option value="initial">최초 심사 (Initial)</option>
+            <option value="surveillance">사후 심사 (Surveillance)</option>
+            <option value="recertification">갱신 심사 (Recertification)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">사후심사 주기</label>
+          <select name="surveillance_cycle" class="w-full border rounded p-2 text-sm">
+            <option value="12">12개월</option>
+            <option value="6">6개월</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">총 MD</label>
+          <input type="number" name="total_md" id="total-md" min="0.5" step="0.5" value="2.0" required class="w-full border rounded p-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">단계</label>
+          <select name="stage" class="w-full border rounded p-2 text-sm">
+            <option value="combined">combined</option>
+            <option value="stage1">stage1</option>
+            <option value="stage2">stage2</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Auditor Team Selection -->
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+
+        <!-- Lead Auditor Select -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center">
+            <span class="w-2 h-2 bg-blue-600 rounded-full mr-2"></span> 심사팀장 지정 (Lead Auditor - 필수 1명)
+          </h3>
+          <div id="lead-list" class="space-y-2">
+            <p class="text-sm text-slate-400">심사원 목록을 불러오는 중…</p>
+          </div>
+        </div>
+
+        <!-- Team Member Select -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center">
+            <span class="w-2 h-2 bg-slate-400 rounded-full mr-2"></span> 심사팀원 지정 (Team Members - 선택)
+          </h3>
+          <div id="member-list" class="space-y-2">
+            <p class="text-sm text-slate-400">심사원 목록을 불러오는 중…</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Scope Text -->
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <label class="block text-xs font-semibold text-slate-500 mb-1">국문 인증 범위 확정</label>
+        <textarea name="scope_kr" rows="2" class="w-full border rounded p-2 text-sm" placeholder="예: 소프트웨어 개발, 공급 및 디지털 트랜스포메이션 컨설팅"></textarea>
+      </div>
+
+      <button type="submit" id="btn-submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition">
+        🚀 심사팀 배정 확정 및 최종 계약 완료
+      </button>
+
+    </form>
+
+  </div>
+
+  <script src="/static/js/cb_admin_api.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const appId = urlParams.get("id") || urlParams.get("app_id") || "";
+
+    if (!localStorage.getItem("access_token")) {
+      alert("로그인이 필요합니다.");
+      location.href = "/login.html";
+    }
+
+    document.getElementById("app-id-label").textContent = appId ? `#${appId}` : "";
+    if (!appId) {
+      document.getElementById("btn-submit").disabled = true;
+    }
+
+    function escapeHtml(t) {
+      const d = document.createElement("div");
+      d.textContent = t == null ? "" : String(t);
+      return d.innerHTML;
+    }
+
+    function authHeaders() {
+      const token = localStorage.getItem("access_token");
+      return {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+    }
+
+    function auditorMeta(a) {
+      const m = a.membership || {};
+      const grade = m.approved_grade || m.grade_at_cb || m.apply_grade || "심사원";
+      const iaf = m.approved_iaf_codes || m.cert_standards || "-";
+      return { grade, iaf };
+    }
+
+    function renderAuditors(rows) {
+      const leadList = document.getElementById("lead-list");
+      const memberList = document.getElementById("member-list");
+      leadList.innerHTML = "";
+      memberList.innerHTML = "";
+
+      if (!rows.length) {
+        leadList.innerHTML = '<p class="text-sm text-rose-500">승인된 심사원이 없습니다. CB 포털에서 구성원을 먼저 승인하세요.</p>';
+        memberList.innerHTML = '<p class="text-sm text-slate-400">팀원 후보 없음</p>';
+        return;
+      }
+
+      rows.forEach((a, idx) => {
+        const id = a.auditor_id;
+        const name = a.name || ("심사원 #" + id);
+        const { grade, iaf } = auditorMeta(a);
+
+        const leadLabel = document.createElement("label");
+        leadLabel.className = "flex items-center p-3 border rounded-lg hover:bg-slate-50 cursor-pointer";
+        leadLabel.innerHTML =
+          `<input type="radio" name="lead_auditor_id" value="${id}" ${idx === 0 ? "required" : ""} class="text-blue-600">` +
+          `<div class="ml-3">` +
+          `<span class="text-sm font-bold text-slate-800">${escapeHtml(name)}</span>` +
+          `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded ml-2">${escapeHtml(grade)}</span>` +
+          `<p class="text-xs text-slate-400 mt-0.5">ID ${id} · ${escapeHtml(iaf)}</p>` +
+          `</div>`;
+        leadList.appendChild(leadLabel);
+
+        const memberLabel = document.createElement("label");
+        memberLabel.className = "flex items-center p-3 border rounded-lg hover:bg-slate-50 cursor-pointer";
+        memberLabel.dataset.auditorId = String(id);
+        memberLabel.innerHTML =
+          `<input type="checkbox" name="member_ids" value="${id}" class="rounded text-blue-600">` +
+          `<div class="ml-3">` +
+          `<span class="text-sm font-medium text-slate-800">${escapeHtml(name)}</span>` +
+          `<p class="text-xs text-slate-400 mt-0.5">ID ${id} · ${escapeHtml(iaf)}</p>` +
+          `</div>`;
+        memberList.appendChild(memberLabel);
+      });
+
+      // 팀장으로 선택된 사람은 팀원 체크 비활성
+      document.querySelectorAll('input[name="lead_auditor_id"]').forEach((radio) => {
+        radio.addEventListener("change", () => {
+          document.querySelectorAll('#member-list label').forEach((lab) => {
+            const cb = lab.querySelector('input[type="checkbox"]');
+            if (!cb) return;
+            if (cb.value === radio.value) {
+              cb.checked = false;
+              cb.disabled = true;
+              lab.classList.add("opacity-50");
+            } else {
+              cb.disabled = false;
+              lab.classList.remove("opacity-50");
+            }
+          });
+        });
+      });
+    }
+
+    async function loadAuditors() {
+      try {
+        const data = await CBAdminAPI.listAuditors("approved");
+        const rows = (Array.isArray(data) ? data : []).map((a) => ({
+          auditor_id: a.auditor_id,
+          name: a.name,
+          membership: {
+            approved_grade: a.approved_grade,
+            grade_at_cb: a.grade_at_cb,
+            approved_iaf_codes: a.approved_iaf_codes,
+            cert_standards: a.cert_standards,
+          },
+          conduct_sign_valid: a.conduct_sign_valid,
+          is_assignable: a.is_assignable,
+        }));
+        renderAuditors(rows);
+      } catch (e) {
+        document.getElementById("lead-list").innerHTML =
+          `<p class="text-sm text-rose-500">심사원 목록 로드 실패: ${escapeHtml(e.message || e)}</p>`;
+        document.getElementById("member-list").innerHTML = "";
+      }
+    }
+
+    async function loadAppMd() {
+      if (!appId) return;
+      try {
+        const list = await CBAdminAPI.listApplications();
+        const row = (list || []).find((x) => Number(x.id) === Number(appId));
+        if (row && row.final_md != null) {
+          document.getElementById("total-md").value = Number(row.final_md).toFixed(1);
+        }
+      } catch (_) { /* optional */ }
+    }
+
+    async function submitAssignment(e) {
+      e.preventDefault();
+      if (!appId) {
+        alert("app id (?id=) 가 필요합니다.");
+        return;
+      }
+      const form = e.target;
+      const formData = new FormData(form);
+
+      const leadId = formData.get("lead_auditor_id");
+      if (!leadId) {
+        alert("심사팀장을 선택해주세요.");
+        return;
+      }
+      const memberIds = Array.from(document.querySelectorAll('input[name="member_ids"]:checked')).map((cb) => cb.value);
+
+      const payload = {
+        leadAuditorId: leadId,
+        memberAuditorIds: memberIds,
+        auditStart: formData.get("audit_start"),
+        auditEnd: formData.get("audit_end"),
+        auditType: formData.get("audit_type"),
+        stage: formData.get("stage") || "combined",
+        totalMd: formData.get("total_md") || 2.0,
+        surveillanceCycle: formData.get("surveillance_cycle"),
+        scopeKr: formData.get("scope_kr"),
+      };
+
+      const btn = document.getElementById("btn-submit");
+      try {
+        btn.disabled = true;
+        await CBAdminAPI.assignAuditors(appId, payload);
+        alert("🎉 심사팀 배정이 완료되었습니다! 계약이 Finalized 되었습니다.");
+        window.location.href = "/cb-portal/dashboard";
+      } catch (err) {
+        // 백엔드의 서약서 만료 / 자격 부족 예외 처리 alert 출력됨
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadAuditors();
+      loadAppMd();
+    });
+  </script>
+</body>
+</html>

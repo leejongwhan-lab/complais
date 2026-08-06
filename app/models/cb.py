@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, SmallInteger, String, Text, BigInteger
+from sqlalchemy.dialects.mysql import INTEGER as MySQLInteger
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -210,9 +211,14 @@ class CertificationBodies(Base):
     accreditation: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     tel: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="연락처(표시용)")
     email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     website: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     logo_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    intro: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="기관 소개")
+    owner_user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, comment="최고 관리자 user_id"
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
     activated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -225,6 +231,7 @@ class CertificationBodies(Base):
     bank_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     account_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     account_holder: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    # 레거시 컬럼 — 운영 규칙은 cb_operational_rules 로 이관 (하위 호환 유지)
     doc_rule_contract: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     doc_rule_report: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     doc_rule_ncr: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -247,3 +254,23 @@ class CertificationBodies(Base):
     status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, comment="정상/정지/취소")
     evaluation_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
     tax_email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+
+class CbOperationalRules(Base):
+    """CB별 운용/수수료 규칙 (ISO 17021-1 조항 9.1~9.5 독립성)."""
+
+    __tablename__ = "cb_operational_rules"
+
+    cb_id: Mapped[int] = mapped_column(MySQLInteger(unsigned=True), primary_key=True)
+    doc_rule_contract: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, default="CB-QE-{YYMMDD}-{SEQ3}"
+    )
+    doc_rule_report: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    doc_rule_ncr: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    fee_per_md: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    fee_travel: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    fee_cert: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_consecutive_audits: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    impartiality_cycle_months: Mapped[int] = mapped_column(Integer, nullable=False, default=12)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

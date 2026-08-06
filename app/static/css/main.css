@@ -1,0 +1,92 @@
+/* ComplAIs — 공통 스타일시트 (어드민 / 기업 포털)
+ * URL: /static/css/main.css
+ */
+@import url("../components_v3.css");
+@import url("../brand.css");
+
+/* --------------------------------------------------------------------------
+   Base layout normalization
+   -------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-family-main, "Pretendard", system-ui, -apple-system, sans-serif);
+  color: var(--font-primary, #222);
+  background-color: var(--gray-line-1, #f7f7f3);
+  letter-spacing: var(--letter-spacing-body, -0.01em);
+  line-height: 1.5;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0 0 0.5em;
+  color: var(--font-primary, #222);
+  font-weight: var(--font-weight-semibold, 600);
+  letter-spacing: var(--letter-spacing-heading, -0.02em);
+}
+
+p {
+  margin: 0 0 0.75em;
+}
+
+a {
+  color: var(--sec-blue, #1a5fdf);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* --------------------------------------------------------------------------
+   Tables
+   -------------------------------------------------------------------------- */
+table.data-table,
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table.data-table th,
+table.data-table td,
+.data-table th,
+.data-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-line-2, #eee);
+  font: var(--font-body-small, 14px/1.45 inherit);
+  vertical-align: middle;
+}
+
+table.data-table th,
+.data-table th {
+  background: var(--gray-line-1, #f7f7f3);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--font-secondary, #666);
+}
+
+/* --------------------------------------------------------------------------
+   Spacing helpers
+   -------------------------------------------------------------------------- */
+.stack-sm > * + * { margin-top: 8px; }
+.stack-md > * + * { margin-top: 16px; }
+.stack-lg > * + * { margin-top: 24px; }
+
+.muted,
+.text-muted {
+  color: var(--font-secondary, #666);
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}

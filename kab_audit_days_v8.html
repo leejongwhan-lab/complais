@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>KAB 심사일수 산정 v8</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+/* ── 디자인 토큰: company_main.php(assets/css/dashboard.css 등)와 동일한 변수명 체계 사용.
+   실제 플랫폼에 이 페이지가 dashboard.css와 함께 로드되면 거기서 정의한 값이 쓰이고,
+   이 :root 블록은 이 파일을 단독으로 열어봤을 때(정적 프리뷰)를 위한 기본값이다. ── */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --surface2:#f7f8fa;
+  --text:#1a1a1a; --text2:#555555; --text3:#8a8f98; --text4:#b0b4bb;
+  --border:#e5e7eb; --border2:#d1d5db;
+  --blue:#185fa5; --blue2:#e6f1fb;
+  --green:#047a5a; --green2:#e3f5ef; --green3:#0a9d76;
+  --amber:#c97820; --amber2:#fff5e0; --amber3:#e0941a;
+  --red:#dc2626; --red2:#fcebeb;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Pretendard',var(--font-sans,'Apple SD Gothic Neo',sans-serif);background:var(--surface,#fff);color:var(--text,#1a1a1a);font-size:13px}
+.card{background:var(--surface,#fff);border:0.5px solid var(--border,#e0e0e0);border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px}
+.step{font-size:10px;font-weight:700;padding:2px 9px;border-radius:5px;background:var(--blue2,#e6f1fb);color:var(--blue,#0c447c);display:inline-block;margin-bottom:8px;letter-spacing:.3px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.field label{font-size:11px;color:var(--text2,#555);display:block;margin-bottom:3px;font-weight:600}
+.field select,.field input{font-size:12px;width:100%}
+/* 표준 카드 */
+.std-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:4px}
+.scard{border:0.5px solid var(--border,#e0e0e0);border-radius:7px;padding:7px 8px;cursor:pointer;transition:.12s;background:var(--surface,#fff)}
+.scard:hover{border-color:var(--border2,#aaa)}
+.scard.on{border-color:#185FA5;background:#E6F1FB}
+.scard.on .sn{color:#0C447C}
+.scard.on .sc{color:#185FA5}
+.sn{font-size:11px;font-weight:700;color:var(--text,#1a1a1a);margin-bottom:1px}
+.sc{font-size:9px;color:var(--text3,#888)}
+.ck{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--border2,#aaa);display:inline-flex;align-items:center;justify-content:center;font-size:7px;float:right;margin-top:-1px}
+.scard.on .ck{background:#185FA5;border-color:#185FA5;color:#fff}
+/* 패널 */
+.panel{background:var(--bg,#f7f7f7);border-radius:7px;padding:10px;margin-top:7px;display:none;border-left:2px solid #185FA5}
+.panel.show{display:block}
+.panel-title{font-size:11px;font-weight:700;color:var(--text,#1a1a1a);margin-bottom:7px;display:flex;align-items:center;gap:5px}
+.pbadge{font-size:9px;padding:1px 6px;border-radius:3px;background:#185FA5;color:#fff;font-weight:600}
+/* 뱃지 */
+.nace-row{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.cbadge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;white-space:nowrap;display:inline-block}
+.cb-h{background:#FCEBEB;color:#791F1F;border:0.5px solid #A32D2D}
+.cb-m{background:#FFF5E0;color:#633806;border:0.5px solid #C97820}
+.cb-l{background:#EAF3DE;color:#27500A;border:0.5px solid #3B6D11}
+.cb-i{background:#E6F1FB;color:#0C447C;border:0.5px solid #185FA5}
+/* 가감요인 */
+.frow{display:flex;align-items:flex-start;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border,#e0e0e0);gap:8px}
+.frow:last-child{border:none}
+.fleft{flex:1}
+.fname{font-size:12px;font-weight:600;color:var(--text,#1a1a1a)}
+.fdesc{font-size:10px;color:var(--text3,#888);margin-top:1px;line-height:1.4}
+.fright{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.fpct{font-size:11px;font-weight:700;min-width:40px;text-align:right}
+.fpct.pos{color:#791F1F}.fpct.neg{color:#27500A}.fpct.zero{color:#aaa}
+.tbtn{font-size:10px;padding:2px 7px;border-radius:4px;border:0.5px solid var(--border2,#ccc);background:var(--surface,#fff);color:var(--text2,#555);cursor:pointer;white-space:nowrap}
+.tbtn.pos{background:#FCEBEB;color:#791F1F;border-color:#A32D2D}
+.tbtn.neg{background:#EAF3DE;color:#27500A;border-color:#3B6D11}
+.tbtn.zero{background:var(--bg,#f7f7f7);color:#888}
+/* 결과 */
+.res-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.ri{background:var(--bg,#f7f7f7);border-radius:7px;padding:10px 8px;text-align:center}
+.rl{font-size:10px;color:var(--text2,#555);margin-bottom:3px}
+.rv{font-size:22px;font-weight:700;color:var(--text,#1a1a1a);line-height:1}
+.rv.info{color:#0C447C}
+.rs{font-size:9px;color:var(--text3,#888);margin-top:2px}
+.alert{padding:6px 10px;font-size:11px;margin-bottom:5px;border-radius:5px;border-left:2px solid;line-height:1.4}
+.al-ok{border-color:#3B6D11;background:#EAF3DE;color:#27500A}
+.al-warn{border-color:#854F0B;background:#FAEEDA;color:#633806}
+.al-info{border-color:#185FA5;background:#E6F1FB;color:#0C447C}
+/* 로그 */
+table{width:100%;border-collapse:collapse;font-size:11px;margin-top:6px}
+th{text-align:left;padding:4px 8px;background:var(--bg,#f7f7f7);color:var(--text2,#555);font-weight:700;border-bottom:0.5px solid var(--border,#e0e0e0)}
+td{padding:4px 8px;border-bottom:0.5px solid var(--border,#e0e0e0);color:var(--text,#1a1a1a)}
+.tr-sub td{color:var(--text2,#666);font-size:10px}
+.tr-total td{font-weight:700;background:var(--bg,#f7f7f7);border-top:1px solid var(--border2,#ccc)}
+.tr-final td{font-weight:700;background:#E6F1FB;color:#0C447C;font-size:12px}
+.note{padding:9px;background:var(--bg,#f7f7f7);border-radius:7px;font-size:10px;color:var(--text2,#555);line-height:1.8;margin-top:8px}
+.note li{margin-left:14px}
+.mode-tabs{display:flex;gap:4px;margin-bottom:7px}
+.mtab{font-size:11px;font-weight:700;padding:4px 13px;border-radius:5px;border:0.5px solid var(--border2,#ccc);background:var(--surface,#fff);color:var(--text2,#555);cursor:pointer}
+.mtab.on{background:#E6F1FB;color:#0C447C;border-color:#185FA5}
+.sep{height:0.5px;background:var(--border,#e0e0e0);margin:8px 0}
+.sub-label{font-size:10px;font-weight:700;color:var(--text2,#666);text-transform:uppercase;letter-spacing:.4px;margin:7px 0 4px}
+</style>
+</head>
+<body>
+<div style="color:var(--text,#1a1a1a)">
+
+<!-- ── Step 1: 표준 선택 ── -->
+<div class="card">
+  <div class="step">Step 1 — 표준 선택</div>
+  <div class="mode-tabs">
+    <button class="mtab on" id="tab-s" onclick="setMode('single')">단일 심사</button>
+    <button class="mtab"    id="tab-i" onclick="setMode('integrated')">통합 심사</button>
+  </div>
+  <div style="font-size:11px;color:var(--text2,#666);margin-bottom:5px" id="std-hint">표준을 선택하세요</div>
+  <div class="std-grid" id="std-grid"></div>
+
+  <!-- 통합심사 수준 (IAF MD11 Figure 1 — 2축 조회 방법론) -->
+  <div class="panel" id="intg-panel" style="border-left-color:#7B3FAF">
+    <div class="panel-title"><span class="pbadge" style="background:#7B3FAF">통합심사</span>MD11 Figure 1 — 통합수준 × 심사팀 자격비율</div>
+    <div class="row2">
+      <div class="field">
+        <label>세로축 — 시스템 통합수준(%)</label>
+        <select id="intg-level" onchange="calc()">
+          <option value="0">0% — 병행 심사(통합 요소 없음)</option>
+          <option value="20">20% — 일부 문서·회의 공유</option>
+          <option value="40" selected>40% — 내부심사/방침·목표 일부 통합</option>
+          <option value="60">60% — 대부분 통합(문서/개선체계 등)</option>
+          <option value="80">80% — 거의 완전 통합</option>
+          <option value="100">100% — 완전 통합경영시스템</option>
+        </select>
+        <div style="font-size:9px;color:var(--text3,#888);margin-top:3px">
+          판단기준(MD11): 통합문서세트, 전사전략 반영 경영검토, 통합 내부심사, 통합 방침·목표, 통합 프로세스, 통합 개선체계, 통합 경영지원·책임 — 7개 충족정도로 인증기관이 판단
+        </div>
+      </div>
+      <div class="field">
+        <label>가로축 — 심사팀 다표준자격 비율(%) 자동계산</label>
+        <div class="row2" style="gap:5px">
+          <input type="number" id="intg-team-z" placeholder="심사원 수(Z)" min="1" value="1" oninput="calc()">
+          <input type="number" id="intg-team-sumx" placeholder="자격표준수 합(ΣXi)" min="0" value="0" oninput="calc()">
+        </div>
+        <div id="intg-team-result" style="font-size:11px;color:var(--text2,#555);margin-top:4px">계산: -</div>
+        <div style="font-size:9px;color:var(--text3,#888);margin-top:3px">
+          공식(MD11): 100×Σ(Xᵢ-1)/(Z×(Y-1)), Xᵢ=심사원별 자격표준수, Y=통합대상 표준수, Z=심사원수
+        </div>
+      </div>
+    </div>
+    <div id="intg-reduction-result" style="font-size:12px;font-weight:700;color:#7B3FAF;margin-top:8px">예상 단축률: -</div>
+  </div>
+</div>
+
+<!-- ── Step 2: 인증수행범위 ── -->
+<div class="card">
+  <div class="step">Step 2 — 인증수행범위</div>
+  <div style="font-size:10px;color:var(--text3,#888);margin-bottom:5px">선택 표준에 따라 해당 패널이 표시됩니다</div>
+
+  <!-- IAF 1~39 -->
+  <div id="p-nace" class="panel">
+    <div class="panel-title"><span class="pbadge">KSIC 코드</span>ISO 9001/14001/45001 복잡도 자동결정 (IAF코드_1 크로스워크 기준)</div>
+    <div class="field">
+      <label style="font-size:11px;color:var(--text2,#555);display:block;margin-bottom:4px">KSIC 코드 (기업정보 DB 값)</label>
+      <input type="text" id="ksic-input" list="ksic-datalist" placeholder="예: 2011" oninput="onKsicChange()">
+      <datalist id="ksic-datalist"></datalist>
+    </div>
+    <div class="nace-row" id="nace-badges"></div>
+    <div id="ksic-match-info" style="font-size:11px;color:var(--text3,#888);margin-top:6px"></div>
+  </div>
+
+  <!-- ISO 13485 -->
+  <div id="p-13485" class="panel" style="border-left-color:#C97820">
+    <div class="panel-title"><span class="pbadge" style="background:#C97820">ISO 13485</span>의료기기 분류 (복수 선택)</div>
+    <div id="md-list" style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:8px"></div>
+    <div class="sep"></div>
+    <div class="row3" style="margin-top:6px">
+      <div class="field"><label>제품 등급 (위험도)</label>
+        <select id="md-risk" onchange="calc()">
+          <option value="0">Class I — 저위험</option>
+          <option value="1" selected>Class II — 중위험</option>
+          <option value="2">Class III — 고위험</option>
+          <option value="3">Class IV / 멸균 — 최고위험</option>
+        </select>
+      </div>
+      <div class="field"><label>주요 제조 공정 수</label>
+        <select id="md-proc" onchange="calc()">
+          <option value="1">1~2개</option>
+          <option value="2" selected>3~5개</option>
+          <option value="3">6~10개</option>
+          <option value="4">11개 이상</option>
+        </select>
+      </div>
+      <div class="field"><label>규제 적용 지역</label>
+        <select id="md-reg" onchange="calc()">
+          <option value="1">단일 국가</option>
+          <option value="2" selected>복수 (2~3개국)</option>
+          <option value="3">글로벌 (4개국 이상)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ISO 22000 -->
+  <div id="p-22000" class="panel" style="border-left-color:#27500A">
+    <div class="panel-title"><span class="pbadge" style="background:#27500A">ISO 22000</span>식품사슬 범주 (ISO 22003-1:2022)</div>
+    <div class="row2">
+      <div class="field"><label>식품사슬 범주</label><select id="fsms-cat" onchange="updateFsmsTD();calc()"></select></div>
+      <div class="field"><label>산정 기준 (자동)</label><div id="fsms-td-info" style="font-size:11px;padding:4px 0;color:var(--text2,#555)">—</div></div>
+    </div>
+    <div class="row3" style="margin-top:6px">
+      <div class="field"><label>HACCP 연구 수</label><input type="number" id="haccp" value="1" min="0" max="20" oninput="validatePos(this);calc()"></div>
+      <div class="field"><label>CCP 수</label><input type="number" id="ccp" value="5" min="0" max="50" oninput="validatePos(this);calc()"></div>
+      <div class="field"><label>외주처리 비율</label>
+        <select id="fsms-outsource" onchange="calc()">
+          <option value="0">없음</option>
+          <option value="1" selected>일부 (10~30%)</option>
+          <option value="2">절반 이상 (30%+)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ISO 50001 -->
+  <div id="p-50001" class="panel" style="border-left-color:#791F1F">
+    <div class="panel-title"><span class="pbadge" style="background:#791F1F">ISO 50001</span>ISO 50003:2021 기반</div>
+    <div class="row3">
+      <div class="field"><label>연간 에너지 소비량 (TJ)</label><input type="number" id="en-tj" value="50" min="0" step="1" oninput="validatePos(this);calc()"></div>
+      <div class="field"><label>SEU (주요에너지사용처) 수</label><input type="number" id="seu" value="3" min="0" max="30" oninput="validatePos(this);calc()"></div>
+      <div class="field"><label>에너지원 복잡도</label>
+        <select id="en-complexity" onchange="calc()">
+          <option value="1">단순 — 단일 에너지원</option>
+          <option value="2" selected>중간 — 2~3종</option>
+          <option value="3">복잡 — 자가발전·재생에너지 포함</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ISO 27001 -->
+  <div id="p-27001" class="panel" style="border-left-color:#1a5276">
+    <div class="panel-title"><span class="pbadge" style="background:#1a5276">ISO 27001</span>정보보안 — 시스템 기준</div>
+    <div class="row3">
+      <div class="field"><label>IT 사용자 수 (명)</label><input type="number" id="it-users" value="100" min="1" oninput="calc()"></div>
+      <div class="field"><label>정보시스템 수</label>
+        <select id="it-systems" onchange="calc()">
+          <option value="1">1~5개</option>
+          <option value="2" selected>6~15개</option>
+          <option value="3">16~30개</option>
+          <option value="4">31개 이상</option>
+        </select>
+      </div>
+      <div class="field"><label>데이터 민감도</label>
+        <select id="it-sensitivity" onchange="calc()">
+          <option value="1">일반 내부 데이터</option>
+          <option value="2" selected>고객·개인정보 포함</option>
+          <option value="3">금융·의료·국가 기밀</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ISO 19443 -->
+  <div id="p-19443" class="panel">
+    <div class="panel-title"><span class="pbadge">ISO 19443</span>핵연료 공급망 분류</div>
+    <div class="field"><select id="nuclear-scope" onchange="calc()">
+      <option value="A">A — 기계 및 구조물</option>
+      <option value="B">B — 전자기기 및 계전기기</option>
+      <option value="C">C — 핵연료</option>
+      <option value="D">D — 발전 및 송전</option>
+      <option value="E">E — 건설</option>
+      <option value="F">F — 운송 및 폐기물 처리</option>
+      <option value="G">G — 정보기술</option>
+    </select></div>
+  </div>
+
+  <!-- 하부코드 없음 -->
+  <div id="p-nocode" class="panel" style="border-left-color:#888">
+    <div class="panel-title"><span class="pbadge" style="background:#888">IAF 1~39 공용</span>하부코드 없이 사용</div>
+    <div style="font-size:11px;color:var(--text2,#555)">
+      ISO 37001 / ISO 37301 / ISO 22301 / ISO/IEC 42001은 위 "IAF 1~39" 패널에서 선택한
+      업종코드(KSIC 자동조회 결과)를 그대로 사용하며, 별도의 하부 세분류 코드는 적용하지 않습니다.
+    </div>
+  </div>
+
+  <!-- ISO 27701 — PII 역할 (KAB-SR-PIMS 9.1.4 확정 공식의 필수 입력값) -->
+  <div id="p-27701-pii" class="panel" style="border-left-color:#555">
+    <div class="panel-title"><span class="pbadge" style="background:#555">ISO/IEC 27701</span>PII 역할 (27001 기준 가산율 결정)</div>
+    <div class="field"><select id="pii-role" onchange="calc()">
+      <option value="controller" selected>PII 컨트롤러 — 27001기준 +30% (최소 3일)</option>
+      <option value="processor">PII 프로세서 — 27001기준 +20% (최소 2.5일)</option>
+      <option value="both">컨트롤러+프로세서 둘 다 — 27001기준 +50% (최소 3.5일)</option>
+    </select></div>
+    <div style="font-size:10px;color:var(--text3,#888);margin-top:4px">KAB-SR-PIMS 9.1.4 확정 기준 — 기준값은 동일 범위 ISO/IEC 27001 계산결과</div>
+  </div>
+</div>
+
+<!-- ── Step 3: 조직 정보 ── -->
+<div class="card">
+  <div class="step">Step 3 — 조직 기본 정보</div>
+  <div class="row2" style="margin-bottom:9px">
+    <div class="field"><label>유효 인원수 (명) *</label><input type="number" id="emp" value="50" min="1" oninput="validateEmp();calc()"></div>
+    <div class="field"><label>심사 종류</label>
+      <select id="atype" onchange="onSiteChange();calc()">
+        <option value="initial">최초심사 (1단계+2단계)</option>
+        <option value="surv6">사후관리심사 — 6개월 주기</option>
+        <option value="surv12">사후관리심사 — 12개월 주기</option>
+        <option value="recert">갱신인증심사</option>
+        <option value="transfer_surv6">전환심사 — 사후(6개월) 시점</option>
+        <option value="transfer_surv12">전환심사 — 사후(12개월) 시점</option>
+        <option value="transfer_recert">전환심사 — 갱신 시점</option>
+      </select>
+    </div>
+  </div>
+  <div class="row2" style="margin-bottom:9px">
+    <div class="field">
+      <label>교대 근무 유형</label>
+      <select id="shift-type" onchange="onShiftChange()">
+        <option value="same">동일 인원 교대 (인원 그대로)</option>
+        <option value="diff">다른 인원 교대 (총 인원 합산)</option>
+      </select>
+    </div>
+    <div class="field" id="shift-cnt-wrap" style="display:none">
+      <label>교대 수</label>
+      <select id="shift-cnt" onchange="calc()">
+        <option value="2">2교대</option>
+        <option value="3">3교대</option>
+      </select>
+    </div>
+  </div>
+  <!-- 복수 사업장 -->
+  <div class="sep"></div>
+  <div class="sub-label">복수 사업장 (IAF MD1 6.1.3.3 — 심사유형별 공식 자동 적용)</div>
+  <div class="row3">
+    <div class="field"><label>총 사업장 수</label>
+      <input type="number" id="site-total" value="1" min="1" oninput="onSiteChange();calc()">
+    </div>
+    <div class="field"><label>샘플 사업장 심사 비율</label>
+      <select id="site-factor" onchange="calc()">
+        <option value="0.5" selected>0.5 (50%) — 기본값 권장</option>
+        <option value="0.6">0.6 (60%)</option>
+        <option value="0.7">0.7 (70%)</option>
+        <option value="0.8">0.8 (80%)</option>
+      </select>
+    </div>
+    <div class="field"><label>샘플 사업장 수 (공식 자동)</label>
+      <div id="site-sample-info" style="font-size:12px;padding:4px 0;color:var(--text2,#555)">해당없음</div>
+    </div>
+  </div>
+  <div class="row3" style="margin-top:6px">
+    <div class="field">
+      <label>갱신심사 시스템 성숙도 (갱신심사에만 적용)</label>
+      <select id="recert-mature" onchange="calc()">
+        <option value="n" selected>일반 — y=√x</option>
+        <option value="y">성숙(전 주기 효과적 운영 입증) — y=0.8√x</option>
+      </select>
+    </div>
+  </div>
+  <div style="font-size:10px;color:var(--text3,#888);margin-top:4px">
+    최초/갱신심사: y=√x | 사후심사: y=0.6√x | 갱신심사(성숙): y=0.8√x — 전부 올림(ceil) 적용 (MD1 6.1.3.3)
+  </div>
+</div>
+
+<!-- ── Step 4: 위험도 ── -->
+<div class="card">
+  <div class="step">Step 4 — 위험도 설정</div>
+  <div style="font-size:10px;color:var(--text3,#888);margin-bottom:7px">인증수행범위 선택 시 기본값 자동 제안 → 직접 수정 가능</div>
+  <div class="row3">
+    <div class="field">
+      <label>환경 위험도 (ISO 14001)</label>
+      <select id="risk14" onchange="calc()">
+        <option value="high">높음 — 화학·정유·조선·핵</option>
+        <option value="med" selected>중간 — 제조·건설·운송</option>
+        <option value="low">낮음 — 서비스·사무</option>
+        <option value="restrict">제한 — 환경영향 최소</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>안전보건 위험도 (ISO 45001)</label>
+      <select id="risk45" onchange="calc()">
+        <option value="high">높음 — 건설·금속·화학·조선</option>
+        <option value="med" selected>중간 — 제조·운송·보건</option>
+        <option value="low">낮음 — 서비스·IT·사무</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>범용 복잡도 (9001 등)</label>
+      <select id="complexity" onchange="calc()">
+        <option value="high">높음 (+15%)</option>
+        <option value="med" selected>중간 (±0%)</option>
+        <option value="low">낮음 (-10%)</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- ── 결과 ── -->
+<div class="card">
+  <div style="font-size:13px;font-weight:700;margin-bottom:10px">산정 결과 (기본 MD)</div>
+  <div class="res-grid">
+    <div class="ri"><div class="rl">기준 심사일수</div><div class="rv info" id="r-base">-</div><div class="rs">M/D</div></div>
+    <div class="ri"><div class="rl">가감 합계</div><div class="rv" id="r-adj">-</div><div class="rs">M/D</div></div>
+    <div class="ri"><div class="rl">최종 심사일수</div><div class="rv" style="font-size:26px" id="r-final">-</div><div class="rs">M/D</div></div>
+    <div class="ri"><div class="rl">권장 심사원</div><div class="rv" id="r-aud">-</div><div class="rs">명 (참고)</div></div>
+  </div>
+  <div id="alerts"></div>
+  <!-- 최초심사 1단계/2단계 배분 가이드 -->
+  <div id="stage-split" style="display:none;background:#f0f7ff;border:0.5px solid #185FA5;border-radius:7px;padding:10px 12px;margin-bottom:8px">
+    <div style="font-size:11px;font-weight:700;color:#0C447C;margin-bottom:6px">📋 최초심사 1단계 / 2단계 배분</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="background:#fff;border-radius:5px;padding:8px;text-align:center;border:0.5px solid #185FA5">
+        <div style="font-size:10px;color:#555;margin-bottom:3px">1단계 — 문서심사 (20%)</div>
+        <div style="font-size:20px;font-weight:700;color:#185FA5" id="stage1-days">-</div>
+        <div style="font-size:9px;color:#888;margin-top:2px">M/D</div>
+      </div>
+      <div style="background:#fff;border-radius:5px;padding:8px;text-align:center;border:0.5px solid #27500A">
+        <div style="font-size:10px;color:#555;margin-bottom:3px">2단계 — 현장심사 (80%)</div>
+        <div style="font-size:20px;font-weight:700;color:#27500A" id="stage2-days">-</div>
+        <div style="font-size:9px;color:#888;margin-top:2px">M/D</div>
+      </div>
+    </div>
+  </div>
+  <div id="log-table"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 산정 근거 및 기준 안내 -->
+<!-- ══════════════════════════════════════════════════ -->
+<div class="card">
+  <div style="font-size:15px;font-weight:800;margin-bottom:4px">📚 산정 근거 및 기준 안내</div>
+  <div style="font-size:11px;color:var(--text3,#888);margin-bottom:16px">
+    이 계산기가 사용하는 공식 근거·기준표를 공개합니다.
+  </div>
+
+  <div style="font-size:13px;font-weight:700;margin:16px 0 8px;padding-top:10px;border-top:1px solid var(--border,#e5e7eb)">
+    ① IAF 1~39 복잡도 기준
+  </div>
+  <div id="guidance-complexity-table" style="overflow-x:auto"></div>
+
+  <div style="font-size:13px;font-weight:700;margin:20px 0 8px;padding-top:14px;border-top:1px solid var(--border,#e5e7eb)">
+    ② QMS·EMS·OHSMS 기본 MD 기준표
+  </div>
+  <div id="guidance-md5-table" style="overflow-x:auto"></div>
+
+  <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border,#e5e7eb)">
+    <button type="button" id="guidance-standards-toggle" onclick="toggleGuidanceStandards()"
+      style="background:none;border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;color:var(--text2,#555)">
+      ▼ 표준별 산출 요인 및 방식 보기
+    </button>
+    <div id="guidance-standards-box" style="display:none;margin-top:10px;overflow-x:auto">
+      <div id="guidance-standards-table"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<style>
+.gtbl{width:100%;border-collapse:collapse;font-size:12px}
+.gtbl th{background:var(--surface2,#f7f8fa);color:var(--text2,#555);font-weight:700;padding:6px 8px;text-align:center;border:1px solid var(--border,#e5e7eb);position:sticky;top:0}
+.gtbl td{padding:6px 8px;text-align:center;border:1px solid var(--border,#e5e7eb)}
+</style>
+
+<script>
+const KAB_CONFIG = {"kab_ratios":{"surv6":0.26666666666666666,"surv12":0.4,"recert":0.5333333333333333,"transfer_review_add":0.5,"transfer_deprecated_flat":0.75},"md5_employee_table":{"9001":[[1,0.5,1,1,1.5],[6,0.5,1.5,1,1.5],[11,0.5,2,1,2],[16,1,2,1,2],[26,1,3,1.5,3],[46,1,4,2,3.5],[66,1,5,2,4],[86,1,6,2.5,5],[126,1,7,3,5.5],[176,1,8,3,6],[276,2,8,3.5,7],[426,2,9,4,7.5],[626,2,10,4,8],[876,2,11,4.5,9],[1176,2,12,5,9.5],[1551,3,12,5,10],[2026,3,13,5.5,11],[2676,3,14,6,11.5],[3451,3.5,14.5,6,12],[4351,3.5,15.5,6.5,13],[5451,4,16,7,13.5],[6801,4,17,7,14],[8501,4,18,7.5,15],[10701,4,18,7.5,15]],"14001":[[1,1,2,1,1.5,0.5,2,0.5,2,1,1,1,1,2,2,2,2],[6,1,2.5,1,2,0.5,2.5,0.5,2.5,1.5,1,1,1,2.5,2,2,2],[11,1,3.5,1,2.5,0.5,2.5,0.5,2.5,1.5,1.5,1,1,3,2.5,2,2],[16,1,4.5,1,3.5,0.5,3,0.5,3,2,1.5,1.5,1,4,3,2.5,2],[26,1,6,1,4.5,1,3,0.5,3,2.5,2,1.5,1,5,4,3,2],[46,1,7,1,5,1,3.5,0.5,3,3,2,1.5,1.5,5.5,4,3,2.5],[66,1,8,1,6,1,4,0.5,3,3,2.5,1.5,1.5,6,5,3.5,2.5],[86,1,10,1,7,1,4.5,1,3,4,3,2,1.5,7.5,5.5,4,3],[126,1,11,1,8,1,5,1,3.5,4,3,2,1.5,8,6,4,3],[176,1,12,1,9,1,6,1,4,4.5,3.5,2.5,2,9,7,5,3.5],[276,2,13,2,9,1,7,1,4.5,5,4,3,2,10,7.5,5.5,4],[426,2,14,2,10,1,8,1,5,5.5,4,3,2,11,8,6,4],[626,2,15,2,11,1,9,1,5.5,6,4.5,3.5,2.5,11.5,9,7,4.5],[876,2,17,2,13,1,10,1,6,6.5,5,4,2.5,13,10,7.5,5],[1176,3,17,3,13,2,10,1,6.5,7,5.5,4,2.5,13.5,11,8,5],[1551,3,18,3,14,2,10,1,7,7,6,4,3,14,11.5,8,5.5],[2026,3,20,3,15,2,11,1,7.5,8,6,4.5,3,15.5,12,9,6],[2676,3,22,3,16,2,12,1,8,8.5,6.5,5,3,17,13,9.5,6],[3451,4,23,4,16,3,12,2,8,9,7,5,3.5,18,13.5,10,7],[4351,4,24,4,17,3,13,2,9,9.5,7,5.5,4,19,14,11,7.5],[5451,4,26,4,19,3,14,2,10,10,8,6,4,20,15.5,11.5,8],[6801,4,28,4,21,3,16,2,11,11,8.5,6.5,4.5,21.5,17,13,9],[8501,4,30,4,23,3,17,2,12,11.5,9,7,5,23,18,13.5,9.5],[10701,4,30,4,23,3,17,2,12,11.5,9,7,5,23,18,13.5,9.5]],"45001":[[1,1,2,1,1.5,0.5,2,1,1,1,2,2,2],[6,1,2.5,1,2,0.5,2.5,1.5,1,1,2.5,2,2],[11,1,3.5,1,2.5,0.5,2.5,1.5,1.5,1,3,2.5,2],[16,1,4.5,1,3.5,0.5,3,2,1.5,1.5,4,3,2.5],[26,1,6,1,4.5,1,3,2.5,2,1.5,5,4,3],[46,1,7,1,5,1,3.5,3,2,1.5,5.5,4,3],[66,1,8,1,6,1,4,3,2.5,1.5,6,5,3.5],[86,1,10,1,7,1,4.5,4,3,2,7.5,5.5,4],[126,1,11,1,8,1,5,4,3,2,8,6,4],[176,1,12,1,9,1,6,4.5,3.5,2.5,9,7,5],[276,2,13,2,9,1,7,5,4,3,10,7.5,5.5],[426,2,14,2,10,1,8,5.5,4,3,11,8,6],[626,2,15,2,11,1,9,6,4.5,3.5,11.5,9,7],[876,2,17,2,13,1,10,6.5,5,4,13,10,7.5],[1176,3,17,3,13,2,10,7,5.5,4,13.5,11,8],[1551,3,18,3,14,2,10,7,6,4,14,11.5,8],[2026,3,20,3,15,2,11,8,6,4.5,15.5,12,9],[2676,3,22,3,16,2,12,8.5,6.5,5,17,13,9.5],[3451,4,23,4,16,3,12,9,7,5,18,13.5,10],[4351,4,24,4,17,3,13,9.5,7,5.5,19,14,11],[5451,4,26,4,19,3,14,10,8,6,20,15.5,11.5],[6801,4,28,4,21,3,16,11,8.5,6.5,21.5,17,13],[8501,4,30,4,23,3,17,11.5,9,7,23,18,13.5],[10701,4,30,4,23,3,17,11.5,9,7,23,18,13.5]]},"nace":[{"c":"01","n":"농업, 임업 및 어업","r14":"low","r45":"low","cx":"low"},{"c":"02","n":"광업 및 채석업","r14":"high","r45":"high","cx":"med"},{"c":"03","n":"음식료 및 담배 제조업","r14":"med","r45":"med","cx":"med"},{"c":"04","n":"섬유 및 섬유제품 제조업","r14":"high","r45":"high","cx":"low"},{"c":"05","n":"가죽 및 가죽제품 제조업","r14":"med","r45":"med","cx":"med"},{"c":"06","n":"목재 및 목재제품 제조업","r14":"low","r45":"med","cx":"med"},{"c":"07","n":"펄프, 종이 및 종이제품 제조업","r14":"high","r45":"med","cx":"low"},{"c":"08","n":"출판업","r14":"low","r45":"low","cx":"low"},{"c":"09","n":"인쇄업","r14":"low","r45":"med","cx":"low"},{"c":"10","n":"코크스, 연탄 및 석유정제품","r14":"high","r45":"high","cx":"med"},{"c":"11","n":"핵연료 제조업","r14":"high","r45":"high","cx":"high"},{"c":"12","n":"화학물질, 화학제품 및 화학섬유","r14":"high","r45":"high","cx":"med"},{"c":"13","n":"의료용 물질 및 의약품 제조업","r14":"high","r45":"high","cx":"high"},{"c":"14","n":"고무제품 및 플라스틱제품 제조업","r14":"low","r45":"med","cx":"med"},{"c":"15","n":"비금속 광물제품 제조업","r14":"med","r45":"med","cx":"med"},{"c":"16","n":"콘크리트, 시멘트, 석회 등 제조업","r14":"med","r45":"high","cx":"med"},{"c":"17","n":"1차 금속 및 금속가공제품 제조업","r14":"med","r45":"high","cx":"med"},{"c":"18","n":"기계 및 장비 제조업","r14":"med","r45":"med","cx":"med"},{"c":"19","n":"전기기기 및 광학기기 제조업","r14":"med","r45":"med","cx":"med"},{"c":"20","n":"조선업","r14":"med","r45":"high","cx":"med"},{"c":"21","n":"항공기 제조업","r14":"high","r45":"high","cx":"high"},{"c":"22","n":"기타 운송장비 제조업","r14":"med","r45":"high","cx":"med"},{"c":"23","n":"기타 제조업","r14":"med","r45":"med","cx":"med"},{"c":"24","n":"재생업","r14":"med","r45":"med","cx":"med"},{"c":"25","n":"전기 공급업","r14":"med","r45":"high","cx":"med"},{"c":"26","n":"연료용 가스 공급업","r14":"high","r45":"high","cx":"high"},{"c":"27","n":"수도 및 증기 공급업","r14":"med","r45":"med","cx":"med"},{"c":"28","n":"건설업","r14":"high","r45":"high","cx":"med"},{"c":"29","n":"도소매업, 자동차 및 수리업","r14":"low","r45":"low","cx":"low"},{"c":"30","n":"숙박업, 음식점업 및 주점업","r14":"med","r45":"low","cx":"low"},{"c":"31","n":"운송업, 창고업 및 통신업","r14":"med","r45":"low","cx":"med"},{"c":"32","n":"금융업, 보험업, 부동산업","r14":"low","r45":"low","cx":"low"},{"c":"33","n":"정보기술업","r14":"restrict","r45":"low","cx":"med"},{"c":"34","n":"전문, 과학 및 기술 서비스업","r14":"med","r45":"low","cx":"med"},{"c":"35","n":"기타 서비스업","r14":"restrict","r45":"low","cx":"med"},{"c":"36","n":"공공 행정","r14":"restrict","r45":"low","cx":"med"},{"c":"37","n":"교육 서비스업","r14":"restrict","r45":"low","cx":"low"},{"c":"38","n":"보건업 및 사회복지 서비스업","r14":"med","r45":"high","cx":"med"},{"c":"39","n":"기타 사회 서비스업","r14":"med","r45":"high","cx":"low"}],"fsms_categories":{"22000":[{"k":"C0","l":"C0 — 동물 일차전환(도축)","td":2,"th":0.5},{"k":"CI","l":"CI — 부패성 동물성 제품 가공","td":2,"th":0.5},{"k":"CII","l":"CII — 부패성 식물성 제품 가공","td":2,"th":0.5},{"k":"CIII","l":"CIII — 부패성 혼합식품 가공","td":2,"th":0.5},{"k":"CIV","l":"CIV — 상온 유통 제품 가공","td":2,"th":0.5},{"k":"D","l":"D — 사료 및 동물용 먹이 가공","td":1,"th":0.5},{"k":"E","l":"E — 케이터링 / 음식 서비스","td":1.5,"th":0.5},{"k":"FI","l":"FI — 소매 / 도매","td":1,"th":0.5},{"k":"FII","l":"FII — 식품 중개 / 거래","td":1,"th":0.5},{"k":"G","l":"G — 운송 및 보관 서비스","td":1.5,"th":0.25},{"k":"H","l":"H — 보조서비스 (용수·해충방제 등)","td":1.5,"th":0.25},{"k":"I","l":"I — 포장재 생산","td":1.5,"th":0.5},{"k":"J","l":"J — 장비","td":1.5,"th":0.5},{"k":"K","l":"K — 화학제품 및 생화학제품","td":2,"th":0.5}]},"md13_categories":[{"k":"AI","l":"AⅠ — 수동식 비이식형 일반 의료기기"},{"k":"AII","l":"AⅡ — 수동식 임플란트"},{"k":"AIII","l":"AⅢ — 상처 치료용 기기"},{"k":"AIV","l":"AⅣ — 수동식 치과용 기기 및 부속품"},{"k":"AV","l":"AⅤ — 상기 이외의 수동식 의료기기"},{"k":"BI","l":"BⅠ — 전동식 일반 의료기기"},{"k":"BII","l":"BⅡ — 이미지용 기기"},{"k":"BIII","l":"BⅢ — 모니터링용 기기"},{"k":"BIV","l":"BⅣ — 방사선 및 열 치료용 기기"},{"k":"BV","l":"BⅤ — 상기 이외의 전동식(비이식형) 의료기기"},{"k":"CI","l":"CⅠ — 전동식 이식형 일반 의료기기"},{"k":"CII","l":"CⅡ — 상기 이외의 이식용 의료기기"},{"k":"DI","l":"DⅠ — 시약·교정기·제어물질 (IVD)"},{"k":"DII","l":"DⅡ — 체외진단용 기구 및 소프트웨어"},{"k":"DIII","l":"DⅢ — 상기 이외의 체외진단용 의료기기"},{"k":"EI","l":"EⅠ — 에틸렌옥사이드 가스 멸균"},{"k":"EII","l":"EⅡ — 습열 멸균"},{"k":"EIII","l":"EⅢ — 무균처리"},{"k":"EIV","l":"EⅣ — 방사선 멸균"},{"k":"EV","l":"EⅤ — 상기 이외의 멸균방법"},{"k":"FI","l":"FⅠ — 의료용 물질 조합 의료기기"},{"k":"FII","l":"FⅡ — 동물유래 조직 활용 의료기기"},{"k":"FIII","l":"FⅢ — 인간혈액 유도체 조합 의료기기"},{"k":"FIV","l":"FⅣ — 마이크로메카닉스 활용 의료기기"},{"k":"FV","l":"FⅤ — 나노물질 활용 의료기기"},{"k":"FVI","l":"FⅥ — 생물학적 활성 코팅·흡수성 소재 의료기기"},{"k":"FVII","l":"FⅦ — 상기 이외의 특정물질/기술 조합 의료기기"},{"k":"GI","l":"GⅠ — 원재료"},{"k":"GII","l":"GⅡ — 구성품"},{"k":"GIII","l":"GⅢ — 서브어셈블리"},{"k":"GIV","l":"GⅣ — 교정 서비스"},{"k":"GV","l":"GⅤ — 유통 서비스"},{"k":"GVI","l":"GⅥ — 유지보수 서비스"},{"k":"GVII","l":"GⅦ — 운송 서비스"},{"k":"GVIII","l":"GⅧ — 기타 서비스"}],"standards":[{"code":"9001","version_year":2015,"status":"active","full":"ISO 9001:2015 품질경영시스템","name":"품질경영(2015)","hls":true,"type":"MD5","code_scheme":"IAF39","scopeGroup":"iaf39","color":"#185FA5"},{"code":"9001-2026","version_year":2026,"status":"pending_publication","full":"ISO 9001:2026 품질경영시스템","name":"품질경영(2026)","hls":true,"type":"MD5","code_scheme":"IAF39","scopeGroup":"iaf39","color":"#185FA5","note":"2026.09 발행 예정(FDIS 단계) — 발행 전까지 2015년판 산정표를 잠정 적용, 발행 후 갱신 필요"},{"code":"14001","version_year":2015,"status":"active","full":"ISO 14001:2015 환경경영시스템","name":"환경경영(2015)","hls":true,"type":"MD5","code_scheme":"IAF39","scopeGroup":"iaf39","color":"#27500A"},{"code":"14001-2026","version_year":2026,"status":"published_data_pending","full":"ISO 14001:2026 환경경영시스템","name":"환경경영(2026)","hls":true,"type":"MD5","code_scheme":"IAF39","scopeGroup":"iaf39","color":"#27500A","note":"2026.04.15 발행됨(전환기간 3년, ~2029.4) — 개정판 심사시간기준표(MD5 개정본) 확인 전까지 2015년판 산정표 잠정 적용"},{"code":"45001","version_year":2018,"status":"active","full":"ISO 45001:2018 안전보건경영시스템","name":"안전보건","hls":true,"type":"MD5","code_scheme":"IAF39","scopeGroup":"iaf39","color":"#791F1F"},{"code":"50001","version_year":2018,"status":"active","full":"ISO 50001:2018 에너지경영시스템","name":"에너지경영","hls":true,"type":"EN50","code_scheme":"IAF39","scopeGroup":"50001","color":"#791F1F"},{"code":"27001","version_year":2022,"status":"active","full":"ISO/IEC 27001:2022 정보보안경영시스템","name":"정보보안","hls":true,"type":"IS27","code_scheme":"IAF39","scopeGroup":"27001","color":"#1a5276"},{"code":"27701","version_year":2019,"status":"active","full":"ISO/IEC 27701:2019 개인정보보호경영시스템","name":"개인정보보호","hls":true,"type":"GEN","code_scheme":"IAF39","scopeGroup":"iaf39_nosub","color":"#555","coefficient_status":"confirmed","base_standard":"27001"},{"code":"37001","version_year":2016,"status":"active","full":"ISO 37001:2016 부패방지경영시스템","name":"부패방지","hls":true,"type":"GEN","code_scheme":"IAF39","scopeGroup":"iaf39_nosub","color":"#555","coefficient_status":"estimated","gf":0.75},{"code":"37301","version_year":2021,"status":"active","full":"ISO 37301:2021 준법경영시스템","name":"준법경영","hls":true,"type":"GEN","code_scheme":"IAF39","scopeGroup":"iaf39_nosub","color":"#555","coefficient_status":"estimated","gf":0.75},{"code":"22301","version_year":2019,"status":"active","full":"ISO 22301:2019 사업연속성경영시스템","name":"사업연속성","hls":true,"type":"GEN","code_scheme":"IAF39","scopeGroup":"iaf39_nosub","color":"#555","coefficient_status":"estimated","gf":0.9},{"code":"22000","version_year":2018,"status":"active","full":"ISO 22000:2018 식품안전경영시스템","name":"식품안전","hls":true,"type":"FSMS","code_scheme":"FOOD_CHAIN","scopeGroup":"22000","color":"#27500A"},{"code":"13485","version_year":2016,"status":"active","full":"ISO 13485:2016 의료기기품질경영시스템","name":"의료기기품질","hls":false,"type":"MD13","code_scheme":"MEDICAL_DEVICE","scopeGroup":"13485","color":"#C97820"},{"code":"42001","version_year":2023,"status":"active","full":"ISO/IEC 42001:2023 인공지능경영시스템","name":"인공지능경영","hls":true,"type":"GEN","code_scheme":"IAF39","scopeGroup":"iaf39_nosub","color":"#555","coefficient_status":"unconfirmed","note":"KAB-SR-AIMS(Issue 1, 2025.6 정식도입) 존재 확인, 심사일수 산정 수치는 원문 확보 후 반영 필요"},{"code":"19443","version_year":2018,"status":"active","full":"ISO 19443:2018 원자력공급망품질경영시스템","name":"원자력공급망품질","hls":false,"type":"GEN","code_scheme":"NUCLEAR_CHAIN","scopeGroup":"19443","color":"#791F1F","coefficient_status":"estimated","gf":0.9}],"md5_table_schema":{"9001":{"categories":["single"],"stageColBase":1,"survColBase":3,"recertColBase":4,"survMode":"single"},"14001":{"categories":["high","med","low","restrict"],"stageColBase":1,"survColBase":9,"recertColBase":13,"survMode":"per_category"},"45001":{"categories":["high","med","low"],"stageColBase":1,"survColBase":7,"recertColBase":10,"survMode":"per_category"}},"md5_standard_map":{"9001":{"table":"9001","multiplier":1.0},"9001-2026":{"table":"9001","multiplier":1.0},"14001":{"table":"14001","multiplier":1.0},"14001-2026":{"table":"14001","multiplier":1.0},"45001":{"table":"45001","multiplier":1.0}},"is27_table":[[1,10,5],[11,15,6],[16,25,7],[26,45,8.5],[46,65,10],[66,85,11],[86,125,12],[126,175,13],[176,275,14],[276,425,15],[426,625,16.5],[626,875,17.5],[876,1175,18.5],[1176,1550,19.5],[1551,2025,21],[2026,2675,22],[2676,3450,23],[3451,4350,24],[4351,5450,25],[5451,6800,26],[6801,8500,27],[8501,10700,28]],"iaf_subcode_master":[{"iaf_main":"01","kr":"농업, 임업 및 어업","en":"Agriculture, forestry and fishing","sub":"01A","ksic_raw":"0111, 0112, 0113, 0114, 0115, 0121, 0122, 0123, 0129, 0130, 0141, 0142, 0150, \n0201,0202, 0203, 0204","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"01","kr":"농업, 임업 및 어업","en":"Agriculture, forestry and fishing","sub":"01B","ksic_raw":"0311, 0312, 0321, 0322","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"02","kr":"광업 채석업","en":"Mining and quarrying","sub":"02A","ksic_raw":"0510, 0520, 0610, 0620 \n0711, 0712, 0721, 0722, 0729, 0800","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"03","kr":"음식료 및 담배","en":"Food products, beverages and tobacco","sub":"03A","ksic_raw":"1011, 1012, 1021, 1022, 1030, 1041, 1042, 1051, 1052. 1060, 1070, 1081, 1082, 1083, 1089, 1090, 1111, 1112, 1120","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"03","kr":"음식료 및 담배","en":"Food products, beverages and tobacco","sub":"03B","ksic_raw":1200,"qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"04","kr":"섬유 및 섬유제품","en":"Textiles and textile products","sub":"04A","ksic_raw":"1310, 1321, 1322, 1330","qms":"낮음","ems":"높음","ohsms":"높음"},{"iaf_main":"04","kr":"섬유 및 섬유제품","en":"Textiles and textile products","sub":"04B","ksic_raw":"1340, 1391, 1392, 1399","qms":"낮음","ems":"높음","ohsms":"높음"},{"iaf_main":"04","kr":"섬유 및 섬유제품","en":"Textiles and textile products","sub":"04C","ksic_raw":"1411, 1412, 1413, 1419, 1420, 1430, 1441, 1449","qms":"낮음","ems":"높음","ohsms":"높음"},{"iaf_main":"05","kr":"가죽 및 가죽제품","en":"Leather and leather products","sub":"05A","ksic_raw":1511,"qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"05","kr":"가죽 및 가죽제품","en":"Leather and leather products","sub":"05B","ksic_raw":"1512, 1519","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"05","kr":"가죽 및 가죽제품","en":"Leather and leather products","sub":"05C","ksic_raw":"1521, 1522","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"06","kr":"목재 및 목재제품","en":"Wood and wood products","sub":"06A","ksic_raw":"1610, 1621, 1622, 1623, 1629,1630","qms":"중간","ems":"낮음","ohsms":"중간"},{"iaf_main":"07","kr":"펄프, 종이, 종이제품 ","en":"Pulp, paper and paper products","sub":"07A","ksic_raw":1710,"qms":"낮음","ems":"높음","ohsms":"높음"},{"iaf_main":"07","kr":"펄프, 종이, 종이제품 ","en":"Pulp, paper and paper products","sub":"07_extra","ksic_raw":"1721, 1722, 1790","qms":"낮음","ems":"중간","ohsms":"중간"},{"iaf_main":"08","kr":"출판업","en":"Publishing companies","sub":"08A","ksic_raw":"5811, 5812, 5819, 5920","qms":"낮음","ems":"중간","ohsms":"중간"},{"iaf_main":"09","kr":"인쇄업","en":"Printing companies","sub":"09A","ksic_raw":"1811, 1812, 1820","qms":"낮음","ems":"중간","ohsms":"중간"},{"iaf_main":"10","kr":"코르스 제조 및 석유 정제품","en":"Manufacture of coke and refined petroleum products","sub":"10A","ksic_raw":"1910, 1921, 1922","qms":"중간","ems":"높음","ohsms":"높음"},{"iaf_main":"11","kr":"핵연료","en":"Nuclear fuel","sub":"11A","ksic_raw":"20129, 24219","qms":"높음","ems":"높음","ohsms":"높음"},{"iaf_main":"12","kr":"화학약품, 화학제품, 섬유류","en":"Chemicals, chemical products and fibres","sub":"12A","ksic_raw":"2011, 2012(단, 20129 중 핵연료 가공업과 관련된 산업은 제외), 2013","qms":"중간","ems":"높음","ohsms":"높음"},{"iaf_main":"12","kr":"화학약품, 화학제품, 섬유류","en":"Chemicals, chemical products and fibres","sub":"12B","ksic_raw":"2020, 2031, 2032, 2041, 2042, 2049, 2050","qms":"중간","ems":"높음","ohsms":"높음"},{"iaf_main":"13","kr":"의료용 물질 및 의약품","en":"Pharmaceuticals","sub":"13A","ksic_raw":"2110, 2121, 2122, 2123","qms":"높음","ems":"높음","ohsms":"높음"},{"iaf_main":"13","kr":"의료용 물질 및 의약품","en":"Pharmaceuticals","sub":"13B","ksic_raw":2130,"qms":"높음","ems":"높음","ohsms":"높음"},{"iaf_main":"14","kr":"고무 및 플라스틱제품","en":"Rubber and plastic products","sub":"14A","ksic_raw":"2211, 2219","qms":"중간","ems":"낮음","ohsms":"중간"},{"iaf_main":"14","kr":"고무 및 플라스틱제품","en":"Rubber and plastic products","sub":"14B","ksic_raw":"2221, 2222, 2223, 2224, 2225, 2229","qms":"중간","ems":"낮음","ohsms":"중간"},{"iaf_main":"15","kr":"비금속 광물제품","en":"Non-metallic mineral products","sub":"15A","ksic_raw":"2311, 2312, 2319, 2321, 2322, 2323, 2391, 2399                          *233제외","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"16","kr":"콘크리트, 시멘트, 석회 및 플라스터 등","en":"Concrete, cement, lime, plaster etc.","sub":"16A","ksic_raw":"2331, 2332","qms":"중간","ems":"중간","ohsms":"높음"},{"iaf_main":"17","kr":"1차 금속 및 금속가공제품 ","en":"Basic metals and fabricated metal products","sub":"17A","ksic_raw":"2411, 2412, 2413, 2419, 2421*, 2422, 2429, 2431, 2432\n*24219 중 우라늄 등 방사성 물질을 제련 및 정련하는 산업 제외","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"17","kr":"1차 금속 및 금속가공제품 ","en":"Basic metals and fabricated metal products","sub":"17B","ksic_raw":"2511, 2512, 2513, 2591, 2592, 2593, 2594 2599                                 *252제외","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"18","kr":"기계 및 장비","en":"Machinery and equipment","sub":"18A","ksic_raw":"2520, 2911, 2912, 2913, 2914, 2915, 2916, 2917, 2918, 2919, 2921, 2922, 2923, 2924, 2925, 2926, 2927, 2928, 2929, 3031, 3032, 3033, 3039, 3040, 3191, 3401*\n*340190 중 선박부품 수리업 및 항공기 부품 수리업 제외","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"19","kr":"전기 및 광학기기","en":"Electrical and optical equipment","sub":"19A","ksic_raw":"2631, 2632, 2811, 2812, 2820, 2830, 2841, 2842, 2851, 2852, 2890, 9511","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"19","kr":"전기 및 광학기기","en":"Electrical and optical equipment","sub":"19B","ksic_raw":"2611, 2612, 2621, 2622, 2629, 2631, 2632 2641, 2642, 2651, 2652, 2660, 9512","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"19","kr":"전기 및 광학기기","en":"Electrical and optical equipment","sub":"19C","ksic_raw":"2711, 2719","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"19","kr":"전기 및 광학기기","en":"Electrical and optical equipment","sub":"19D","ksic_raw":"2721, 2722, 2730, 3402","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"20","kr":"조선업","en":"Shipbuilding","sub":"20A","ksic_raw":"3111, 3112, 34019*\n*선박 부품 수리업에 한함","qms":"중간","ems":"중간","ohsms":"높음"},{"iaf_main":"21","kr":"항공기","en":"Aerospace","sub":"21A","ksic_raw":"3131, 3132, 34019*\n*항공기 부품 수리업에 한함","qms":"높음","ems":"중간","ohsms":"높음"},{"iaf_main":"22","kr":"기타 수송장비","en":"Other transport equipment","sub":"22A","ksic_raw":"3011, 3012, 3020","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"22","kr":"기타 수송장비","en":"Other transport equipment","sub":"22B","ksic_raw":3120,"qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"22","kr":"기타 수송장비","en":"Other transport equipment","sub":"22C","ksic_raw":"3192, 3199                          *3191제외","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"23","kr":"기타 제조업","en":"Manufacturingnotelsewhereclassified","sub":"23A","ksic_raw":"3201, 3202, 3209","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"23","kr":"기타 제조업","en":"Manufacturingnotelsewhereclassified","sub":"23B","ksic_raw":3320,"qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"23","kr":"기타 제조업","en":"Manufacturingnotelsewhereclassified","sub":"23C","ksic_raw":3330,"qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"23","kr":"기타 제조업","en":"Manufacturingnotelsewhereclassified","sub":"23D","ksic_raw":"3311, 3312, 3340, 3391, 3392, 3393, 3399","qms":"낮음","ems":"중간","ohsms":"중간"},{"iaf_main":"24","kr":"재생","en":"Recycling","sub":"24A","ksic_raw":"3831, 3832","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"25","kr":"전기공급","en":"Electricity supply","sub":"25A","ksic_raw":"3511, 3512, 3513","qms":"중간","ems":"중간","ohsms":"높음"},{"iaf_main":"26","kr":"연료용 가스공급","en":"Gas supply","sub":"26A","ksic_raw":3520,"qms":"높음","ems":"높음","ohsms":"높음"},{"iaf_main":"27","kr":"수도및 증기 공급","en":"Water supply","sub":"27A","ksic_raw":3530,"qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"27","kr":"수도및 증기 공급","en":"Water supply","sub":"27B","ksic_raw":"3601, 3602","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"28","kr":"건설","en":"Construction","sub":"28A","ksic_raw":"4111, 4112","qms":"중간","ems":"높음","ohsms":"높음"},{"iaf_main":"28","kr":"건설","en":"Construction","sub":"28B","ksic_raw":"4121, 4122, 4211, 4212, ","qms":"중간","ems":"높음","ohsms":"높음"},{"iaf_main":"28","kr":"건설","en":"Construction","sub":"28C","ksic_raw":"4213. 4219, 4231, 4232, 4241, 4242, 4249","qms":"중간","ems":"중간","ohsms":"높음"},{"iaf_main":"28","kr":"건설","en":"Construction","sub":"28D","ksic_raw":"4220, 4250","qms":"중간","ems":"중간","ohsms":"높음"},{"iaf_main":"28","kr":"건설","en":"Construction","sub":"28E","ksic_raw":4260,"qms":"중간","ems":"중간","ohsms":"높음"},{"iaf_main":"29","kr":"도소매업, 자동차 및 모터사이클 수리, 개인 및 가정용품 수리","en":"Wholesale and retail trade; repair of motor vehicles, motorcycles and personal and household goods","sub":"29A","ksic_raw":"4511, 4512, 4521, 4522, 4530, 4610, 4620, 4631, 4632, 4633, 4641, 4642,  4643, 4644, 4645, 4646, 4649, 4651, 4652, 4653, 4659, 4661, 4662, 4669, 4671, 4672, 4673, 4674, 4679, 4680, 4711, 4712, 4713, 4719, 4721, 4722, 4723, 4731, 4732, 4741, 4742, 4743, 4744, 4751, 4752, 4759, 4761, 4762, 4763, 4764, 4771, 4772, 4781, 4782, 4783, 4784, 4785, 4786, 4791, 4792, 4799","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"iaf_main":"29","kr":"도소매업, 자동차 및 모터사이클 수리, 개인 및 가정용품 수리","en":"Wholesale and retail trade; repair of motor vehicles, motorcycles and personal and household goods","sub":"29B","ksic_raw":"9521, 9522, 9531, 9539         *951 제외","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"iaf_main":"30","kr":"숙박업, 음식점업 및 주점","en":"Hotels and restaurants","sub":"30A","ksic_raw":"5510, 5590","qms":"낮음","ems":"중간","ohsms":"낮음"},{"iaf_main":"30","kr":"숙박업, 음식점업 및 주점","en":"Hotels and restaurants","sub":"30B","ksic_raw":"5611, 5612, 5613, 5614, 5615, 5616, 5619, 5621, 5622","qms":"낮음","ems":"중간","ohsms":"낮음"},{"iaf_main":"31","kr":"운송업, 창고업 및 통신","en":"Transport, storage and communication","sub":"31A","ksic_raw":"4910, 4921, 4922, 4923, 4930, 4940, 4950, 5011, 5012, 5013, 5020, 5110, 5120","qms":"중간","ems":"중간","ohsms":"낮음"},{"iaf_main":"31","kr":"운송업, 창고업 및 통신","en":"Transport, storage and communication","sub":"31B","ksic_raw":"5210, 5291, 5292, 5293, 5294, 5299","qms":"중간","ems":"중간","ohsms":"낮음"},{"iaf_main":"31","kr":"운송업, 창고업 및 통신","en":"Transport, storage and communication","sub":"31C","ksic_raw":"6110, 6121, 6122, 6123, 6129","qms":"중간","ems":"중간","ohsms":"낮음"},{"iaf_main":"32","kr":"금융업, 보험업, 부동산업 및 임대","en":"Financial intermediation; real estate; renting","sub":"32A","ksic_raw":"6411, 6412, 6413, 6420, 6491, 6499, 6511, 6512, 6520, 6530, 6611, 6619, 6620\n                        ","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"iaf_main":"32","kr":"금융업, 보험업, 부동산업 및 임대","en":"Financial intermediation; real estate; renting","sub":"32B","ksic_raw":"6811, 6812, 6821, 6822, 7611, 7619, 7621, 7622, 7629, 7631, 7632, 7639, 7640","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"iaf_main":"33","kr":"정보기술","en":"Information technology","sub":"33A","ksic_raw":"6202, 6209","qms":"중간","ems":"제한","ohsms":"낮음"},{"iaf_main":"33","kr":"정보기술","en":"Information technology","sub":"33B","ksic_raw":"5821, 5822, 6201, 6031, 6032, 6311, 6312, 6399","qms":"중간","ems":"제한","ohsms":"낮음"},{"iaf_main":"34","kr":"전문, 과학 및 기술서비스","en":"Engineering services","sub":"34A","ksic_raw":"7011, 7012, 7013,  7211, 7212, 7291, 7292, 7320, 7390*\n                                           *73902 제외","qms":"중간","ems":"중간","ohsms":"낮음"},{"iaf_main":"34","kr":"전문, 과학 및 기술서비스","en":"Engineering services","sub":"34B","ksic_raw":"7020, 7160","qms":"중간","ems":"중간","ohsms":"낮음"},{"iaf_main":"35","kr":"기타 서비스","en":"Other services","sub":"35A","ksic_raw":"7110, 7120, 7140, 7151, 7153","qms":"중간","ems":"제한","ohsms":"낮음"},{"iaf_main":"35","kr":"기타 서비스","en":"Other services","sub":"35B","ksic_raw":null,"qms":null,"ems":"제한","ohsms":"낮음"},{"iaf_main":"35","kr":"기타 서비스","en":"Other services","sub":"35C","ksic_raw":"7131, 7139, 7330, 73902, 7410, 7421, 7422, 7430, 7511, 7512, 7531, 7532, 7533, 7591, 7599","qms":"중간","ems":"제한","ohsms":"낮음"},{"iaf_main":"36","kr":"공공행정","en":"Public administration","sub":"36A","ksic_raw":"8411, 8412, 8421, 8422, 8431, 8432, 8440, 8450, 8461, 8462","qms":"중간","ems":"특별","ohsms":"낮음"},{"iaf_main":"37","kr":"교육 서비스","en":"Education","sub":"37A","ksic_raw":"8511, 8512, 8521, 8522, 8530, 8541, 8542, 8543, 8550, 8561, 8562, 8563, 8564, 8565, 8566, 8569, 8570","qms":"낮음","ems":"제한","ohsms":"낮음"},{"iaf_main":"38","kr":"보건업 및 사회복지 서비스","en":"Health and social work","sub":"38A","ksic_raw":"7310, 8610, 8620, 8630, 8690","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"38","kr":"보건업 및 사회복지 서비스","en":"Health and social work","sub":"38B","ksic_raw":"8711, 8712, 8713, 8721, 8729","qms":"중간","ems":"중간","ohsms":"중간"},{"iaf_main":"39","kr":"기타 사회 서비스","en":"Other social services","sub":"39A","ksic_raw":"5911, 5912, 5913, 5914, 6010, 6021, 6022, 6391, 7521, 7529, 9011, 9012, 9013, 9019, 9021, 9022, 9023, 9029, 9111, 9112, 9113, 9119, 9121, 9122, 9123, 9124, 9129,  9611, 9612, 9691, 9692, 9699 ,9900  ","qms":"낮음","ems":"중간","ohsms":"낮음"},{"iaf_main":"39","kr":"기타 사회 서비스","en":"Other social services","sub":"39B","ksic_raw":"3701, 3702, 3811, 3812, 3813, 3821, 3822, 3823, 3824, 3900,          *383 제외","qms":"낮음","ems":"높음","ohsms":"높음"},{"iaf_main":"39","kr":"기타 사회 서비스","en":"Other social services","sub":"39C","ksic_raw":"9411, 9412, 9420, 9491, 9492, 9493, 9499,","qms":"낮음","ems":"제한","ohsms":"낮음"}],"ksic_iaf_map":[{"ksic":"0111","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0112","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0113","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0114","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0115","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0121","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0122","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0123","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0129","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0130","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0141","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0142","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0150","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0201","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0202","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0203","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0204","note":"","iaf_main":"01","iaf_sub":"01A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0311","note":"","iaf_main":"01","iaf_sub":"01B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0312","note":"","iaf_main":"01","iaf_sub":"01B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0321","note":"","iaf_main":"01","iaf_sub":"01B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0322","note":"","iaf_main":"01","iaf_sub":"01B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0510","note":"","iaf_main":"02","iaf_sub":"02A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0520","note":"","iaf_main":"02","iaf_sub":"02A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0610","note":"","iaf_main":"02","iaf_sub":"02A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0620","note":"","iaf_main":"02","iaf_sub":"02A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0711","note":"","iaf_main":"02","iaf_sub":"02A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0712","note":"","iaf_main":"02","iaf_sub":"02A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0721","note":"","iaf_main":"02","iaf_sub":"02A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0722","note":"","iaf_main":"02","iaf_sub":"02A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0729","note":"","iaf_main":"02","iaf_sub":"02A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"0800","note":"","iaf_main":"02","iaf_sub":"02A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1011","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1012","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1021","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1022","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1030","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1041","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1042","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1051","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1052","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1070","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1081","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1082","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1083","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1089","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1090","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1111","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1112","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1120","note":"","iaf_main":"03","iaf_sub":"03A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1200","note":"","iaf_main":"03","iaf_sub":"03B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1310","note":"","iaf_main":"04","iaf_sub":"04A","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1321","note":"","iaf_main":"04","iaf_sub":"04A","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1322","note":"","iaf_main":"04","iaf_sub":"04A","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1330","note":"","iaf_main":"04","iaf_sub":"04A","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1340","note":"","iaf_main":"04","iaf_sub":"04B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1391","note":"","iaf_main":"04","iaf_sub":"04B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1392","note":"","iaf_main":"04","iaf_sub":"04B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1399","note":"","iaf_main":"04","iaf_sub":"04B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1411","note":"","iaf_main":"04","iaf_sub":"04C","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1412","note":"","iaf_main":"04","iaf_sub":"04C","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1413","note":"","iaf_main":"04","iaf_sub":"04C","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1419","note":"","iaf_main":"04","iaf_sub":"04C","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1420","note":"","iaf_main":"04","iaf_sub":"04C","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1430","note":"","iaf_main":"04","iaf_sub":"04C","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1441","note":"","iaf_main":"04","iaf_sub":"04C","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1449","note":"","iaf_main":"04","iaf_sub":"04C","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1511","note":"","iaf_main":"05","iaf_sub":"05A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1512","note":"","iaf_main":"05","iaf_sub":"05B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1519","note":"","iaf_main":"05","iaf_sub":"05B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1521","note":"","iaf_main":"05","iaf_sub":"05C","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1522","note":"","iaf_main":"05","iaf_sub":"05C","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"1610","note":"","iaf_main":"06","iaf_sub":"06A","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"1621","note":"","iaf_main":"06","iaf_sub":"06A","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"1622","note":"","iaf_main":"06","iaf_sub":"06A","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"1623","note":"","iaf_main":"06","iaf_sub":"06A","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"1629","note":"","iaf_main":"06","iaf_sub":"06A","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"1630","note":"","iaf_main":"06","iaf_sub":"06A","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"1710","note":"","iaf_main":"07","iaf_sub":"07A","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"1721","note":"","iaf_main":"07","iaf_sub":"07_extra","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"1722","note":"","iaf_main":"07","iaf_sub":"07_extra","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"1790","note":"","iaf_main":"07","iaf_sub":"07_extra","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"5811","note":"","iaf_main":"08","iaf_sub":"08A","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"5812","note":"","iaf_main":"08","iaf_sub":"08A","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"5819","note":"","iaf_main":"08","iaf_sub":"08A","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"5920","note":"","iaf_main":"08","iaf_sub":"08A","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"1811","note":"","iaf_main":"09","iaf_sub":"09A","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"1812","note":"","iaf_main":"09","iaf_sub":"09A","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"1820","note":"","iaf_main":"09","iaf_sub":"09A","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"1910","note":"","iaf_main":"10","iaf_sub":"10A","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"1921","note":"","iaf_main":"10","iaf_sub":"10A","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"1922","note":"","iaf_main":"10","iaf_sub":"10A","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"20129","note":"","iaf_main":"11","iaf_sub":"11A","qms":"높음","ems":"높음","ohsms":"높음"},{"ksic":"24219","note":"","iaf_main":"11","iaf_sub":"11A","qms":"높음","ems":"높음","ohsms":"높음"},{"ksic":"2011","note":"단, 20129 중 핵연료 가공업과 관련된 산업은 제외","iaf_main":"12","iaf_sub":"12A","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"2012","note":"단, 20129 중 핵연료 가공업과 관련된 산업은 제외","iaf_main":"12","iaf_sub":"12A","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"2013","note":"단, 20129 중 핵연료 가공업과 관련된 산업은 제외","iaf_main":"12","iaf_sub":"12A","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"2020","note":"","iaf_main":"12","iaf_sub":"12B","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"2031","note":"","iaf_main":"12","iaf_sub":"12B","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"2032","note":"","iaf_main":"12","iaf_sub":"12B","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"2041","note":"","iaf_main":"12","iaf_sub":"12B","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"2042","note":"","iaf_main":"12","iaf_sub":"12B","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"2049","note":"","iaf_main":"12","iaf_sub":"12B","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"2050","note":"","iaf_main":"12","iaf_sub":"12B","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"2110","note":"","iaf_main":"13","iaf_sub":"13A","qms":"높음","ems":"높음","ohsms":"높음"},{"ksic":"2121","note":"","iaf_main":"13","iaf_sub":"13A","qms":"높음","ems":"높음","ohsms":"높음"},{"ksic":"2122","note":"","iaf_main":"13","iaf_sub":"13A","qms":"높음","ems":"높음","ohsms":"높음"},{"ksic":"2123","note":"","iaf_main":"13","iaf_sub":"13A","qms":"높음","ems":"높음","ohsms":"높음"},{"ksic":"2130","note":"","iaf_main":"13","iaf_sub":"13B","qms":"높음","ems":"높음","ohsms":"높음"},{"ksic":"2211","note":"","iaf_main":"14","iaf_sub":"14A","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"2219","note":"","iaf_main":"14","iaf_sub":"14A","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"2221","note":"","iaf_main":"14","iaf_sub":"14B","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"2222","note":"","iaf_main":"14","iaf_sub":"14B","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"2223","note":"","iaf_main":"14","iaf_sub":"14B","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"2224","note":"","iaf_main":"14","iaf_sub":"14B","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"2225","note":"","iaf_main":"14","iaf_sub":"14B","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"2229","note":"","iaf_main":"14","iaf_sub":"14B","qms":"중간","ems":"낮음","ohsms":"중간"},{"ksic":"2311","note":"","iaf_main":"15","iaf_sub":"15A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2312","note":"","iaf_main":"15","iaf_sub":"15A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2319","note":"","iaf_main":"15","iaf_sub":"15A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2321","note":"","iaf_main":"15","iaf_sub":"15A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2322","note":"","iaf_main":"15","iaf_sub":"15A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2323","note":"","iaf_main":"15","iaf_sub":"15A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2391","note":"","iaf_main":"15","iaf_sub":"15A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2399","note":"","iaf_main":"15","iaf_sub":"15A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2331","note":"","iaf_main":"16","iaf_sub":"16A","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"2332","note":"","iaf_main":"16","iaf_sub":"16A","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"2411","note":"","iaf_main":"17","iaf_sub":"17A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2412","note":"","iaf_main":"17","iaf_sub":"17A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2413","note":"","iaf_main":"17","iaf_sub":"17A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2419","note":"","iaf_main":"17","iaf_sub":"17A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2421","note":"코드 자체에 예외조건 있음(원본 * 표기)","iaf_main":"17","iaf_sub":"17A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2422","note":"","iaf_main":"17","iaf_sub":"17A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2429","note":"","iaf_main":"17","iaf_sub":"17A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2431","note":"","iaf_main":"17","iaf_sub":"17A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2432","note":"","iaf_main":"17","iaf_sub":"17A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2511","note":"","iaf_main":"17","iaf_sub":"17B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2512","note":"","iaf_main":"17","iaf_sub":"17B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2513","note":"","iaf_main":"17","iaf_sub":"17B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2591","note":"","iaf_main":"17","iaf_sub":"17B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2592","note":"","iaf_main":"17","iaf_sub":"17B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2593","note":"","iaf_main":"17","iaf_sub":"17B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2594","note":"","iaf_main":"17","iaf_sub":"17B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2520","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2911","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2912","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2913","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2914","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2915","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2916","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2917","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2918","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2919","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2921","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2922","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2923","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2924","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2925","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2926","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2927","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2928","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2929","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3031","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3032","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3033","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3039","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3040","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3191","note":"","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3401","note":"코드 자체에 예외조건 있음(원본 * 표기)","iaf_main":"18","iaf_sub":"18A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2631","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2632","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2811","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2812","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2820","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2830","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2841","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2842","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2851","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2852","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2890","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"9511","note":"","iaf_main":"19","iaf_sub":"19A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2611","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2612","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2621","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2622","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2629","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2631","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2632","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2642","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2651","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2652","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2660","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"9512","note":"","iaf_main":"19","iaf_sub":"19B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2711","note":"","iaf_main":"19","iaf_sub":"19C","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2719","note":"","iaf_main":"19","iaf_sub":"19C","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2721","note":"","iaf_main":"19","iaf_sub":"19D","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2722","note":"","iaf_main":"19","iaf_sub":"19D","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"2730","note":"","iaf_main":"19","iaf_sub":"19D","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3402","note":"","iaf_main":"19","iaf_sub":"19D","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3111","note":"","iaf_main":"20","iaf_sub":"20A","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"3112","note":"","iaf_main":"20","iaf_sub":"20A","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"34019","note":"코드 자체에 예외조건 있음(원본 * 표기)","iaf_main":"20","iaf_sub":"20A","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"3131","note":"","iaf_main":"21","iaf_sub":"21A","qms":"높음","ems":"중간","ohsms":"높음"},{"ksic":"3132","note":"","iaf_main":"21","iaf_sub":"21A","qms":"높음","ems":"중간","ohsms":"높음"},{"ksic":"34019","note":"코드 자체에 예외조건 있음(원본 * 표기)","iaf_main":"21","iaf_sub":"21A","qms":"높음","ems":"중간","ohsms":"높음"},{"ksic":"3011","note":"","iaf_main":"22","iaf_sub":"22A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3012","note":"","iaf_main":"22","iaf_sub":"22A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3020","note":"","iaf_main":"22","iaf_sub":"22A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3120","note":"","iaf_main":"22","iaf_sub":"22B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3192","note":"","iaf_main":"22","iaf_sub":"22C","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3199","note":"","iaf_main":"22","iaf_sub":"22C","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3201","note":"","iaf_main":"23","iaf_sub":"23A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3202","note":"","iaf_main":"23","iaf_sub":"23A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3209","note":"","iaf_main":"23","iaf_sub":"23A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3320","note":"","iaf_main":"23","iaf_sub":"23B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3330","note":"","iaf_main":"23","iaf_sub":"23C","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3311","note":"","iaf_main":"23","iaf_sub":"23D","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"3312","note":"","iaf_main":"23","iaf_sub":"23D","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"3340","note":"","iaf_main":"23","iaf_sub":"23D","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"3391","note":"","iaf_main":"23","iaf_sub":"23D","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"3392","note":"","iaf_main":"23","iaf_sub":"23D","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"3393","note":"","iaf_main":"23","iaf_sub":"23D","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"3399","note":"","iaf_main":"23","iaf_sub":"23D","qms":"낮음","ems":"중간","ohsms":"중간"},{"ksic":"3831","note":"","iaf_main":"24","iaf_sub":"24A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3832","note":"","iaf_main":"24","iaf_sub":"24A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3511","note":"","iaf_main":"25","iaf_sub":"25A","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"3512","note":"","iaf_main":"25","iaf_sub":"25A","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"3513","note":"","iaf_main":"25","iaf_sub":"25A","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"3520","note":"","iaf_main":"26","iaf_sub":"26A","qms":"높음","ems":"높음","ohsms":"높음"},{"ksic":"3530","note":"","iaf_main":"27","iaf_sub":"27A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3601","note":"","iaf_main":"27","iaf_sub":"27B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"3602","note":"","iaf_main":"27","iaf_sub":"27B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"4111","note":"","iaf_main":"28","iaf_sub":"28A","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"4112","note":"","iaf_main":"28","iaf_sub":"28A","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"4121","note":"","iaf_main":"28","iaf_sub":"28B","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"4122","note":"","iaf_main":"28","iaf_sub":"28B","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"4211","note":"","iaf_main":"28","iaf_sub":"28B","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"4212","note":"","iaf_main":"28","iaf_sub":"28B","qms":"중간","ems":"높음","ohsms":"높음"},{"ksic":"4213","note":"","iaf_main":"28","iaf_sub":"28C","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"4231","note":"","iaf_main":"28","iaf_sub":"28C","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"4232","note":"","iaf_main":"28","iaf_sub":"28C","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"4241","note":"","iaf_main":"28","iaf_sub":"28C","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"4242","note":"","iaf_main":"28","iaf_sub":"28C","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"4249","note":"","iaf_main":"28","iaf_sub":"28C","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"4220","note":"","iaf_main":"28","iaf_sub":"28D","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"4250","note":"","iaf_main":"28","iaf_sub":"28D","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"4260","note":"","iaf_main":"28","iaf_sub":"28E","qms":"중간","ems":"중간","ohsms":"높음"},{"ksic":"4511","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4512","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4521","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4522","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4530","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4610","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4620","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4631","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4632","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4633","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4641","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4642","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4643","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4644","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4645","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4646","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4649","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4651","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4652","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4653","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4659","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4661","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4662","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4669","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4671","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4672","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4673","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4674","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4679","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4680","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4711","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4712","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4713","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4719","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4721","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4722","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4723","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4731","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4732","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4741","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4742","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4743","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4744","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4751","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4752","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4759","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4761","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4762","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4763","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4764","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4771","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4772","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4781","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4782","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4783","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4784","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4785","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4786","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4791","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4792","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"4799","note":"","iaf_main":"29","iaf_sub":"29A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"9521","note":"","iaf_main":"29","iaf_sub":"29B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"9522","note":"","iaf_main":"29","iaf_sub":"29B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"9531","note":"","iaf_main":"29","iaf_sub":"29B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"9539","note":"","iaf_main":"29","iaf_sub":"29B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"5510","note":"","iaf_main":"30","iaf_sub":"30A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5590","note":"","iaf_main":"30","iaf_sub":"30A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5611","note":"","iaf_main":"30","iaf_sub":"30B","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5612","note":"","iaf_main":"30","iaf_sub":"30B","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5613","note":"","iaf_main":"30","iaf_sub":"30B","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5614","note":"","iaf_main":"30","iaf_sub":"30B","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5615","note":"","iaf_main":"30","iaf_sub":"30B","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5616","note":"","iaf_main":"30","iaf_sub":"30B","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5619","note":"","iaf_main":"30","iaf_sub":"30B","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5621","note":"","iaf_main":"30","iaf_sub":"30B","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5622","note":"","iaf_main":"30","iaf_sub":"30B","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"4910","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"4921","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"4922","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"4923","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"4930","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"4940","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"4950","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5011","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5012","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5013","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5020","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5110","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5120","note":"","iaf_main":"31","iaf_sub":"31A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5210","note":"","iaf_main":"31","iaf_sub":"31B","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5291","note":"","iaf_main":"31","iaf_sub":"31B","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5292","note":"","iaf_main":"31","iaf_sub":"31B","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5293","note":"","iaf_main":"31","iaf_sub":"31B","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5294","note":"","iaf_main":"31","iaf_sub":"31B","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"5299","note":"","iaf_main":"31","iaf_sub":"31B","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"6110","note":"","iaf_main":"31","iaf_sub":"31C","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"6121","note":"","iaf_main":"31","iaf_sub":"31C","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"6122","note":"","iaf_main":"31","iaf_sub":"31C","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"6123","note":"","iaf_main":"31","iaf_sub":"31C","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"6129","note":"","iaf_main":"31","iaf_sub":"31C","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"6411","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6412","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6413","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6420","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6491","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6499","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6511","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6512","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6520","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6530","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6611","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6619","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6620","note":"","iaf_main":"32","iaf_sub":"32A","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6811","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6812","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6821","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6822","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"7611","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"7619","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"7621","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"7622","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"7629","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"7631","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"7632","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"7639","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"7640","note":"","iaf_main":"32","iaf_sub":"32B","qms":"낮음","ems":"낮음","ohsms":"낮음"},{"ksic":"6202","note":"","iaf_main":"33","iaf_sub":"33A","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"6209","note":"","iaf_main":"33","iaf_sub":"33A","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"5821","note":"","iaf_main":"33","iaf_sub":"33B","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"5822","note":"","iaf_main":"33","iaf_sub":"33B","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"6201","note":"","iaf_main":"33","iaf_sub":"33B","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"6031","note":"","iaf_main":"33","iaf_sub":"33B","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"6032","note":"","iaf_main":"33","iaf_sub":"33B","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"6311","note":"","iaf_main":"33","iaf_sub":"33B","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"6312","note":"","iaf_main":"33","iaf_sub":"33B","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"6399","note":"","iaf_main":"33","iaf_sub":"33B","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7011","note":"","iaf_main":"34","iaf_sub":"34A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"7012","note":"","iaf_main":"34","iaf_sub":"34A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"7013","note":"","iaf_main":"34","iaf_sub":"34A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"7211","note":"","iaf_main":"34","iaf_sub":"34A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"7212","note":"","iaf_main":"34","iaf_sub":"34A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"7291","note":"","iaf_main":"34","iaf_sub":"34A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"7292","note":"","iaf_main":"34","iaf_sub":"34A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"7320","note":"","iaf_main":"34","iaf_sub":"34A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"7390","note":"코드 자체에 예외조건 있음(원본 * 표기)","iaf_main":"34","iaf_sub":"34A","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"7020","note":"","iaf_main":"34","iaf_sub":"34B","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"7160","note":"","iaf_main":"34","iaf_sub":"34B","qms":"중간","ems":"중간","ohsms":"낮음"},{"ksic":"7110","note":"","iaf_main":"35","iaf_sub":"35A","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7120","note":"","iaf_main":"35","iaf_sub":"35A","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7140","note":"","iaf_main":"35","iaf_sub":"35A","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7151","note":"","iaf_main":"35","iaf_sub":"35A","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7153","note":"","iaf_main":"35","iaf_sub":"35A","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7131","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7139","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7330","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"73902","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7410","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7421","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7422","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7430","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7511","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7512","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7531","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7532","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7533","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7591","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"7599","note":"","iaf_main":"35","iaf_sub":"35C","qms":"중간","ems":"제한","ohsms":"낮음"},{"ksic":"8411","note":"","iaf_main":"36","iaf_sub":"36A","qms":"중간","ems":"특별","ohsms":"낮음"},{"ksic":"8412","note":"","iaf_main":"36","iaf_sub":"36A","qms":"중간","ems":"특별","ohsms":"낮음"},{"ksic":"8421","note":"","iaf_main":"36","iaf_sub":"36A","qms":"중간","ems":"특별","ohsms":"낮음"},{"ksic":"8422","note":"","iaf_main":"36","iaf_sub":"36A","qms":"중간","ems":"특별","ohsms":"낮음"},{"ksic":"8431","note":"","iaf_main":"36","iaf_sub":"36A","qms":"중간","ems":"특별","ohsms":"낮음"},{"ksic":"8432","note":"","iaf_main":"36","iaf_sub":"36A","qms":"중간","ems":"특별","ohsms":"낮음"},{"ksic":"8440","note":"","iaf_main":"36","iaf_sub":"36A","qms":"중간","ems":"특별","ohsms":"낮음"},{"ksic":"8450","note":"","iaf_main":"36","iaf_sub":"36A","qms":"중간","ems":"특별","ohsms":"낮음"},{"ksic":"8461","note":"","iaf_main":"36","iaf_sub":"36A","qms":"중간","ems":"특별","ohsms":"낮음"},{"ksic":"8462","note":"","iaf_main":"36","iaf_sub":"36A","qms":"중간","ems":"특별","ohsms":"낮음"},{"ksic":"8511","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8512","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8521","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8522","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8530","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8541","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8542","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8543","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8550","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8561","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8562","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8563","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8564","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8565","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8566","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8569","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"8570","note":"","iaf_main":"37","iaf_sub":"37A","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"7310","note":"","iaf_main":"38","iaf_sub":"38A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"8610","note":"","iaf_main":"38","iaf_sub":"38A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"8620","note":"","iaf_main":"38","iaf_sub":"38A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"8630","note":"","iaf_main":"38","iaf_sub":"38A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"8690","note":"","iaf_main":"38","iaf_sub":"38A","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"8711","note":"","iaf_main":"38","iaf_sub":"38B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"8712","note":"","iaf_main":"38","iaf_sub":"38B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"8713","note":"","iaf_main":"38","iaf_sub":"38B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"8721","note":"","iaf_main":"38","iaf_sub":"38B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"8729","note":"","iaf_main":"38","iaf_sub":"38B","qms":"중간","ems":"중간","ohsms":"중간"},{"ksic":"5911","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5912","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5913","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"5914","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"6010","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"6021","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"6022","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"6391","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"7521","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"7529","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9011","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9012","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9013","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9019","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9021","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9022","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9023","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9029","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9111","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9112","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9113","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9119","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9121","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9122","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9123","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9124","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9129","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9611","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9612","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9691","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9692","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9699","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"9900","note":"","iaf_main":"39","iaf_sub":"39A","qms":"낮음","ems":"중간","ohsms":"낮음"},{"ksic":"3701","note":"","iaf_main":"39","iaf_sub":"39B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"3702","note":"","iaf_main":"39","iaf_sub":"39B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"3811","note":"","iaf_main":"39","iaf_sub":"39B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"3812","note":"","iaf_main":"39","iaf_sub":"39B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"3813","note":"","iaf_main":"39","iaf_sub":"39B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"3821","note":"","iaf_main":"39","iaf_sub":"39B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"3822","note":"","iaf_main":"39","iaf_sub":"39B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"3823","note":"","iaf_main":"39","iaf_sub":"39B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"3824","note":"","iaf_main":"39","iaf_sub":"39B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"3900","note":"","iaf_main":"39","iaf_sub":"39B","qms":"낮음","ems":"높음","ohsms":"높음"},{"ksic":"9411","note":"","iaf_main":"39","iaf_sub":"39C","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"9412","note":"","iaf_main":"39","iaf_sub":"39C","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"9420","note":"","iaf_main":"39","iaf_sub":"39C","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"9491","note":"","iaf_main":"39","iaf_sub":"39C","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"9492","note":"","iaf_main":"39","iaf_sub":"39C","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"9493","note":"","iaf_main":"39","iaf_sub":"39C","qms":"낮음","ems":"제한","ohsms":"낮음"},{"ksic":"9499","note":"","iaf_main":"39","iaf_sub":"39C","qms":"낮음","ems":"제한","ohsms":"낮음"}],"guidance_standards":[{"code":"9001/14001/45001","basis":"KAB-AR-MD5 (IAF MD5:2019 국문 반영)","factors":"인원수(FTE) + IAF코드 기반 위험도(고/중/저)","method":"Table QMS1/EMS1/OHSMS1에서 인원구간별 기본일수 조회 → 심사유형별 배율(최초 1+2단계, 사후6개월=×4/15, 사후12개월=×6/15, 갱신=×8/15, 전환=×0.75) 적용","status":"확정"},{"code":"50001","basis":"자체 EnMS 산정기준 (에너지경영시스템 특성 반영)","factors":"연간 에너지소비량(TJ) + 주요에너지사용설비(SEU) 수 + 에너지원 복잡도","method":"TJ 구간별 기본일수 + SEU수·복잡도 가중","status":"확정"},{"code":"27001","basis":"자체 ISMS 산정기준","factors":"IT 사용자 수 + 정보시스템 수 + 데이터 민감도","method":"인원구간표 조회 + 시스템수·민감도 가중","status":"확정"},{"code":"27701","basis":"KAB-SR-PIMS 9.1.4 (ISO/IEC TS 27006-2 반영)","factors":"동일 범위 ISO/IEC 27001 계산결과 + PII 역할(컨트롤러/프로세서/둘다)","method":"27001 기준MD × (1 + 역할별 가산율: 컨트롤러+30%/프로세서+20%/둘다+50%), 최초심사 역할별 최소일수(3/2.5/3.5일) 하한 적용","status":"확정 — 9001기준 아님, 27001기준인 점 주의"},{"code":"22000","basis":"KAB-SR-FSMS 부속서B (ISO 22003-1:2022 반영)","factors":"식품체인 카테고리(TD) + HACCP 연구 수(TH, 카테고리별 단가 0.25/0.50) + 상근상당 종업원수(TFTE, FSMS 전용 구간표)","method":"D_S = T_D + T_H + T_FTE","status":"확정"},{"code":"13485","basis":"자체 MDQMS 산정기준","factors":"제품 위험등급(Class I~IV) + 주요 제조공정 수 + 규제 적용지역 범위","method":"9001 기준표×1.15(의료기기 가중) × 등급계수(최대×1.5)","status":"확정"},{"code":"37001/37301/22301/42001/19443","basis":"근거문서 확인 중 (37001만 부패위험요인 원문 확인됨)","factors":"9001 기준 MD × 표준별 잠정계수","method":"9001 KAB기준표 결과 × gf(잠정치, 표준마다 0.75~0.90)","status":"잠정/추정 — 공식 근거문서 확보 전까지 참고치로만 사용 권장"},{"code":"통합심사(전체 공통)","basis":"KAB-AR-MD11 2.1.2 + Figure 1","factors":"시스템 통합수준(%, 7개 기준 CB판단) × 심사팀 다표준자격비율(%, 공식산출)","method":"두 값을 2축표(Figure 1)에서 조회 → 감축률(0~20%) → 전체 표준 합계(T)에 1회만 적용","status":"확정"},{"code":"복수사업장(전체 공통)","basis":"IAF MD1 6.1.3.3","factors":"총 사업장 수 + 심사유형","method":"최초/갱신 y=√x, 사후 y=0.6√x, 갱신(성숙) y=0.8√x — 전부 올림 적용","status":"확정"}],"qms_complexity_addon":{"enabled":true,"high_pct":10,"med_pct":0,"low_pct":0,"note":"인증기관마다 상이한 관행 — 본 사이트는 KSIC 크로스워크 결과가 '높음'인 경우에 한해 자동 적용. 필요시 high_pct 값만 조정."},"iaf39_summary":[{"iaf":1,"kr":"농업, 임업 및 어업","qms":"중간","ems":"중간","ohsms":"중간","ksic":["0111","0112","0113","0114","0115","0121","0122","0123","0129","0130","0141","0142","0150","0201","0202","0203","0204"]},{"iaf":1,"kr":"농업, 임업 및 어업","qms":"중간","ems":"중간","ohsms":"중간","ksic":["0311","0312","0321","0322"]},{"iaf":2,"kr":"광업 채석업","qms":"중간","ems":"중간","ohsms":"중간","ksic":["0510","0520","0610","0620","0711","0712","0721","0722","0729","0800"]},{"iaf":3,"kr":"음식료 및 담배","qms":"중간","ems":"중간","ohsms":"중간","ksic":["1011","1012","1021","1022","1030","1041","1042","1051","1052","1070","1081","1082","1083","1089","1090","1111","1112","1120"]},{"iaf":3,"kr":"음식료 및 담배","qms":"중간","ems":"중간","ohsms":"중간","ksic":["1200"]},{"iaf":4,"kr":"섬유 및 섬유제품","qms":"낮음","ems":"높음","ohsms":"높음","ksic":["1310","1321","1322","1330"]},{"iaf":4,"kr":"섬유 및 섬유제품","qms":"낮음","ems":"높음","ohsms":"높음","ksic":["1340","1391","1392","1399"]},{"iaf":4,"kr":"섬유 및 섬유제품","qms":"낮음","ems":"높음","ohsms":"높음","ksic":["1411","1412","1413","1419","1420","1430","1441","1449"]},{"iaf":5,"kr":"가죽 및 가죽제품","qms":"중간","ems":"중간","ohsms":"중간","ksic":["1511"]},{"iaf":5,"kr":"가죽 및 가죽제품","qms":"중간","ems":"중간","ohsms":"중간","ksic":["1512","1519"]},{"iaf":5,"kr":"가죽 및 가죽제품","qms":"중간","ems":"중간","ohsms":"중간","ksic":["1521","1522"]},{"iaf":6,"kr":"목재 및 목재제품","qms":"중간","ems":"낮음","ohsms":"중간","ksic":["1610","1621","1622","1623","1629","1630"]},{"iaf":7,"kr":"펄프, 종이, 종이제품 ","qms":"낮음","ems":"높음","ohsms":"높음","ksic":["1710"]},{"iaf":7,"kr":"펄프, 종이, 종이제품 ","qms":"낮음","ems":"중간","ohsms":"중간","ksic":["1721","1722","1790"]},{"iaf":8,"kr":"출판업","qms":"낮음","ems":"중간","ohsms":"중간","ksic":["5811","5812","5819","5920"]},{"iaf":9,"kr":"인쇄업","qms":"낮음","ems":"중간","ohsms":"중간","ksic":["1811","1812","1820"]},{"iaf":10,"kr":"코르스 제조 및 석유 정제품","qms":"중간","ems":"높음","ohsms":"높음","ksic":["1910","1921","1922"]},{"iaf":11,"kr":"핵연료","qms":"높음","ems":"높음","ohsms":"높음","ksic":["20129","24219"]},{"iaf":12,"kr":"화학약품, 화학제품, 섬유류","qms":"중간","ems":"높음","ohsms":"높음","ksic":["2011","2012","2013"]},{"iaf":12,"kr":"화학약품, 화학제품, 섬유류","qms":"중간","ems":"높음","ohsms":"높음","ksic":["2020","2031","2032","2041","2042","2049","2050"]},{"iaf":13,"kr":"의료용 물질 및 의약품","qms":"높음","ems":"높음","ohsms":"높음","ksic":["2110","2121","2122","2123"]},{"iaf":13,"kr":"의료용 물질 및 의약품","qms":"높음","ems":"높음","ohsms":"높음","ksic":["2130"]},{"iaf":14,"kr":"고무 및 플라스틱제품","qms":"중간","ems":"낮음","ohsms":"중간","ksic":["2211","2219"]},{"iaf":14,"kr":"고무 및 플라스틱제품","qms":"중간","ems":"낮음","ohsms":"중간","ksic":["2221","2222","2223","2224","2225","2229"]},{"iaf":15,"kr":"비금속 광물제품","qms":"중간","ems":"중간","ohsms":"중간","ksic":["2311","2312","2319","2321","2322","2323","2391","2399"]},{"iaf":16,"kr":"콘크리트, 시멘트, 석회 및 플라스터 등","qms":"중간","ems":"중간","ohsms":"높음","ksic":["2331","2332"]},{"iaf":17,"kr":"1차 금속 및 금속가공제품 ","qms":"중간","ems":"중간","ohsms":"중간","ksic":["2411","2412","2413","2419","2421","2422","2429","2431","2432"]},{"iaf":17,"kr":"1차 금속 및 금속가공제품 ","qms":"중간","ems":"중간","ohsms":"중간","ksic":["2511","2512","2513","2591","2592","2593","2594"]},{"iaf":18,"kr":"기계 및 장비","qms":"중간","ems":"중간","ohsms":"중간","ksic":["2520","2911","2912","2913","2914","2915","2916","2917","2918","2919","2921","2922","2923","2924","2925","2926","2927","2928","2929","3031","3032","3033","3039","3040","3191","3401"]},{"iaf":19,"kr":"전기 및 광학기기","qms":"중간","ems":"중간","ohsms":"중간","ksic":["2631","2632","2811","2812","2820","2830","2841","2842","2851","2852","2890","9511"]},{"iaf":19,"kr":"전기 및 광학기기","qms":"중간","ems":"중간","ohsms":"중간","ksic":["2611","2612","2621","2622","2629","2631","2632","2642","2651","2652","2660","9512"]},{"iaf":19,"kr":"전기 및 광학기기","qms":"중간","ems":"중간","ohsms":"중간","ksic":["2711","2719"]},{"iaf":19,"kr":"전기 및 광학기기","qms":"중간","ems":"중간","ohsms":"중간","ksic":["2721","2722","2730","3402"]},{"iaf":20,"kr":"조선업","qms":"중간","ems":"중간","ohsms":"높음","ksic":["3111","3112","34019"]},{"iaf":21,"kr":"항공기","qms":"높음","ems":"중간","ohsms":"높음","ksic":["3131","3132","34019"]},{"iaf":22,"kr":"기타 수송장비","qms":"중간","ems":"중간","ohsms":"중간","ksic":["3011","3012","3020"]},{"iaf":22,"kr":"기타 수송장비","qms":"중간","ems":"중간","ohsms":"중간","ksic":["3120"]},{"iaf":22,"kr":"기타 수송장비","qms":"중간","ems":"중간","ohsms":"중간","ksic":["3192","3199"]},{"iaf":23,"kr":"기타 제조업","qms":"중간","ems":"중간","ohsms":"중간","ksic":["3201","3202","3209"]},{"iaf":23,"kr":"기타 제조업","qms":"중간","ems":"중간","ohsms":"중간","ksic":["3320"]},{"iaf":23,"kr":"기타 제조업","qms":"중간","ems":"중간","ohsms":"중간","ksic":["3330"]},{"iaf":23,"kr":"기타 제조업","qms":"낮음","ems":"중간","ohsms":"중간","ksic":["3311","3312","3340","3391","3392","3393","3399"]},{"iaf":24,"kr":"재생","qms":"중간","ems":"중간","ohsms":"중간","ksic":["3831","3832"]},{"iaf":25,"kr":"전기공급","qms":"중간","ems":"중간","ohsms":"높음","ksic":["3511","3512","3513"]},{"iaf":26,"kr":"연료용 가스공급","qms":"높음","ems":"높음","ohsms":"높음","ksic":["3520"]},{"iaf":27,"kr":"수도및 증기 공급","qms":"중간","ems":"중간","ohsms":"중간","ksic":["3530"]},{"iaf":27,"kr":"수도및 증기 공급","qms":"중간","ems":"중간","ohsms":"중간","ksic":["3601","3602"]},{"iaf":28,"kr":"건설","qms":"중간","ems":"높음","ohsms":"높음","ksic":["4111","4112"]},{"iaf":28,"kr":"건설","qms":"중간","ems":"높음","ohsms":"높음","ksic":["4121","4122","4211","4212"]},{"iaf":28,"kr":"건설","qms":"중간","ems":"중간","ohsms":"높음","ksic":["4213","4231","4232","4241","4242","4249"]},{"iaf":28,"kr":"건설","qms":"중간","ems":"중간","ohsms":"높음","ksic":["4220","4250"]},{"iaf":28,"kr":"건설","qms":"중간","ems":"중간","ohsms":"높음","ksic":["4260"]},{"iaf":29,"kr":"도소매업, 자동차 및 모터사이클 수리, 개인 및 가정용품 수리","qms":"낮음","ems":"낮음","ohsms":"낮음","ksic":["4511","4512","4521","4522","4530","4610","4620","4631","4632","4633","4641","4642","4643","4644","4645","4646","4649","4651","4652","4653","4659","4661","4662","4669","4671","4672","4673","4674","4679","4680","4711","4712","4713","4719","4721","4722","4723","4731","4732","4741","4742","4743","4744","4751","4752","4759","4761","4762","4763","4764","4771","4772","4781","4782","4783","4784","4785","4786","4791","4792","4799"]},{"iaf":29,"kr":"도소매업, 자동차 및 모터사이클 수리, 개인 및 가정용품 수리","qms":"낮음","ems":"낮음","ohsms":"낮음","ksic":["9521","9522","9531","9539"]},{"iaf":30,"kr":"숙박업, 음식점업 및 주점","qms":"낮음","ems":"중간","ohsms":"낮음","ksic":["5510","5590"]},{"iaf":30,"kr":"숙박업, 음식점업 및 주점","qms":"낮음","ems":"중간","ohsms":"낮음","ksic":["5611","5612","5613","5614","5615","5616","5619","5621","5622"]},{"iaf":31,"kr":"운송업, 창고업 및 통신","qms":"중간","ems":"중간","ohsms":"낮음","ksic":["4910","4921","4922","4923","4930","4940","4950","5011","5012","5013","5020","5110","5120"]},{"iaf":31,"kr":"운송업, 창고업 및 통신","qms":"중간","ems":"중간","ohsms":"낮음","ksic":["5210","5291","5292","5293","5294","5299"]},{"iaf":31,"kr":"운송업, 창고업 및 통신","qms":"중간","ems":"중간","ohsms":"낮음","ksic":["6110","6121","6122","6123","6129"]},{"iaf":32,"kr":"금융업, 보험업, 부동산업 및 임대","qms":"낮음","ems":"낮음","ohsms":"낮음","ksic":["6411","6412","6413","6420","6491","6499","6511","6512","6520","6530","6611","6619","6620"]},{"iaf":32,"kr":"금융업, 보험업, 부동산업 및 임대","qms":"낮음","ems":"낮음","ohsms":"낮음","ksic":["6811","6812","6821","6822","7611","7619","7621","7622","7629","7631","7632","7639","7640"]},{"iaf":33,"kr":"정보기술","qms":"중간","ems":"제한","ohsms":"낮음","ksic":["6202","6209"]},{"iaf":33,"kr":"정보기술","qms":"중간","ems":"제한","ohsms":"낮음","ksic":["5821","5822","6031","6032","6201","6311","6312","6399"]},{"iaf":34,"kr":"전문, 과학 및 기술서비스","qms":"중간","ems":"중간","ohsms":"낮음","ksic":["7011","7012","7013","7211","7212","7291","7292","7320","7390"]},{"iaf":34,"kr":"전문, 과학 및 기술서비스","qms":"중간","ems":"중간","ohsms":"낮음","ksic":["7020","7160"]},{"iaf":35,"kr":"기타 서비스","qms":"중간","ems":"제한","ohsms":"낮음","ksic":["7110","7120","7140","7151","7153"]},{"iaf":35,"kr":"기타 서비스","qms":null,"ems":"제한","ohsms":"낮음","ksic":[]},{"iaf":35,"kr":"기타 서비스","qms":"중간","ems":"제한","ohsms":"낮음","ksic":["7131","7139","7330","73902","7410","7421","7422","7430","7511","7512","7531","7532","7533","7591","7599"]},{"iaf":36,"kr":"공공행정","qms":"중간","ems":"특별","ohsms":"낮음","ksic":["8411","8412","8421","8422","8431","8432","8440","8450","8461","8462"]},{"iaf":37,"kr":"교육 서비스","qms":"낮음","ems":"제한","ohsms":"낮음","ksic":["8511","8512","8521","8522","8530","8541","8542","8543","8550","8561","8562","8563","8564","8565","8566","8569","8570"]},{"iaf":38,"kr":"보건업 및 사회복지 서비스","qms":"중간","ems":"중간","ohsms":"중간","ksic":["7310","8610","8620","8630","8690"]},{"iaf":38,"kr":"보건업 및 사회복지 서비스","qms":"중간","ems":"중간","ohsms":"중간","ksic":["8711","8712","8713","8721","8729"]},{"iaf":39,"kr":"기타 사회 서비스","qms":"낮음","ems":"중간","ohsms":"낮음","ksic":["5911","5912","5913","5914","6010","6021","6022","6391","7521","7529","9011","9012","9013","9019","9021","9022","9023","9029","9111","9112","9113","9119","9121","9122","9123","9124","9129","9611","9612","9691","9692","9699","9900"]},{"iaf":39,"kr":"기타 사회 서비스","qms":"낮음","ems":"높음","ohsms":"높음","ksic":["3701","3702","3811","3812","3813","3821","3822","3823","3824","3900"]},{"iaf":39,"kr":"기타 사회 서비스","qms":"낮음","ems":"제한","ohsms":"낮음","ksic":["9411","9412","9420","9491","9492","9493","9499"]}]};
+</script>
+<script>
+
+'use strict';
+
+// ═══════════════════════════════════════════════════
+// 데이터 계층 — 전부 KAB_CONFIG(md_calc_config.php/json, DB 연동 예정)에서 읽음
+// 하드코딩된 표준별 배열은 이 파일에 없음. 값 갱신은 md_calc_config.json만 수정하면 됨.
+// ═══════════════════════════════════════════════════
+function cfg(){
+  if (typeof KAB_CONFIG === 'undefined' || !KAB_CONFIG) {
+    throw new Error('KAB_CONFIG가 로드되지 않았습니다. initKabCalcEngine() 호출 전에 설정을 주입하세요.');
+  }
+  return KAB_CONFIG;
+}
+const KAB_SURV6    = () => cfg().kab_ratios.surv6;
+const KAB_SURV12   = () => cfg().kab_ratios.surv12;
+const KAB_RECERT   = () => cfg().kab_ratios.recert;
+const KAB_TRANSFER_ADD = () => cfg().kab_ratios.transfer_review_add; // 전환심사 시 이전 인증기관 이력검토 추가시간 (근거 미확정, 추정치)
+
+
+// ═══ 상태 ═══
+let mode='single';
+let selStds=new Set(['9001']);
+let stdAtypeOverrides={}; // 표준코드별 심사유형 override — 예: 9001=사후, 14001=갱신을 같은 신청서에서 동시에
+function getAtypeFor(code){
+  return stdAtypeOverrides[code] || g('atype')?.value || 'initial';
+}
+function setStdAtype(code, atype){
+  if(!atype || atype==='__default__') delete stdAtypeOverrides[code];
+  else stdAtypeOverrides[code]=atype;
+  calc();
+}
+let selMdCats=new Set(['AI']);
+// fv (Step5 가감요인 상태) 제거됨 — review.php로 이관
+
+// ═══ 유틸 ═══
+const r1=(v)=>Math.round(v*10)/10;
+// 0.5 M/D 단위 반올림 (실무 표준 — 예: 3.2→3.5, 4.7→5.0)
+const snap05=(v)=>Math.round(v*2)/2;
+// 절대 최소 일수 (IAF MD5)
+const FLOOR_INITIAL=1.0;   // 최초심사
+const FLOOR_SURV=0.5;      // 사후심사
+
+// ── KAB 기준표 룩업 — 표준 하나당 함수 하나씩 있던 lk9001/lk14001/lk45001을
+//    표(md5_employee_table)와 표모양 정의(md5_table_schema)만 다르고 로직은 완전히 같으므로
+//    함수 하나(lookupMD5Table)로 통일. 신규 MD5계열 표준 추가 시 config만 늘리면 됨(코드 변경 없음).
+// 행 구조: [emp_min, (1단계,2단계)×카테고리수, 사후(카테고리수 또는 1개), 갱신(카테고리수 또는 1개)]
+// ※ 9001은 원문(KAB-AR-MD5 Table QMS1)에 위험도 구분이 없는 단일 트랙임 — cx 입력은 무시됨.
+function lookupMD5Table(stdCode, emp, cx){
+  const map = cfg().md5_standard_map[stdCode];
+  if(!map) throw new Error(`md5_standard_map에 ${stdCode} 정의가 없습니다`);
+  const table  = cfg().md5_employee_table[map.table];
+  const schema = cfg().md5_table_schema[map.table];
+
+  let row = table[table.length-1];
+  for(let i=0;i<table.length-1;i++){
+    if(emp>=table[i][0] && emp<table[i+1][0]){ row=table[i]; break; }
+  }
+
+  const categories = schema.categories;
+  let catIdx = categories.indexOf(cx);
+  if(catIdx<0) catIdx = schema.survMode==='single' ? 0 : Math.min(1, categories.length-1); // 못 찾으면 '중간'격 항목으로 대체
+
+  const st1 = row[schema.stageColBase + catIdx*2]   * map.multiplier;
+  const st2 = row[schema.stageColBase + catIdx*2+1] * map.multiplier;
+  const total = r1(st1+st2);
+
+  let surv=null, recert=null;
+  if(schema.survMode==='single'){
+    surv   = row[schema.survColBase];
+    recert = row[schema.recertColBase];
+  } else if(schema.survMode==='per_category'){
+    surv   = row[schema.survColBase + catIdx];
+    recert = row[schema.recertColBase + catIdx];
+  }
+
+  return {
+    total: r1(total), st1: r1(st1), st2: r1(st2),
+    surv:  surv!=null  ? r1(surv*map.multiplier)  : null,
+    recert:recert!=null? r1(recert*map.multiplier): null,
+  };
+}
+
+const lk=(t,e)=>{for(const r of t)if(e>=r[0]&&e<=r[1])return r[2];return t[t.length-1][2];};
+const g=(id)=>document.getElementById(id);
+const gv=(id,def=0)=>parseFloat(g(id)?.value??def)||def;
+const gi=(id,def=0)=>parseInt(g(id)?.value??def)||def;
+const rL=(r)=>({high:'높음',med:'중간',low:'낮음',restrict:'제한'}[r]||'중간');
+const cL=(c)=>({high:'복잡도 높음',med:'복잡도 중간',low:'복잡도 낮음'}[c]||'중간');
+
+function validateEmp(){
+  const el=g('emp');
+  if(!el) return;
+  if(parseInt(el.value)<=0||isNaN(parseInt(el.value))){
+    el.value=1;
+    alert('유효 인원수는 1명 이상이어야 합니다.');
+  }
+}
+function validatePos(el){
+  if(parseFloat(el.value)<0) el.value=0;
+}
+
+function getEmp(){
+  const e=gi('emp',50);
+  if(g('shift-type')?.value==='diff'){
+    return e*(gi('shift-cnt',2));
+  }
+  return e;
+}
+function r14val(){return g('risk14')?.value||'med';}
+function r45val(){return g('risk45')?.value||'med';}
+
+// ═══════════════════════════════════════════════════
+// 계산 함수 — 표준별 분리
+// ═══════════════════════════════════════════════════
+
+// MD5: ISO 9001 / 14001 / 45001 (2015·2026 버전 포함) — KAB 공식 기준표 적용
+function CALC_MD5(code, empN){
+  const log=[];
+  const at=getAtypeFor(code);
+  const cx=g('complexity')?.value||'med';
+  const r14=r14val(), r45=r45val();
+
+  const stdMeta=cfg().standards.find(s=>s.code===code);
+  const family = code.startsWith('14001') ? '14001' : code.startsWith('45001') ? '45001' : '9001';
+
+  let looked, stdLabel, cxLabel;
+  if(family==='14001'){
+    looked=lookupMD5Table(code, empN, r14);
+    stdLabel=`${stdMeta?.full||code} KAB 기준표`;
+    cxLabel=`환경위험: ${rL(r14)}`;
+  } else if(family==='45001'){
+    looked=lookupMD5Table(code, empN, r45);
+    stdLabel=`${stdMeta?.full||code} KAB 기준표`;
+    cxLabel=`안전위험: ${rL(r45)}`;
+  } else {
+    looked=lookupMD5Table(code, empN, 'single');
+    stdLabel=`${stdMeta?.full||code} KAB 기준표`;
+    cxLabel=`인원수 단일트랙(위험도 구분 없음, KAB-AR-MD5 Table QMS1 원문 기준)`;
+
+    // QMS 고복잡도 가산 — 인증기관 정책값(config), KSIC 크로스워크로 이미 확정된 복잡도(cx) 기준 자동 적용
+    // ※ 수동선택이 아니라 KSIC 결과를 그대로 씀 — 판단이 아니라 객관적 파생값이므로 여기서 적용해도 원칙 위반 아님
+    const addon = cfg().qms_complexity_addon;
+    if(addon?.enabled){
+      const pct = cx==='high' ? addon.high_pct : cx==='low' ? addon.low_pct : addon.med_pct;
+      if(pct){
+        const mult = 1 + pct/100;
+        const before = looked.total;
+        looked = {
+          total: r1(looked.total*mult), st1: r1(looked.st1*mult), st2: r1(looked.st2*mult),
+          surv:  looked.surv!=null  ? r1(looked.surv*mult)  : null,
+          recert:looked.recert!=null? r1(looked.recert*mult): null,
+        };
+        log.push([`QMS 고복잡도 가산 (인증기관 정책, 조정 가능)`,
+          `KSIC 크로스워크 복잡도 '${cL(cx)}' → +${pct}%`, `${before}→${looked.total} M/D`]);
+      }
+    }
+  }
+
+  if(stdMeta?.status && stdMeta.status!=='active'){
+    log.push([`⚠ ${stdMeta.full}`, stdMeta.note||'개정판 반영 전 — 기존판 산정표 잠정 적용', '잠정치']);
+  }
+
+  // ── STEP 1: 기준일수 (최초 기준)
+  let baseInit=looked.total;
+  log.push([`① 최초 기준일수 (${stdLabel})`,
+    `${cxLabel} | 인원: ${empN}명 | 합계: ${baseInit} M/D (1단계 ${looked.st1} + 2단계 ${looked.st2})`,
+    `${baseInit} M/D`]);
+
+  // ── STEP 2: 심사유형 적용 — 반드시 최종 단계
+  let base=baseInit;
+  if(at==='surv6'){
+    // 9001/45001: 사후 직접값 있는 경우 활용, 없으면 비율
+    let survVal;
+    if(looked.surv && looked.surv>0){
+      survVal=r1(looked.surv*KAB_SURV6()/KAB_SURV12()); // SA6 = SA12 값의 2/3
+    } else {
+      survVal=r1(baseInit*KAB_SURV6());
+    }
+    base=survVal;
+    log.push(['② 심사유형 — 사후관리(6개월)',`최초×${(KAB_SURV6()).toFixed(4)} (KAB 기준: 4/15)`,`${base} M/D`]);
+  } else if(at==='surv12'){
+    let survVal=looked.surv&&looked.surv>0 ? looked.surv : r1(baseInit*KAB_SURV12());
+    base=survVal;
+    log.push(['② 심사유형 — 사후관리(12개월)',`최초×${(KAB_SURV12()).toFixed(4)} (KAB 기준: 6/15)`,`${base} M/D`]);
+  } else if(at==='recert'){
+    let recertVal=looked.recert&&looked.recert>0 ? looked.recert : r1(baseInit*KAB_RECERT());
+    base=recertVal;
+    log.push(['② 심사유형 — 갱신인증',`최초×${(KAB_RECERT()).toFixed(4)} (KAB 기준: 8/15)`,`${base} M/D`]);
+  } else if(at==='transfer_surv6'){
+    let survVal;
+    if(looked.surv && looked.surv>0){
+      survVal=r1(looked.surv*KAB_SURV6()/KAB_SURV12());
+    } else {
+      survVal=r1(baseInit*KAB_SURV6());
+    }
+    base=r1(survVal+KAB_TRANSFER_ADD());
+    log.push(['② 심사유형 — 전환심사(사후 6개월 시점)',
+      `사후(6개월) ${survVal} M/D + 이전기관 이력검토 ${KAB_TRANSFER_ADD()} M/D(추정치)`, `${base} M/D`]);
+  } else if(at==='transfer_surv12'){
+    let survVal=looked.surv&&looked.surv>0 ? looked.surv : r1(baseInit*KAB_SURV12());
+    base=r1(survVal+KAB_TRANSFER_ADD());
+    log.push(['② 심사유형 — 전환심사(사후 12개월 시점)',
+      `사후(12개월) ${survVal} M/D + 이전기관 이력검토 ${KAB_TRANSFER_ADD()} M/D(추정치)`, `${base} M/D`]);
+  } else if(at==='transfer_recert'){
+    let recertVal=looked.recert&&looked.recert>0 ? looked.recert : r1(baseInit*KAB_RECERT());
+    base=r1(recertVal+KAB_TRANSFER_ADD());
+    log.push(['② 심사유형 — 전환심사(갱신 시점)',
+      `갱신 ${recertVal} M/D + 이전기관 이력검토 ${KAB_TRANSFER_ADD()} M/D(추정치)`, `${base} M/D`]);
+  } else {
+    log.push(['② 심사유형 — 최초인증 (1단계+2단계)',
+      `1단계 ${looked.st1} M/D + 2단계 ${looked.st2} M/D`,`${base} M/D`]);
+  }
+  return {base, log};
+}
+// FSMS: ISO 22000 — DS = TD + (HACCP수 × TH단가) + TFTE
+// ※ MD5 기준표 미사용. CCP수 항목은 KAB-SR-FSMS 원문(부속서B, DS=TD+TH+TFTE)에 없어 제거함.
+function CALC_FSMS(code, empN){
+  const log=[];
+  const catKey=g('fsms-cat')?.value||'CI';
+  const cats=cfg().fsms_categories['22000'];
+  const cat=cats.find(x=>x.k===catKey)||cats[1];
+
+  const haccp=Math.max(0,gi('haccp',1));
+  const outsource=gi('fsms-outsource',1);
+
+  // STEP 1: TD — 식품체인 범주별 기본일수
+  const td=cat.td;
+  log.push(['TD — 식품사슬 범주 기본일수',`범주: ${cat.k}`,`${td} M/D`]);
+
+  // STEP 2: TH — HACCP 연구 1건당 가산(범주별 단가: A/B계열 0.25, C0 이후 0.50 — KAB-SR-FSMS 표B.1)
+  const th=r1(haccp*cat.th);
+  log.push(['TH — HACCP 연구 가산',`${haccp}건 × ${cat.th} (범주 ${cat.k} 단가)`,`+${th} M/D`]);
+
+  // STEP 3: TFTE (인원 기반, KAB-SR-FSMS 표B.1 전용 구간표)
+  const tfte=empN<=5?0:empN<=49?0.5:empN<=99?1.0:empN<=199?1.5:empN<=499?2.0:empN<=999?2.5:3.0;
+  log.push(['TFTE — 상근상당 종업원',`${empN}명`,`+${tfte} M/D`]);
+
+  // STEP 4: 외주처리 보정 (참고: KAB-SR-FSMS 원문 DS=TD+TH+TFTE에는 없는 보조 조정 — 필요시 검토서 단계로 이관 검토)
+  let outsourceAdj=0;
+  if(outsource>0){
+    outsourceAdj=outsource===1?0.25:0.5;
+    log.push(['외주처리 비율 보정(보조)',`${['없음','일부(10~30%)','절반이상'][outsource]}`,`+${outsourceAdj} M/D`]);
+  }
+
+  let base=r1(td+th+tfte+outsourceAdj);
+  log.push(['소계 (DS = TD + TH + TFTE, + 보조조정)','KAB-SR-FSMS 부속서B',`${base} M/D`]);
+  return {base, log};
+}
+
+// EN50: ISO 50001
+// TD(TJ기반) × SEU계수(1+SEU×0.05, max1.5) × 에너지복잡도계수
+function CALC_EN50(code, empN){
+  const log=[];
+  const tj=Math.max(0,gv('en-tj',50));
+  const seu=Math.max(0,gi('seu',3));
+  const ec=gi('en-complexity',2);
+
+  // STEP 1: TJ 기반 기본일수
+  const td=tj<10?1.5:tj<50?2:tj<100?2.5:tj<500?3:tj<1000?3.5:tj<5000?4:tj<10000?5:6;
+  log.push(['TD — 연간 에너지 소비량 기준',`${tj} TJ`,`${td} M/D`]);
+
+  // STEP 2: SEU 계수 = 1 + min(SEU수 × 0.05, 0.5) — 상한 0.5 고정
+  let seuFactor=1+Math.min(seu*0.05, 0.5);
+  seuFactor=Math.round(seuFactor*100)/100;
+  log.push(['SEU 계수','1 + min(SEU수×0.05, 0.5) — 상한 0.5 고정',`×${seuFactor}`]);
+
+  // STEP 3: 에너지 복잡도 계수
+  const ecFactor=ec===1?1.0:ec===2?1.1:1.2;
+  log.push(['에너지복잡도 계수',`${['','단순','중간(2~3종)','복잡(자가발전포함)'][ec]}`,`×${ecFactor}`]);
+
+  const base=r1(td*seuFactor*ecFactor);
+  log.push(['소계','TD × SEU계수 × 복잡도계수',`${base} M/D`]);
+  return {base, log};
+}
+
+// IS27: ISO 27001 — IT 사용자 수 기반
+function CALC_IS27(code, empN){
+  const log=[];
+  const itUsers=Math.max(1,gi('it-users',100));
+  const itSys=gi('it-systems',2);
+  const itSens=gi('it-sensitivity',2);
+
+  const base0=lk(cfg().is27_table, itUsers);
+  log.push(['기본일수 (27001 IT사용자 기준표)',`IT 사용자: ${itUsers}명`,`${base0} M/D`]);
+
+  const sysFactor=itSys===1?0.9:itSys===2?1.0:itSys===3?1.15:1.3;
+  log.push(['정보시스템 수 계수',`${['','1~5개','6~15개','16~30개','31개+'][itSys]} ×${sysFactor}`,`×${sysFactor}`]);
+
+  const sensFactor=itSens===1?0.9:itSens===2?1.0:1.2;
+  log.push(['데이터 민감도 계수',`${['','일반내부','고객·개인정보','금융·의료·기밀'][itSens]} ×${sensFactor}`,`×${sensFactor}`]);
+
+  const base=r1(base0*sysFactor*sensFactor);
+  log.push(['소계','기본 × 시스템 × 민감도',`${base} M/D`]);
+  return {base, log};
+}
+
+// MD13: ISO 13485
+// 기준일수×1.15 × 제품등급계수(1+등급×0.2, max1.6) × 공정복잡도 × 규제지역 × 분류수
+function CALC_MD13(code, empN){
+  const log=[];
+  const mdRisk=gi('md-risk',1); // 0~3
+  const mdProc=gi('md-proc',2);
+  const mdReg=gi('md-reg',2);
+  const catCount=Math.max(1,selMdCats.size);
+
+  const cx=g('complexity')?.value||'med';
+  const base0=r1(lookupMD5Table('9001', empN, cx).total*1.15);
+  log.push(['기본일수 (9001 KAB 기준표 × 1.15 의료기기 가중)',`인원: ${empN}명 (9001 Table QMS1은 위험도 구분 없는 단일트랙)`,`${base0} M/D`]);
+
+  // STEP 2: 제품 등급 계수 = 1 + 등급 × 0.2, 최대 1.5
+  let riskFactor=1+(mdRisk*0.2);
+  if(riskFactor>1.5) riskFactor=1.5;
+  riskFactor=Math.round(riskFactor*10)/10;
+  const riskLabel=['Class I','Class II','Class III','Class IV/멸균'][mdRisk];
+  log.push(['제품 등급 계수','1 + (등급 × 0.2), 최대 1.5',`${riskLabel} ×${riskFactor}`]);
+
+  const procFactor=mdProc===1?0.9:mdProc===2?1.0:mdProc===3?1.15:1.3;
+  log.push(['제조 공정 복잡도',`공정수 ${['','1~2개','3~5개','6~10개','11개+'][mdProc]} ×${procFactor}`,`×${procFactor}`]);
+
+  const regFactor=mdReg===1?1.0:mdReg===2?1.1:1.25;
+  log.push(['규제 적용 지역',`${['','단일국가','복수(2~3국)','글로벌(4국+)'][mdReg]} ×${regFactor}`,`×${regFactor}`]);
+
+  const catAdj=r1(1+Math.min(catCount-1,5)*0.04);
+  if(catCount>1) log.push(['의료기기 분류 수 보정',`${catCount}개 분류`,`×${catAdj}`]);
+
+  const base=r1(base0*riskFactor*procFactor*regFactor*catAdj);
+  log.push(['소계','기본 × 등급 × 공정 × 규제 × 분류수',`${base} M/D`]);
+  return {base, log};
+}
+
+// GEN: 일반 표준 (9001 KAB 기준표 × 표준계수)
+function CALC_GEN(code, empN){
+  const log=[];
+  const std=cfg().standards.find(s=>s.code===code);
+
+  // 27701 — KAB-SR-PIMS 9.1.4 확정 공식: 27001 계산결과 기준 + PII 역할별 % 가산 (9001기준 아님)
+  if(code==='27701' && std?.base_standard){
+    const roleEl=g('pii-role');
+    const role=roleEl?.value||'controller';
+    const roleTable={controller:{pct:0.30,min:3}, processor:{pct:0.20,min:2.5}, both:{pct:0.50,min:3.5}};
+    const r=roleTable[role]||roleTable.controller;
+
+    const base27001=calcStd(std.base_standard, empN);
+    log.push(...base27001.log.map(l=>[`[27001 기준] ${l[0]}`, l[1], l[2]]));
+
+    let base=r1(base27001.base*(1+r.pct));
+    log.push([`PII 역할 가산 (${role})`,`27001 기준 × (1+${r.pct})`,`${base} M/D`]);
+
+    const at=getAtypeFor(code);
+    if(at==='initial' && base<r.min){
+      log.push(['최소일수 하한 (KAB-SR-PIMS)',`역할 '${role}' 최초심사 최소 ${r.min}일`,`→ ${r.min} M/D`]);
+      base=r.min;
+    }
+    // 별도 심사(ISMS 사후/갱신과 분리 진행) 시 +0.5일 — 검토서 단계 판단 필요, 참고 로그만 표시
+    log.push(['참고 — ISMS와 별도심사 시', 'PIMS 관점 확장 확인용 +0.5일 별도 고려 필요(KAB-SR-PIMS 9.1.4)', '수동 확인']);
+    return {base, log};
+  }
+
+  // 나머지(37001/37301/22301/42001/19443) — 근거계수 확정 전, 9001기준 gf 잠정치
+  const f=std?.gf||1.0;
+  const cx=g('complexity')?.value||'med';
+  const looked=lookupMD5Table('9001', empN, cx);
+  const base0=looked.total;
+  log.push(['기본일수 (ISO 9001 KAB 기준표, 잠정 기준)',`인원: ${empN}명 (9001 Table QMS1은 위험도 구분 없는 단일트랙)`,`${base0} M/D`]);
+  const base=r1(base0*f);
+  const statusNote = std?.coefficient_status==='unconfirmed' ? '근거 미확인 — 원문 확보 전 잠정치'
+                    : std?.coefficient_status==='estimated'  ? '업계 추정치 — 공식 근거 미확정'
+                    : '';
+  if(f!==1) log.push(['표준 계수(잠정)',`×${f}${statusNote?' — '+statusNote:''}`,`${base} M/D`]);
+  return {base, log};
+}
+
+// ═══════════════════════════════════════════════════
+// 심사유형 적용 — MD5 이외의 표준(FSMS/EN50/IS27/MD13/GEN)용
+// KAB 비율: SA6=4/15, SA12=6/15, RA=8/15
+// ═══════════════════════════════════════════════════
+function applyAuditType(base, log, code){
+  const at=getAtypeFor(code);
+  let result=base;
+  if(at==='surv6'){
+    result=r1(base*KAB_SURV6());
+    log.push(['심사유형 — 사후관리(6개월)',`최초×4/15 (KAB 기준)`,`${result} M/D`]);
+  } else if(at==='surv12'){
+    result=r1(base*KAB_SURV12());
+    log.push(['심사유형 — 사후관리(12개월)',`최초×6/15 (KAB 기준)`,`${result} M/D`]);
+  } else if(at==='recert'){
+    result=r1(base*KAB_RECERT());
+    log.push(['심사유형 — 갱신인증',`최초×8/15 (KAB 기준)`,`${result} M/D`]);
+  } else if(at==='transfer_surv6'){
+    const survPart=r1(base*KAB_SURV6());
+    result=r1(survPart+KAB_TRANSFER_ADD());
+    log.push(['심사유형 — 전환심사(사후 6개월 시점)',
+      `사후(6개월) ${survPart} M/D + 이전기관 이력검토 ${KAB_TRANSFER_ADD()} M/D(추정치)`, `${result} M/D`]);
+  } else if(at==='transfer_surv12'){
+    const survPart=r1(base*KAB_SURV12());
+    result=r1(survPart+KAB_TRANSFER_ADD());
+    log.push(['심사유형 — 전환심사(사후 12개월 시점)',
+      `사후(12개월) ${survPart} M/D + 이전기관 이력검토 ${KAB_TRANSFER_ADD()} M/D(추정치)`, `${result} M/D`]);
+  } else if(at==='transfer_recert'){
+    const recertPart=r1(base*KAB_RECERT());
+    result=r1(recertPart+KAB_TRANSFER_ADD());
+    log.push(['심사유형 — 전환심사(갱신 시점)',
+      `갱신 ${recertPart} M/D + 이전기관 이력검토 ${KAB_TRANSFER_ADD()} M/D(추정치)`, `${result} M/D`]);
+  } else {
+    log.push(['심사유형 — 최초인증','—',`${result} M/D`]);
+  }
+  return {result, log};
+}
+
+// 디스패처
+const _calcStdVisiting = new Set(); // 재귀 순환 방지용 — base_standard 체인이 실수로 순환구조가 되어도 무한루프로 안 빠지게 함
+function calcStd(code, empN){
+  if(_calcStdVisiting.has(code)){
+    console.error(`calcStd 순환 참조 감지: ${code} — base_standard 설정을 확인하세요.`);
+    return {base:0, log:[['⚠ 순환 참조 오류', `${code} 계산 중 자기 자신 또는 상위 표준을 다시 참조함`, '0 M/D']], std:null};
+  }
+  _calcStdVisiting.add(code);
+  try {
+    const std=cfg().standards.find(s=>s.code===code);
+    if(!std) return {base:0, log:[], std};
+    let res;
+    switch(std.type){
+      case 'MD5':  res=CALC_MD5(code,empN); res.skipAuditType=true; break; // 심사유형 내부 처리
+      case 'FSMS': res=CALC_FSMS(code,empN); break;
+      case 'EN50': res=CALC_EN50(code,empN); break;
+      case 'IS27': res=CALC_IS27(code,empN); break;
+      case 'MD13': res=CALC_MD13(code,empN); break;
+      case 'GEN':  res=CALC_GEN(code,empN);  break;
+      default:     res={base:0,log:[]};
+    }
+    if(!res.skipAuditType){
+      const {result, log}=applyAuditType(res.base, res.log, code);
+      res.base=result; res.log=log;
+    }
+    return {base:res.base, log:res.log, std};
+  } finally {
+    _calcStdVisiting.delete(code);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// 복수사업장 (IAF MD1) — 본사 DS + 샘플(√n-1)개 × DS × siteFactor
+// siteFactor: 사용자 선택 (기본 0.5)
+// ═══════════════════════════════════════════════════
+// 공용 헬퍼 — MD1 6.1.3.3 심사유형별 샘플 수 계산 (calcMultiSite 및 UI 미리보기에서 공유)
+function multiSiteSampleCount(sites, atype, mature){
+  if(sites<=1) return {sample:0, raw:0, label:''};
+  let raw, label;
+  if(atype==='surv6'||atype==='surv12'||atype==='transfer_surv6'||atype==='transfer_surv12'){
+    raw=0.6*Math.sqrt(sites); label='0.6√x (사후)';
+  } else if((atype==='recert'||atype==='transfer_recert')&&mature){
+    raw=0.8*Math.sqrt(sites); label='0.8√x (갱신·성숙)';
+  } else {
+    raw=Math.sqrt(sites); label=((atype==='recert'||atype==='transfer_recert')?'√x (갱신)':'√x (최초)');
+  }
+  return {sample:Math.ceil(raw), raw, label};
+}
+
+// 복수사업장 (IAF MD1 6.1.3.3) — 심사유형별 공식 분리
+// 최초심사: y=√x | 사후심사: y=0.6√x | 갱신심사: y=√x (성숙시 0.8√x 옵션)
+function calcMultiSite(baseDay){
+  const sites=gi('site-total',1);
+  if(sites<=1) return {add:0, log:[]};
+  const at=g('atype')?.value||'initial';
+  const mature=g('recert-mature')?.value==='y'; // 갱신심사 성숙도 옵션
+
+  const {sample, raw, label}=multiSiteSampleCount(sites, at, mature);
+  const formulaLabel=`복수사업장 샘플링: y=${label} (MD1 6.1.3.3)`;
+  // 사용자 선택 사이트 비율
+  const siteFactor=parseFloat(g('site-factor')?.value||0.5);
+  const siteDays=r1(baseDay*siteFactor);
+  const extraSites=Math.max(0, sample-1);
+  const add=r1(siteDays*extraSites);       // 추가분만 가산 (본사는 이미 포함)
+  return {
+    add,
+    log:[[formulaLabel,
+      `총 ${sites}개 → 샘플 ${sample}개 (계산값 ${r1(raw)}, 올림) | 본사 DS=${r1(baseDay)} + 추가 ${extraSites}개 × DS×${siteFactor}(${siteDays}M/D)`,
+      `+${add} M/D`]]
+  };
+}
+
+// ═══════════════════════════════════════════════════
+// [제거됨] 가감요인(설계포함/범위제한/기존인증성숙도/통역/부적합이력/추가사업장복잡도)
+// → 판단이 필요한 값이라 이 도구(기본MD 산출)가 아닌 인증신청검토서(review.php)에서
+//   운영팀이 입력하도록 이관함 (IAF MD5 8절: "판단 사항은 정당화·기록되어야 한다")
+// ═══════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════
+// IAF MD11 2.1.2 + Figure 1 — 통합심사 감축률 2축 조회 방법론
+// 세로축: 통합수준(%, CB 판단) / 가로축: 심사팀 다표준자격비율(%, 공식산출)
+// ═══════════════════════════════════════════════════
+const MD11_MATRIX = {
+  100:{20:0, 40:5,  60:10, 80:15, 100:20},
+  80: {20:0, 40:5,  60:10, 80:15, 100:15},
+  60: {20:0, 40:5,  60:10, 80:10, 100:10},
+  40: {20:0, 40:5,  60:5,  80:5,  100:5},
+  20: {20:0, 40:0,  60:0,  80:0,  100:0},
+  0:  {20:0, 40:0,  60:0,  80:0,  100:0},
+};
+function snapBucket20(v){
+  const buckets=[0,20,40,60,80,100];
+  let best=0, bd=Infinity;
+  for(const b of buckets){ const d=Math.abs(v-b); if(d<bd){bd=d; best=b;} }
+  return best;
+}
+// 심사팀 다표준자격비율(%) = 100×Σ(Xi-1)/(Z×(Y-1))
+function calcTeamCapabilityPct(z, sumX, y){
+  z=Math.max(1, z||1);
+  y=Math.max(1, y||1);
+  if(y<=1 || z<=0) return 0;
+  const val=100*(sumX - z)/(z*(y-1));
+  return Math.max(0, Math.min(100, val));
+}
+// (통합수준%, 능력%) → 감축률(0~0.20)
+function md11ReductionRate(levelPct, capPct){
+  const lvl=snapBucket20(levelPct);
+  let cap=snapBucket20(capPct);
+  if(cap===0) cap=20; // 표는 20부터 정의, 0~19는 20 컬럼(값 0)과 동일 취급
+  const row=MD11_MATRIX[lvl]||MD11_MATRIX[0];
+  return (row[cap]??0)/100;
+}
+
+// ═══════════════════════════════════════════════════
+// 메인 calc()
+// ═══════════════════════════════════════════════════
+const ATYPE_LABEL={initial:'최초',surv6:'사후(6개월)',surv12:'사후(12개월)',recert:'갱신',
+  transfer_surv6:'전환·사후(6개월)',transfer_surv12:'전환·사후(12개월)',transfer_recert:'전환·갱신'};
+function calc(){
+  updateScopePanels();
+  const empN=getEmp();
+  const maxPct=mode==='integrated'?20:30;
+  const stdArr=[...selStds];
+  const at=g('atype')?.value||'initial'; // 표준별 override가 없을 때 쓰는 기본값
+
+  let rows=[], allLogs=[];
+  let totalBase=0;
+
+  stdArr.forEach((code)=>{
+    const {base, log, std}=calcStd(code,empN);
+    totalBase=r1(totalBase+base);
+    const usedAtype=getAtypeFor(code);
+    const label=`${std?.full||code} — ${ATYPE_LABEL[usedAtype]||usedAtype}`;
+    rows.push({label, color:std?.color||'#555', net:base, intgCut:0, atype:usedAtype});
+    allLogs.push({label, color:std?.color||'#555', log});
+  });
+
+  // ── 통합심사 감축 (IAF MD11 2.1.2 + Figure 1) — 표준별이 아닌 T=A+B+C 합계에 1회만 적용
+  let intgReduction=0;
+  if(mode==='integrated'&&stdArr.length>=2){
+    const levelPct=parseFloat(g('intg-level')?.value||'0');
+    const z=gi('intg-team-z',1);
+    const sumX=gi('intg-team-sumx',0);
+    const y=stdArr.length;
+    const capPct=calcTeamCapabilityPct(z,sumX,y);
+    const rate=md11ReductionRate(levelPct,capPct);
+    intgReduction=r1(totalBase*rate);
+
+    const teamResEl=g('intg-team-result');
+    if(teamResEl) teamResEl.textContent=`계산: Y=${y}, Z=${z}, ΣXi=${sumX} → 능력비율 ${capPct.toFixed(1)}%`;
+    const redResEl=g('intg-reduction-result');
+    if(redResEl) redResEl.textContent=`예상 단축률: 통합수준 ${levelPct}% × 능력비율 ${capPct.toFixed(1)}% → ${(rate*100).toFixed(0)}% 단축 (-${intgReduction} M/D, 상한 20%)`;
+
+    if(intgReduction>0){
+      totalBase=r1(totalBase-intgReduction);
+      allLogs.push({label:'통합심사 감축 (IAF MD11 Fig.1)', color:'#7B3FAF', log:[
+        [`통합수준 ${levelPct}% × 팀능력비율 ${capPct.toFixed(1)}%`,
+         `Figure 1 조회 → 단축률 ${(rate*100).toFixed(0)}% (T=Σ표준base 합계 ${r1(totalBase+intgReduction)} M/D 기준, 상한 20%)`,
+         `-${intgReduction} M/D`]
+      ]});
+    }
+  } else {
+    const redResEl=g('intg-reduction-result');
+    if(redResEl) redResEl.textContent = stdArr.length<2 ? '예상 단축률: 표준 2개 이상 선택 시 계산' : '예상 단축률: -';
+  }
+
+  // 복수사업장 가산
+  const {add:siteAdd, log:siteLog}=calcMultiSite(totalBase);
+  const totalWithSite=r1(totalBase+siteAdd);
+  if(siteLog.length) allLogs.push({label:'복수사업장 (IAF MD1)', color:'#185FA5', log:siteLog});
+
+  // ── 기본일수 기준 확정 (변동 제한의 기준값 — 가감 전)
+  const baseDays=totalWithSite;
+
+  // ── [제거됨] Step5 가감요인 합산 로직 — review.php로 이관 (변수는 하위 호환을 위해 0으로 유지)
+  let adjFactor=0;
+  let daysAdd=0;
+  const adjLog=[];
+  const maxF=maxPct/100;
+  const adjFactorClamped=0;
+  const pctOver=false;
+
+  const adjDays=0;
+  // 0.5 M/D 단위 반올림 (실무 표준)
+  let final=snap05(baseDays);
+
+  // ── 총 변동 범위 제한 — baseDays(기본일수, 가감 전) 기준으로 명확히 적용
+  const limitMin=snap05(baseDays*0.7);
+  const limitMax=snap05(baseDays*1.3);
+  let limitApplied='';
+  if(final<limitMin){ final=limitMin; limitApplied=`하한 (기준${baseDays}×0.7=${limitMin})`; }
+  if(final>limitMax){ final=limitMax; limitApplied=`상한 (기준${baseDays}×1.3=${limitMax})`; }
+  if(limitApplied){
+    allLogs.push({label:'총 변동 범위 제한', color:'#854F0B', log:[
+      ['변동 제한 기준값',`baseDays = ${baseDays} M/D (가감 적용 전 기준)`,`허용: ${limitMin}~${limitMax} M/D`],
+      [limitApplied,'자동 조정',`→ ${final} M/D`]
+    ]});
+  }
+
+  // ── 절대 최소 일수 Floor (IAF MD5) — 심사유형별 하한
+  const isSurv=(at==='surv6'||at==='surv12'||at==='transfer_surv6'||at==='transfer_surv12');
+  const floor=isSurv?FLOOR_SURV:FLOOR_INITIAL;
+  let floorApplied=false;
+  if(final<floor){ final=floor; floorApplied=true; }
+
+  const audN=final<=3?1:final<=6?2:Math.ceil(final/4);
+  const totalAdj=r1(adjDays+daysAdd);
+
+  if(floorApplied){
+    allLogs.push({label:'절대 최소 일수 (IAF MD5 Floor)', color:'#791F1F', log:[
+      [`${isSurv?'사후심사':'최초심사'} 절대 최소 보장`,`IAF MD5 하한 ${floor} M/D`,`→ ${final} M/D`]
+    ]});
+  }
+
+  // ── 구조화 로그 (인정심사 대응 — window._lastCalcLog로 접근 가능)
+  window._lastCalcLog={
+    timestamp:new Date().toISOString(),
+    standards:[...selStds],
+    perStandard:rows.map(r=>({label:r.label, atype:r.atype, md:r.net})),
+    employees:empN,
+    auditType:at,
+    baseDays,
+    adjFactor:Math.round(adjFactorClamped*100),
+    adjDays,
+    daysAdd,
+    siteSampling:{
+      total:gi('site-total',1),
+      sample:multiSiteSampleCount(gi('site-total',1), at, g('recert-mature')?.value==='y').sample,
+      factor:parseFloat(g('site-factor')?.value||0.5),
+      add:siteAdd
+    },
+    integration:{mode, levelPct:g('intg-level')?.value||'0',
+                 teamZ:gi('intg-team-z',1), teamSumX:gi('intg-team-sumx',0)},
+    limitApplied,
+    floor:{applied:floorApplied,value:floor},
+    finalDays:final
+  };
+
+  // UI 업데이트
+  g('r-base').textContent=baseDays.toFixed(1);
+  g('r-adj').textContent=(totalAdj>=0?'+':'')+totalAdj.toFixed(1);
+  g('r-final').textContent=final.toFixed(1);
+  g('r-aud').textContent=audN+'명';
+
+  // 1단계/2단계 배분 (최초심사에만 표시)
+  const stageSplit=g('stage-split');
+  if(at==='initial'){
+    // MD5 표준이 단독 선택된 경우 KAB 기준표 ST1·ST2 실제값 표시
+    const singleMd5=stdArr.length===1 && !!cfg().md5_standard_map[stdArr[0]];
+    let s1, s2;
+    if(singleMd5){
+      const code=stdArr[0];
+      const cx=g('complexity')?.value||'med';
+      const r14=r14val(), r45=r45val();
+      let looked;
+      if(code.startsWith('14001')) looked=lookupMD5Table(code, empN, r14);
+      else if(code.startsWith('45001')) looked=lookupMD5Table(code, empN, r45);
+      else looked=lookupMD5Table(code, empN, cx);
+      s1=snap05(looked.st1);
+      s2=snap05(looked.st2);
+    } else {
+      // 복수 표준 또는 비MD5: 20/80 비율로 배분
+      s1=snap05(final*0.2);
+      s2=snap05(final*0.8);
+    }
+    g('stage1-days').textContent=s1.toFixed(1);
+    g('stage2-days').textContent=s2.toFixed(1);
+    stageSplit.style.display='block';
+  } else {
+    stageSplit.style.display='none';
+  }
+
+  // 알림
+  let al='';
+  if(mode==='integrated'&&stdArr.length<2) al+=`<div class="alert al-info">통합심사 모드 — 표준 2개 이상 선택 시 단축 적용</div>`;
+  if(!limitApplied&&!floorApplied) al+=`<div class="alert al-ok">기본 심사일수(Base MD) 정상 산출 — 가감요인은 인증신청검토서에서 적용</div>`;
+  if(limitApplied) al+=`<div class="alert al-warn">총 변동 범위 제한 (기준 ${baseDays} M/D): ${limitApplied} 적용</div>`;
+  if(floorApplied) al+=`<div class="alert al-warn">절대 최소 일수 적용: ${isSurv?'사후':'최초'}심사 하한 ${floor} M/D (IAF MD5)</div>`;
+  const totalSites=gi('site-total',1);
+  if(totalSites>1){
+    const ms=multiSiteSampleCount(totalSites, at, g('recert-mature')?.value==='y');
+    al+=`<div class="alert al-info">복수사업장 ${totalSites}개 → 샘플 ${ms.sample}개 (MD1 6.1.3.3, y=${ms.label}) | 비율 ${g('site-factor')?.value||'0.5'} | 가산 +${siteAdd} M/D</div>`;
+  }
+  g('alerts').innerHTML=al;
+
+  // 로그 테이블
+  let t='';
+  allLogs.forEach(({label,color,log:lg})=>{
+    if(!lg.length) return;
+    t+=`<table style="margin-bottom:6px">
+      <thead>
+        <tr><th colspan="3" style="background:${color}22;color:${color};border-bottom:1.5px solid ${color};padding:5px 8px">
+          <span style="background:${color};color:#fff;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-right:5px">산정</span>${label}
+        </th></tr>
+        <tr><th style="width:42%">항목</th><th>내용</th><th style="text-align:right;width:80px">결과</th></tr>
+      </thead><tbody>`;
+    lg.forEach((row,i)=>{
+      const isLast=i===lg.length-1;
+      t+=`<tr class="${isLast?'tr-total':'tr-sub'}">
+        <td>${row[0]}</td><td>${row[1]||'—'}</td>
+        <td style="text-align:right">${row[2]||'—'}</td>
+      </tr>`;
+    });
+    t+='</tbody></table>';
+  });
+
+  // 최종 요약
+  t+=`<table><tbody>
+    <tr class="tr-total"><td>기준일수 (가감 전 기준값)</td><td style="font-size:10px;color:#888">변동 범위 제한 기준</td><td style="text-align:right">${baseDays} M/D</td></tr>
+    <tr class="tr-total"><td>가감 (${Math.round(adjFactorClamped*100)>0?'+':''}${Math.round(adjFactorClamped*100)}%${daysAdd>0?' + '+daysAdd+'일':''})</td><td style="font-size:10px;color:#888">단일 계수 1회 적용</td><td style="text-align:right">${totalAdj>=0?'+':''}${totalAdj.toFixed(1)} M/D</td></tr>
+    <tr style="font-size:10px"><td colspan="3" style="padding:3px 8px;color:#888">↑ 0.5 M/D 단위 반올림 | 변동범위 ${baseDays}×0.7(${limitMin})~×1.3(${limitMax}) | Floor ${floor} M/D</td></tr>
+    <tr class="tr-final"><td colspan="2" style="font-size:13px">🔖 최종 심사일수</td><td style="text-align:right;font-size:16px">${final.toFixed(1)} M/D</td></tr>
+  </tbody></table>
+  <div style="font-size:9px;color:#bbb;margin-top:4px;text-align:right">인정심사 대응 로그: 브라우저 콘솔 → window._lastCalcLog</div>`;
+  g('log-table').innerHTML=t;
+}
+
+// ═══ UI 초기화 ═══
+function initNace(){
+  // 예전 39개 대분류 select(IAF 1~39 단순목록)는 제거 — KSIC 크로스워크(ksic_iaf_map)로 대체
+  initKsicDatalist();
+}
+function initKsicDatalist(){
+  const dl=g('ksic-datalist');
+  if(!dl) return;
+  const seen=new Set();
+  const rows=cfg().ksic_iaf_map||[];
+  let opts='';
+  rows.forEach(r=>{
+    if(seen.has(r.ksic)) return;
+    seen.add(r.ksic);
+    opts+=`<option value="${r.ksic}">${r.iaf_sub}</option>`;
+  });
+  dl.innerHTML=opts;
+}
+function initFsmsCats(){
+  const s1=g('fsms-cat');
+  s1.innerHTML=cfg().fsms_categories['22000'].map(c=>`<option value="${c.k}">${c.l}</option>`).join('');
+  s1.value='CI';
+  updateFsmsTD();
+}
+function updateFsmsTD(){
+  const k=g('fsms-cat')?.value||'CI';
+  const c=cfg().fsms_categories['22000'].find(x=>x.k===k)||cfg().fsms_categories['22000'][1];
+  g('fsms-td-info').textContent=`TD=${c.td}일, TH=×${c.th}일/건 (범주별 단가, KAB-SR-FSMS 표B.1)`;
+}
+function initMdList(){
+  g('md-list').innerHTML=cfg().md13_categories.map(c=>`
+    <label style="display:flex;align-items:flex-start;gap:4px;font-size:10px;padding:2px 0;cursor:pointer">
+      <input type="checkbox" value="${c.k}" ${selMdCats.has(c.k)?'checked':''} onchange="toggleMd('${c.k}')" style="margin-top:1px;flex-shrink:0">
+      <span>${c.l}</span>
+    </label>`).join('');
+}
+function toggleMd(k){
+  if(selMdCats.has(k)) selMdCats.delete(k);
+  else selMdCats.add(k);
+  if(!selMdCats.size) selMdCats.add(k);
+  calc();
+}
+function buildAtypeOptionsHtml(selectedValue){
+  const src=g('atype');
+  if(!src) return '';
+  let html=`<option value="__default__"${!selectedValue?' selected':''}>심사유형: 공통 적용</option>`;
+  [...src.options].forEach(o=>{
+    html+=`<option value="${o.value}"${selectedValue===o.value?' selected':''}>${o.textContent}</option>`;
+  });
+  return html;
+}
+function initStds(){
+  g('std-grid').innerHTML=cfg().standards.map(s=>{
+    const on=selStds.has(s.code);
+    const showOverride = on && mode==='integrated';
+    const overrideBlock = showOverride ? `
+      <div onclick="event.stopPropagation()" style="margin-top:6px">
+        <select style="width:100%;font-size:10px;padding:3px 6px" onchange="setStdAtype('${s.code}', this.value)">
+          ${buildAtypeOptionsHtml(stdAtypeOverrides[s.code])}
+        </select>
+      </div>` : '';
+    return `<div class="scard${on?' on':''}" data-code="${s.code}" onclick="toggleStd('${s.code}')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div>
+          <div class="sn"><span style="width:5px;height:5px;border-radius:50%;background:${s.color};display:inline-block;margin-right:3px;vertical-align:middle"></span>${s.name}</div>
+          <div class="sc">${s.full}</div>
+        </div>
+        <div class="ck">${on?'✓':''}</div>
+      </div>
+      ${overrideBlock}
+    </div>`;
+  }).join('');
+}
+function toggleStd(code){
+  if(mode==='single'){selStds.clear();selStds.add(code);}
+  else{
+    if(selStds.has(code)&&selStds.size>1){ selStds.delete(code); delete stdAtypeOverrides[code]; }
+    else selStds.add(code);
+  }
+  initStds(); calc();
+}
+function setMode(m){
+  mode=m;
+  g('tab-s').classList.toggle('on',m==='single');
+  g('tab-i').classList.toggle('on',m==='integrated');
+  g('std-hint').textContent=m==='single'?'표준 1개 선택':'복수 표준 선택 — 통합심사 수준에 따라 단축';
+  const intgPanelEl=g('intg-panel');
+  intgPanelEl.className='panel'+(m==='integrated'?' show':'');
+  intgPanelEl.style.display=''; // 인라인 display:none이 CSS .panel.show를 덮어쓰던 문제 제거 — 이후 클래스로만 표시 제어
+  if(m==='single'&&selStds.size>1){const f=[...selStds][0];selStds.clear();selStds.add(f);}
+  initStds(); calc();
+}
+function updateScopePanels(){
+  const groups=new Set([...selStds].map(c=>cfg().standards.find(x=>x.code===c)?.scopeGroup||'iaf39_nosub'));
+  const show=(id,on,bc)=>{
+    const el=g(id); if(!el) return;
+    el.className='panel'+(on?' show':'');
+    if(on&&bc) el.style.borderLeftColor=bc;
+  };
+  show('p-nace',       groups.has('iaf39'));
+  show('p-13485',      groups.has('13485'),'#C97820');
+  show('p-22000',      groups.has('22000'),'#27500A');
+  show('p-50001',      groups.has('50001'),'#791F1F');
+  show('p-27001',      groups.has('27001'),'#1a5276');
+  show('p-19443',      groups.has('19443'));
+  show('p-nocode',     groups.has('iaf39_nosub'),'#888');
+  show('p-27701-pii',  selStds.has('27701'));
+  if(groups.has('22000')) updateFsmsTD();
+}
+function complexityKeyFromLabel(v){
+  const m={'높음':'high','중간':'med','낮음':'low','제한':'restrict','특별':'special'};
+  return m[v]||'med';
+}
+function onKsicChange(){
+  const v=(g('ksic-input')?.value||'').trim();
+  const infoEl=g('ksic-match-info');
+  const match=(cfg().ksic_iaf_map||[]).find(r=>r.ksic===v);
+  const complexityEl=g('complexity'), risk14El=g('risk14'), risk45El=g('risk45');
+
+  if(!match){
+    // 매칭 실패 — 수동 선택 허용 (잠금 해제)
+    [complexityEl,risk14El,risk45El].forEach(el=>{ if(el) el.disabled=false; });
+    g('nace-badges').innerHTML='';
+    if(infoEl) infoEl.textContent = v ? '⚠ 등록된 KSIC코드가 아닙니다 — 복잡도를 수동으로 확인·선택하세요.' : '';
+    calc();
+    return;
+  }
+
+  // KSIC→IAF 크로스워크 결과로 복잡도 자동 결정 + 잠금 (임의 재선택 방지)
+  const qKey=complexityKeyFromLabel(match.qms), eKey=complexityKeyFromLabel(match.ems), oKey=complexityKeyFromLabel(match.ohsms);
+  if(complexityEl){ complexityEl.value=qKey; complexityEl.disabled=true; }
+  if(risk14El){ risk14El.value=eKey; risk14El.disabled=true; }
+  if(risk45El){ risk45El.value=oKey; risk45El.disabled=true; }
+
+  g('nace-badges').innerHTML=[
+    `<span class="cbadge ${qKey==='high'?'cb-h':qKey==='low'?'cb-l':'cb-m'}">품질 ${match.qms||'-'}</span>`,
+    `<span class="cbadge ${eKey==='high'?'cb-h':eKey==='low'?'cb-l':eKey==='restrict'?'cb-i':'cb-m'}">환경 ${match.ems||'-'}</span>`,
+    `<span class="cbadge ${oKey==='high'?'cb-h':oKey==='low'?'cb-l':'cb-m'}">안전 ${match.ohsms||'-'}</span>`,
+  ].join('');
+  if(infoEl){
+    infoEl.textContent = `심사원배정 매칭코드: IAF ${match.iaf_main} (대분류만 사용, 세분류 불필요) · 복잡도 판정 참고 세분류: ${match.iaf_sub} — 복잡도는 KSIC 크로스워크로 자동확정, 재선택하려면 KSIC 코드를 변경하세요.` + (match.note ? ` [참고: ${match.note}]` : '');
+  }
+  calc();
+}
+function onShiftChange(){
+  g('shift-cnt-wrap').style.display=g('shift-type')?.value==='diff'?'block':'none';
+  calc();
+}
+function onSiteChange(){
+  const total=gi('site-total',1);
+  const at=g('atype')?.value||'initial';
+  const mature=g('recert-mature')?.value==='y';
+  if(total<=1){ g('site-sample-info').textContent='해당없음'; return; }
+  const ms=multiSiteSampleCount(total, at, mature);
+  g('site-sample-info').textContent=`${ms.sample}개 사업장 (y=${ms.label} → 올림, 계산값 ${r1(ms.raw)})`;
+}
+
+// ═══════════════════════════════════════════════════
+// 엔진 진입점 — KAB_CONFIG가 준비된 뒤 이 함수를 호출해서 초기화한다.
+// (kab_audit_days.php: PHP가 KAB_CONFIG를 동기 주입한 뒤 바로 호출 /
+//  kab_audit_days_v8.html: fetch()로 KAB_CONFIG를 받은 뒤 호출)
+// ═══════════════════════════════════════════════════
+function initKabCalcEngine(){
+  initNace();
+  initFsmsCats();
+  initMdList();
+  initStds();
+  onSiteChange();
+  calc();
+  initGuidancePanel();
+  window.dispatchEvent(new CustomEvent('kab-engine-ready'));
+}
+if (typeof window !== 'undefined') window.initKabCalcEngine = initKabCalcEngine;
+
+// ═══════════════════════════════════════════════════
+// 산정 근거 및 기준 안내 패널
+// ① IAF 1~39 복잡도 요약표 (세분류/수행범위 생략, 대분류 기준 통합)
+// ② QMS·EMS·OHSMS 기본MD표 (원본 엑셀과 동일한 9001→14001→45001 구성)
+// ③ 표준별 산출 요인 및 방식 (클릭 시에만 펼침)
+// ═══════════════════════════════════════════════════
+function renderGuidanceComplexityTable(){
+  const rows=cfg().iaf39_summary||[];
+  const groups=[];
+  rows.forEach(r=>{
+    const last=groups[groups.length-1];
+    if(last && last.iaf===r.iaf) last.items.push(r);
+    else groups.push({iaf:r.iaf, kr:r.kr, items:[r]});
+  });
+
+  let html = `<table class="gtbl"><thead><tr>
+    <th>IAF코드</th><th>업종</th><th>KSIC코드</th><th>QMS(9001)</th><th>EMS(14001)</th><th>OHSMS(45001)</th>
+  </tr></thead><tbody>`;
+  groups.forEach(gr=>{
+    gr.items.forEach((r,i)=>{
+      const ksicText=(r.ksic||[]).join(', ');
+      html += '<tr>';
+      if(i===0){
+        html += `<td rowspan="${gr.items.length}">${gr.iaf}</td>`;
+        html += `<td rowspan="${gr.items.length}" style="text-align:left">${gr.kr||''}</td>`;
+      }
+      html += `<td style="text-align:left;font-size:10px;max-width:280px">${ksicText}</td>
+        <td>${r.qms||'-'}</td><td>${r.ems||'-'}</td><td>${r.ohsms||'-'}</td></tr>`;
+    });
+  });
+  return html + `</tbody></table>`;
+}
+const MD5_STD_LABEL = {'9001':'ISO 9001 (QMS)','14001':'ISO 14001 (EMS)','45001':'ISO 45001 (OHSMS)'};
+function renderMd5TableFor(stdKey){
+  const rows=cfg().md5_employee_table[stdKey]||[];
+  const schema=cfg().md5_table_schema[stdKey];
+  const cats=schema.categories;
+  const catLabel={single:'',high:'높음',med:'중간',low:'낮음',restrict:'제한'};
+
+  let head1 = `<th rowspan="2">인원기준</th>` + (cats[0]==='single'
+    ? `<th colspan="2">최초심사</th><th rowspan="2">사후심사</th><th rowspan="2">갱신심사</th>`
+    : cats.map(c=>`<th colspan="2">${catLabel[c]}</th>`).join('') + `<th colspan="${cats.length}">사후심사</th><th colspan="${cats.length}">갱신심사</th>`);
+  let head2 = (cats[0]==='single'
+    ? `<th>1단계 심사</th><th>2단계 심사</th>`
+    : cats.map(()=>`<th>1단계 심사</th><th>2단계 심사</th>`).join('') + cats.map(c=>`<th>${catLabel[c]}</th>`).join('') + cats.map(c=>`<th>${catLabel[c]}</th>`).join(''));
+  let html = `<table class="gtbl"><thead><tr>${head1}</tr><tr>${head2}</tr></thead><tbody>`;
+
+  rows.forEach((r,i)=>{
+    const next=rows[i+1];
+    const rangeLabel = next ? `${r[0]}~${next[0]-1}명` : `${r[0]}명 이상`;
+    let cells='';
+    cats.forEach((c,ci)=>{
+      cells += `<td>${r[schema.stageColBase+ci*2]}</td><td>${r[schema.stageColBase+ci*2+1]}</td>`;
+    });
+    if(schema.survMode==='single'){
+      cells += `<td>${r[schema.survColBase]}</td><td>${r[schema.recertColBase]}</td>`;
+    } else {
+      cats.forEach((c,ci)=>{ cells += `<td>${r[schema.survColBase+ci]}</td>`; });
+      cats.forEach((c,ci)=>{ cells += `<td>${r[schema.recertColBase+ci]}</td>`; });
+    }
+    html += `<tr><td>${rangeLabel}</td>${cells}</tr>`;
+  });
+  return html + `</tbody></table>`;
+}
+function renderGuidanceMd5Table(){
+  return ['9001','14001','45001'].map(stdKey =>
+    `<div style="font-size:12px;font-weight:700;margin:14px 0 6px">${MD5_STD_LABEL[stdKey]}</div>` +
+    renderMd5TableFor(stdKey)
+  ).join('');
+}
+function renderGuidanceStandardsTable(){
+  const rows=cfg().guidance_standards||[];
+  let html = `<table class="gtbl"><thead><tr>
+    <th>표준</th><th>근거문서</th><th>산정 요인</th><th>산출 방식</th><th>확인상태</th>
+  </tr></thead><tbody>`;
+  rows.forEach(r=>{
+    const statusColor = r.status.startsWith('확정') ? '#047a5a' : r.status.startsWith('잠정') ? '#c97820' : '#8a8f98';
+    html += `<tr><td style="font-weight:700;white-space:nowrap">${r.code}</td>
+      <td style="font-size:11px">${r.basis}</td>
+      <td style="font-size:11px">${r.factors}</td>
+      <td style="font-size:11px">${r.method}</td>
+      <td style="font-size:11px;font-weight:700;color:${statusColor}">${r.status}</td></tr>`;
+  });
+  return html + `</tbody></table>`;
+}
+function toggleGuidanceStandards(){
+  const box=g('guidance-standards-box');
+  const btn=g('guidance-standards-toggle');
+  if(!box) return;
+  const show = box.style.display==='none';
+  box.style.display = show?'block':'none';
+  if(btn) btn.textContent = show ? '▲ 접기' : '▼ 표준별 산출 요인 및 방식 보기';
+}
+function initGuidancePanel(){
+  const c1=g('guidance-complexity-table');
+  const c2=g('guidance-md5-table');
+  const c3=g('guidance-standards-table');
+  if(c1) c1.innerHTML=renderGuidanceComplexityTable();
+  if(c2) c2.innerHTML=renderGuidanceMd5Table();
+  if(c3) c3.innerHTML=renderGuidanceStandardsTable();
+}
+
+
+</script>
+<script>initKabCalcEngine();</script>
+
+<!-- ── CB 포털 연동 ── -->
+<script>
+window.addEventListener('kab-engine-ready', function onReady(){
+  window.removeEventListener('kab-engine-ready', onReady);
+
+// URL 파라미터에서 기업 정보 자동 주입
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const emp    = params.get('emp');
+  const stds   = params.get('stds');     // 쉼표구분 표준코드
+  const atype  = params.get('atype');    // initial/followup/renewal
+  const sites  = params.get('sites');
+  const ksic   = params.get('ksic');     // 기업정보 DB의 KSIC코드 (복잡도 판정 주 입력)
+  const iaf    = params.get('iaf');      // 인증기관 기보유 IAF코드 (KSIC 매칭 실패시 참고용)
+  const coName = params.get('co');
+  const appId  = params.get('app_id');   // certification_applications.id — 검토서와 동일 키
+
+  if (emp) {
+    const empEl = document.getElementById('emp');
+    if (empEl) { empEl.value = emp; }
+  }
+  if (atype) {
+    const atEl = document.getElementById('atype');
+    if (atEl) atEl.value = atype;
+  }
+  if (sites && parseInt(sites) > 1) {
+    const siteEl = document.getElementById('site-total');
+    if (siteEl) { siteEl.value = sites; onSiteChange && onSiteChange(); }
+  }
+
+  // 복잡도 판정 — KSIC코드가 주 입력값 (KSIC-IAF 크로스워크로 자동확정)
+  if (ksic) {
+    const ksicEl = document.getElementById('ksic-input');
+    if (ksicEl) {
+      ksicEl.value = ksic;
+      onKsicChange && onKsicChange();
+    }
+  } else if (iaf) {
+    // KSIC이 없을 때만 기존 보유 IAF코드를 참고용으로 표시 (복잡도 자동판정은 되지 않음 — 수동 확인 필요)
+    const infoEl = document.getElementById('ksic-match-info');
+    if (infoEl) infoEl.textContent = `⚠ KSIC코드가 없어 복잡도 자동판정이 불가합니다. 참고: 기존 보유 IAF코드 = ${iaf} (수동으로 KSIC 또는 복잡도를 확인하세요)`;
+  }
+
+  // 표준 자동 선택 — cfg().standards를 기준으로 정확히 매칭 (부분일치 금지)
+  // 형식: "9001,14001" (심사유형 공통) 또는 "9001:surv12,14001:recert" (표준별 심사유형 지정)
+  function resolveStdCode(token) {
+    const clean = token.trim().toLowerCase()
+      .replace(/iso\s*\/?\s*iec\s*/g, '').replace(/[^0-9a-z-]/g, '');
+    const allStds = cfg().standards;
+    let hit = allStds.find(s => s.code.toLowerCase() === clean);
+    if (hit) return hit.code;
+    hit = allStds.find(s => (s.code.replace(/-\d{4}$/, '') + s.version_year) === clean);
+    if (hit) return hit.code;
+    const family = clean.replace(/(19|20)\d{2}$/, '');
+    const candidates = allStds.filter(s => s.code.replace(/-\d{4}$/, '') === family);
+    if (candidates.length) return (candidates.find(s => s.status === 'active') || candidates[0]).code;
+    return null;
+  }
+  if (stds) {
+    const pairs = stds.split(',').map(entry => {
+      const [codeToken, atypeToken] = entry.split(':');
+      return { code: resolveStdCode(codeToken), atype: atypeToken || null };
+    }).filter(p => p.code);
+    setTimeout(() => {
+      if (pairs.length > 1 && typeof setMode === 'function') setMode('integrated');
+      pairs.forEach(({ code }) => {
+        const card = document.querySelector(`.scard[data-code="${code}"]`);
+        if (card && !card.classList.contains('on')) card.click();
+      });
+      // 카드가 전부 선택된 뒤(표준별 override 셀렉트가 렌더링된 뒤) 심사유형 override 적용
+      setTimeout(() => {
+        pairs.forEach(({ code, atype }) => {
+          if (atype && typeof setStdAtype === 'function') setStdAtype(code, atype);
+        });
+        calc && calc();
+      }, 100);
+    }, 300);
+  }
+
+  // 상단에 기업명 표시
+  if (coName) {
+    const title = document.createElement('div');
+    title.style.cssText = 'background:#185FA5;color:#fff;padding:10px 16px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center';
+    title.innerHTML = `🧮 MD 산정 — ${decodeURIComponent(coName)}
+      <div style="display:flex;gap:8px">
+        ${appId ? `<button onclick="saveMdResult('${appId}')" style="padding:5px 12px;background:#fff;color:#185FA5;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">💾 결과 저장</button>` : ''}
+        <button onclick="window.close()" style="padding:5px 12px;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">✕ 닫기</button>
+      </div>`;
+    document.body.insertBefore(title, document.body.firstChild);
+  }
+
+  // 결과 저장 함수 — certification_application_md_reviews.base_md로 저장 (검토서가 그대로 읽어감)
+  window.saveMdResult = async function(applicationId) {
+    const final = document.getElementById('r-final')?.textContent || '0';
+    const fd = new FormData();
+    fd.append('application_id', applicationId);
+    fd.append('base_md', final);
+    fd.append('base_md_detail_json', JSON.stringify(window._lastCalcLog || {}));
+    try {
+      const r = await fetch('md_save_base.php', {method:'POST', body:fd});
+      const j = await r.json();
+      alert(j.ok ? `✅ 저장 완료! 기본 MD: ${final}일` : '저장 실패: ' + (j.msg||''));
+      if (j.ok) window.close();
+    } catch(e) {
+      alert('저장 오류: ' + e.message);
+    }
+  };
+})();
+
+});
+</script>
+</body>
+</html>

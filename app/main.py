@@ -2,6 +2,7 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.api import api_router
@@ -33,12 +34,94 @@ def health_check():
     return {"status": "ok", "project": "ComplAIs API Core"}
 
 
-# 정적 목업 페이지(플랫폼 어드민 대시보드 등) 서빙.
-# 주의: "/" 마운트는 경로 전체를 prefix로 가로채므로, 위의 API 라우터들보다
-# 반드시 나중에 등록해야 한다. 순서가 바뀌면 /api/v1/... 요청까지
-# StaticFiles가 먼저 가로채 404를 반환하게 된다.
-static_dir = os.path.join(os.path.dirname(__file__), "static")
+# ---- Portal page routes (어드민 / 기업 포털 분리) ----
+_BASE_DIR = os.path.dirname(__file__)
+_TEMPLATES_DIR = os.path.join(_BASE_DIR, "templates")
+_STATIC_DIR = os.path.join(_BASE_DIR, "static")
 
-if os.path.exists(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="root")
+
+def _template_path(*names: str) -> str:
+    """templates 우선, 없으면 static 폴백."""
+    for name in names:
+        path = os.path.join(_TEMPLATES_DIR, name)
+        if os.path.exists(path):
+            return path
+        path = os.path.join(_STATIC_DIR, name)
+        if os.path.exists(path):
+            return path
+    raise FileNotFoundError(f"template not found: {names}")
+
+
+@app.get("/enterprise/dashboard", include_in_schema=False)
+@app.get("/enterprise", include_in_schema=False)
+def enterprise_dashboard_page():
+    """기업 포털 메인 — 사이드 패널 4대 영역."""
+    return FileResponse(
+        _template_path("enterprise_dashboard.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/admin/dashboard", include_in_schema=False)
+@app.get("/admin", include_in_schema=False)
+def admin_dashboard_page():
+    """플랫폼 어드민 진입점."""
+    return FileResponse(
+        _template_path("admin_dashboard.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/cb-portal/dashboard", include_in_schema=False)
+@app.get("/cb-admin", include_in_schema=False)
+def cb_admin_dashboard_page():
+    """CB Admin 대시보드."""
+    return FileResponse(
+        _template_path("cb_admin_dashboard.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/cb-portal/review.html", include_in_schema=False)
+def cb_portal_review_page():
+    """검토/승인 화면 — MD 확정 및 Draft 계약 승인."""
+    return FileResponse(
+        _template_path("cb_application_review.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/cb-portal/assign.html", include_in_schema=False)
+@app.get("/cb-portal/assignments", include_in_schema=False)
+def cb_portal_assignments_page():
+    """CB 포털 — 심사원 일괄 배정."""
+    return FileResponse(
+        _template_path("cb_portal_assignments.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/cb-portal/contracts", include_in_schema=False)
+def cb_portal_contracts_page():
+    """CB 포털 — 계약 목록."""
+    return FileResponse(
+        _template_path("cb_portal_contracts.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/cb-portal", include_in_schema=False)
+def cb_portal_page():
+    """CB 포털 홈."""
+    return FileResponse(
+        _template_path("cb_portal.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+# 정적 목업 페이지(플랫폼 어드민 대시보드 등) 서빙.
+# 주의: "/" 마운트는 경로 전체를 prefix로 가로채므로, 위의 API/페이지 라우터들보다
+# 반드시 나중에 등록해야 한다.
+if os.path.exists(_STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+    app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="root")

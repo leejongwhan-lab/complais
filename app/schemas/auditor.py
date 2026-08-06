@@ -197,6 +197,12 @@ class AuditorCbMembershipsBase(BaseModel):
     daily_rate: Optional[int] = None
     cert_standards: Optional[str] = None
     kar_no: Optional[str] = None
+    qualification_granted_at: Optional[date] = None
+    qualification_expires_at: Optional[date] = None
+    knowledge_eval_score: Optional[int] = None
+    cpd_hours_completed: Optional[int] = 0
+    conflict_of_interest_cleared: Optional[bool] = False
+    extra_metadata: Optional[dict] = None
 
 
 class AuditorCbMembershipsCreate(AuditorCbMembershipsBase):
@@ -234,6 +240,12 @@ class AuditorCbMembershipsUpdate(BaseModel):
     daily_rate: Optional[int] = None
     cert_standards: Optional[str] = None
     kar_no: Optional[str] = None
+    qualification_granted_at: Optional[date] = None
+    qualification_expires_at: Optional[date] = None
+    knowledge_eval_score: Optional[int] = None
+    cpd_hours_completed: Optional[int] = None
+    conflict_of_interest_cleared: Optional[bool] = None
+    extra_metadata: Optional[dict] = None
 
 
 class AuditorCbMembershipsResponse(AuditorCbMembershipsBase):

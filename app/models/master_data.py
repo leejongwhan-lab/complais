@@ -1,6 +1,22 @@
 # app/models/master_data.py
-from sqlalchemy import Column, BigInteger, String, Integer, Boolean, ForeignKey, Text
-from sqlalchemy.orm import relationship
+from datetime import date, datetime
+from typing import Optional
+
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.mysql import INTEGER as MySQLInteger
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.core.database import Base
 
 
@@ -21,17 +37,70 @@ class KsicCode(Base):
 
 
 class IafCode(Base):
-    """IAF (인증분류) 마스터"""
+    """IAF (인증분류) 마스터 — 개정/폐기에 대비해 독립 관리."""
+
     __tablename__ = "iaf_codes"
 
-    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
-    code = Column(String(10), unique=True, nullable=False, index=True, comment="IAF 코드 (예: 19, 19B, 33)")
-    name_ko = Column(String(100), nullable=False, comment="국문 범주명")
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)  # iaf_code_id
+    code = Column(String(20), unique=True, nullable=False, index=True, comment="IAF 코드 (예: 01, 14, 19)")
+    name_ko = Column(String(255), nullable=False, comment="산업 분야명(국문)")
     name_en = Column(String(100), nullable=True, comment="영문 범주명")
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True, comment="코드 유효 여부")
+    updated_at = Column(DateTime, nullable=True)
 
     # Relationships
     ksic_mappings = relationship("KsicIafMapping", back_populates="iaf")
     major_mappings = relationship("MajorIafMapping", back_populates="iaf")
+    accredited_scopes = relationship("CbAccreditedScope", back_populates="iaf_code")
+
+
+class IsoStandard(Base):
+    """ISO 인증 표준 마스터 (인정 Scope용 · 운영 14규격).
+
+    standard_key  : QMS_2015 등 — standard_masters / 매핑과 동일 키
+    standard_code : display_code (ISO 9001:2015) — 화면·레거시 호환
+    """
+
+    __tablename__ = "iso_standards"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)  # standard_id
+    standard_key = Column(String(40), unique=True, nullable=True, index=True, comment="예: QMS_2015")
+    standard_code = Column(String(50), unique=True, nullable=False, comment="예: ISO 9001:2015")
+    standard_name_ko = Column(String(255), nullable=False, comment="표준명(국문)")
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+
+    accredited_scopes = relationship("CbAccreditedScope", back_populates="standard")
+
+
+class CbAccreditedScope(Base):
+    """CB 자격 Scope — CB × 표준(1) × IAF(1) 행 단위 매핑."""
+
+    __tablename__ = "cb_accredited_scopes"
+    __table_args__ = (
+        UniqueConstraint("cb_id", "standard_id", "iaf_code_id", name="uk_cb_standard_iaf"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)  # scope_id
+    cb_id: Mapped[int] = mapped_column(
+        MySQLInteger(unsigned=True),
+        ForeignKey("certification_bodies.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    standard_id: Mapped[int] = mapped_column(ForeignKey("iso_standards.id"), nullable=False)
+    iaf_code_id: Mapped[int] = mapped_column(ForeignKey("iaf_codes.id"), nullable=False)
+    accreditation_body: Mapped[str] = mapped_column(String(100), nullable=False, default="KAB")
+    approval_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    expiry_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    standard = relationship("IsoStandard", back_populates="accredited_scopes")
+    iaf_code = relationship("IafCode", back_populates="accredited_scopes")
 
 
 class Major(Base):

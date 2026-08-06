@@ -23,7 +23,11 @@ from app.core.database import Base
 class AccreditationBodies(Base):
     __tablename__ = "accreditation_bodies"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    code: Mapped[Optional[str]] = mapped_column(String(30), nullable=True, unique=True, comment="이니셜 (KAB, UKAS …)")
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    name_en: Mapped[Optional[str]] = mapped_column(String(300), nullable=True, comment="영문 풀네임")
+    continent: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    country_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     is_active: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

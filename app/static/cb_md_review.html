@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<title>CB 제안검토 — MD 가감/입회</title>
+<style>
+body{font-family:Pretendard,sans-serif;margin:24px;background:#f5f6f8;color:#111}
+.card{background:#fff;padding:20px;max-width:960px;border:1px solid #e5e7eb}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid #eee;padding:8px;text-align:left}
+input,select,textarea{padding:6px;margin:4px 0}
+button{padding:8px 12px;background:#185fa5;color:#fff;border:0;cursor:pointer;margin-right:6px}
+button.ghost{background:#fff;color:#185fa5;border:1px solid #185fa5}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.field label{display:block;font-size:12px;color:#555;margin-bottom:2px}
+.final{font-size:20px;font-weight:700}
+.muted{color:#666;font-size:12px}
+hr{border:none;border-top:1px solid #eee;margin:16px 0}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>CB 제안검토</h2>
+  <button type="button" onclick="loadList()">목록 새로고침</button>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>기업</th><th>유형</th><th>기본MD</th><th>상태</th><th>검토</th></tr>
+    </thead>
+    <tbody id="tb"></tbody>
+  </table>
+
+  <div id="panel" style="margin-top:16px;display:none">
+    <h3>신청 #<span id="aid"></span></h3>
+
+    <h4>MD 행정 가감 (CB Admin API)</h4>
+    <p class="muted">가산/감산 비율을 저장하면 <code>/api/v1/cb-admin/.../md-review</code> 로 최종 MD가 계산됩니다.</p>
+    <div class="row">
+      <div class="field">
+        <label for="md-plus-pct">가산 비율 (%) plus_pct</label>
+        <input id="md-plus-pct" type="number" min="0" max="30" step="1" value="0"/>
+      </div>
+      <div class="field">
+        <label for="md-minus-pct">감산 비율 (%) minus_pct</label>
+        <input id="md-minus-pct" type="number" min="0" max="30" step="1" value="0"/>
+      </div>
+      <div class="field" style="flex:1;min-width:240px">
+        <label for="md-note">가감 사유 / 인용</label>
+        <input id="md-note" style="width:100%" placeholder="IAF MD5 조항 등"/>
+      </div>
+    </div>
+    <div class="row">
+      <div>최종 MD: <span id="md-final-display" class="final">—</span> M/D</div>
+      <div class="muted">base <span id="md-base-display">—</span> · add <span id="md-add-display">—</span> · sub <span id="md-sub-display">—</span></div>
+    </div>
+    <div class="field" style="margin:10px 0">
+      <label for="review-memo">승인 메모</label>
+      <input id="review-memo" style="width:100%" placeholder="승인 처리 메모 (계약 Draft 생성 시 기록)"/>
+    </div>
+    <button type="button" id="btn-save-md" onclick="handleSaveMD()">MD 검토 저장</button>
+    <button type="button" class="ghost" id="btn-approve" onclick="handleApprove()">신청 승인</button>
+
+    <hr/>
+
+    <h4>레거시 스냅샷 검토 (enterprise-audit-applications)</h4>
+    <div>순 가감비율(%) <input id="ratio" type="number" step="0.01" value="0"/></div>
+    <div>사유 <input id="reason" style="width:60%"/></div>
+    <div>입회
+      <select id="wit">
+        <option value="NONE">없음</option>
+        <option value="KAB_WITNESS">KAB 입회</option>
+        <option value="INTERNAL_WITNESS">내부 입회</option>
+      </select>
+      심사원명 <input id="witname"/>
+    </div>
+    <div>상태
+      <select id="st">
+        <option>REVIEWING</option>
+        <option>PROPOSED</option>
+        <option>CONTRACTED</option>
+      </select>
+    </div>
+    <button type="button" onclick="saveReview()">스냅샷 저장</button>
+    <pre id="out"></pre>
+  </div>
+</div>
+
+<script src="/static/js/cb_admin_api.js"></script>
+<script src="/static/js/cb_md_review.js"></script>
+<script>
+let current = null;
+
+function baseOf(r) {
+  const t = (r.audit_type || "").toUpperCase();
+  if (t.startsWith("SURV")) return +r.base_surveillance_md;
+  if (t.includes("RECERT")) return +r.base_recertification_md;
+  return (+r.base_stage1_md) + (+r.base_stage2_md);
+}
+
+function syncMdFieldsFromRow(r) {
+  const ratio = Number(r.cb_adjustment_ratio || 0);
+  document.getElementById("md-plus-pct").value = ratio > 0 ? Math.round(ratio) : 0;
+  document.getElementById("md-minus-pct").value = ratio < 0 ? Math.round(Math.abs(ratio)) : 0;
+  document.getElementById("md-note").value = r.cb_adjustment_reason || "";
+  const finalMd = r.final_audit_md != null ? Number(r.final_audit_md) : baseOf(r);
+  document.getElementById("md-final-display").textContent = Number.isFinite(finalMd) ? finalMd.toFixed(1) : "—";
+  document.getElementById("md-base-display").textContent = baseOf(r).toFixed(1);
+  document.getElementById("md-add-display").textContent = "—";
+  document.getElementById("md-sub-display").textContent = "—";
+}
+
+async function loadList() {
+  const rows = await ComplaisCbMdReview.list();
+  const tb = document.getElementById("tb");
+  tb.innerHTML = "";
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${r.application_id}</td>` +
+      `<td>${r.enterprise_id}</td>` +
+      `<td>${r.audit_type}</td>` +
+      `<td>${baseOf(r).toFixed(1)}</td>` +
+      `<td>${r.status}</td>` +
+      `<td><button type="button" data-open-id="${r.application_id}">열기</button></td>`;
+    tr.querySelector("button").addEventListener("click", () => openReview(r));
+    tb.appendChild(tr);
+  });
+}
+
+function openReview(r) {
+  current = r;
+  document.getElementById("panel").style.display = "block";
+  document.getElementById("aid").textContent = r.application_id;
+  document.getElementById("ratio").value = r.cb_adjustment_ratio || 0;
+  document.getElementById("reason").value = r.cb_adjustment_reason || "";
+  document.getElementById("wit").value = r.witness_type || "NONE";
+  document.getElementById("witname").value = r.witness_auditor_name || "";
+  document.getElementById("st").value = r.status === "SUBMITTED" ? "REVIEWING" : r.status;
+  syncMdFieldsFromRow(r);
+  document.getElementById("out").textContent = "";
+}
+
+async function handleSaveMD(appId) {
+  const id = appId != null ? appId : (current && current.application_id);
+  if (!id) {
+    alert("신청건을 먼저 선택해 주세요.");
+    return;
+  }
+
+  const plusPct = document.getElementById("md-plus-pct").value;
+  const minusPct = document.getElementById("md-minus-pct").value;
+  const note = document.getElementById("md-note").value;
+  const btn = document.getElementById("btn-save-md");
+
+  try {
+    if (btn) btn.disabled = true;
+    const res = await CBAdminAPI.reviewMD(id, plusPct, minusPct, note);
+    document.getElementById("md-final-display").textContent = Number(res.final_md).toFixed(1);
+    document.getElementById("md-base-display").textContent = Number(res.base_md).toFixed(1);
+    document.getElementById("md-add-display").textContent = Number(res.add_md).toFixed(1);
+    document.getElementById("md-sub-display").textContent = Number(res.subtract_md).toFixed(1);
+    document.getElementById("out").textContent = JSON.stringify(res, null, 2);
+    alert("💾 MD 검토 결과가 성공적으로 저장되었습니다.");
+    await loadList();
+  } catch (e) {
+    document.getElementById("out").textContent = String(e && e.message ? e.message : e);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function handleApprove(appId) {
+  const id = appId != null ? appId : (current && current.application_id);
+  if (!id) {
+    alert("신청건을 먼저 선택해 주세요.");
+    return;
+  }
+  if (!confirm("신청서를 승인하고 계약(Draft)을 생성하시겠습니까?")) return;
+
+  const memo = document.getElementById("review-memo").value;
+  const btn = document.getElementById("btn-approve");
+
+  try {
+    if (btn) btn.disabled = true;
+    const res = await CBAdminAPI.approveApplication(id, memo);
+    document.getElementById("out").textContent = JSON.stringify(res, null, 2);
+    alert("✅ 승인이 완료되었습니다. 심사원 배정 단계로 이동합니다.");
+    location.href = `/cb-portal/assignments?app_id=${id}`;
+  } catch (e) {
+    // CB Scope 미포함 등 차단 에러는 API 래퍼에서 alert 처리됨
+    document.getElementById("out").textContent = String(e && e.message ? e.message : e);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function saveReview() {
+  if (!current) return;
+  const body = {
+    cb_adjustment_ratio: +document.getElementById("ratio").value,
+    cb_adjustment_reason: document.getElementById("reason").value,
+    witness_type: document.getElementById("wit").value,
+    witness_auditor_name: document.getElementById("witname").value,
+    status: document.getElementById("st").value,
+  };
+  try {
+    const out = await ComplaisCbMdReview.review(current.application_id, body);
+    document.getElementById("out").textContent = JSON.stringify(out, null, 2);
+    loadList();
+  } catch (e) {
+    document.getElementById("out").textContent = String(e);
+  }
+}
+
+loadList()
+  .then(async () => {
+    const qid = parseInt(new URLSearchParams(location.search).get("id") || "", 10);
+    if (!qid) return;
+    try {
+      const rows = await ComplaisCbMdReview.list();
+      const row = (rows || []).find((r) => Number(r.application_id) === qid);
+      if (row) openReview(row);
+    } catch (_) { /* ignore */ }
+  })
+  .catch((e) => {
+    document.getElementById("out").textContent = String(e);
+  });
+</script>
+</body>
+</html>

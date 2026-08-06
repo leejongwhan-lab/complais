@@ -45,6 +45,20 @@ class CBContractResponse(CBContractBase):
 
 class CBContractListResponse(CBContractResponse):
     cb_name: str  # certification_bodies 조인 필드
+    cb_code: Optional[str] = None
+    cb_status: Optional[str] = None
+    scope_count: int = 0
+    held_standard_count: int = 0
+    held_standards: list[str] = Field(default_factory=list)
+    ab_summary: str = ""
+    accreditation_body: Optional[str] = None
+
+
+class AdminDashboardStats(BaseModel):
+    cb_count: int = 0
+    company_count: int = 0
+    auditor_count: int = 0
+    pending_accreditation_count: int = 0
 
 
 # --- CBAccreditedScope ---

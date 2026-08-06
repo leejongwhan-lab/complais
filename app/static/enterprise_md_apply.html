@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<title>기업 인증신청 MD 산출</title>
+<link rel="stylesheet" href="/static/design_tokens_v3.css"/>
+<style>
+body{font-family:Pretendard,sans-serif;margin:24px;background:#f5f6f8;color:#1a1a1a}
+.card{background:#fff;padding:20px;max-width:720px;border:1px solid #e5e7eb}
+label{display:block;font-size:12px;margin:10px 0 4px;color:#555}
+input,select{width:100%;padding:8px;border:1px solid #d1d5db}
+button{margin-top:14px;padding:10px 16px;background:#185fa5;color:#fff;border:0;cursor:pointer}
+pre{background:#f7f8fa;padding:12px;font-size:12px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>기업 인증신청 — MD 산출</h2>
+  <label>CB ID</label><input id="cb_id" type="number" value="1"/>
+  <label>표준 (콤마구분, 예: 9001,14001)</label><input id="stds" value="9001"/>
+  <label>인원</label><input id="emp" type="number" value="50"/>
+  <label>KSIC</label><input id="ksic" value="2011"/>
+  <label>심사유형</label>
+  <select id="atype">
+    <option value="INITIAL">최초</option>
+    <option value="SURVEILLANCE_1">사후1</option>
+    <option value="SURVEILLANCE_2">사후2</option>
+    <option value="RECERT">재인증</option>
+  </select>
+  <button onclick="doPreview()">미리보기</button>
+  <button onclick="doSubmit()">신청 저장</button>
+  <button onclick="doYearly()">연차 인원갱신 스냅샷</button>
+  <pre id="out">-</pre>
+</div>
+<script src="/static/js/enterprise_md_apply.js"></script>
+<script>
+async function body(){
+  return {
+    cb_id: +document.getElementById('cb_id').value,
+    standards: document.getElementById('stds').value.split(',').map(s=>s.trim()).filter(Boolean),
+    employees: +document.getElementById('emp').value,
+    ksic_code: document.getElementById('ksic').value,
+    audit_type: document.getElementById('atype').value,
+  };
+}
+async function doPreview(){
+  try{ document.getElementById('out').textContent=JSON.stringify(await ComplaisMdApply.preview(await body()),null,2);}
+  catch(e){ document.getElementById('out').textContent=String(e); }
+}
+async function doSubmit(){
+  try{ document.getElementById('out').textContent=JSON.stringify(await ComplaisMdApply.submit(await body()),null,2);}
+  catch(e){ document.getElementById('out').textContent=String(e); }
+}
+async function doYearly(){
+  const b=await body();
+  try{ document.getElementById('out').textContent=JSON.stringify(await ComplaisMdApply.yearly({employees:b.employees,audit_type:b.audit_type,standards:b.standards,ksic_code:b.ksic_code,cb_id:b.cb_id}),null,2);}
+  catch(e){ document.getElementById('out').textContent=String(e); }
+}
+</script>
+</body>
+</html>

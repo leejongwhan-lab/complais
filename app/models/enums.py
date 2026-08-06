@@ -10,6 +10,75 @@ class ApprovalStatus(str, enum.Enum):
     EXPIRED = "EXPIRED"     # 만료
 
 
+# 심사원→인증원 승인 요청 상태 (ApprovalStatus와 동일 값)
+class ApplicationStatus(str, enum.Enum):
+    PENDING = "PENDING"     # 승인 대기
+    APPROVED = "APPROVED"   # 승인 완료
+    REJECTED = "REJECTED"   # 반려
+
+
+class ProposalStatus(str, enum.Enum):
+    """인증 제안서 워크플로 상태 (FE types/proposal.ts 와 동일).
+
+    DRAFT → SURVEY_SUBMITTED → MD_CALCULATED → COST_APPLIED
+      → AUDITOR_ASSIGNED → PENDING_APPROVAL → APPROVED → DISPATCHED
+                                         ↘ REJECTED
+    """
+
+    DRAFT = "DRAFT"  # 기업 신청 및 임시저장
+    SURVEY_SUBMITTED = "SURVEY_SUBMITTED"  # 설문 제출 완료
+    MD_CALCULATED = "MD_CALCULATED"  # M/D 및 가감요인 산정 완료
+    COST_APPLIED = "COST_APPLIED"  # 심사비 확정
+    AUDITOR_ASSIGNED = "AUDITOR_ASSIGNED"  # 심사원 배정 완료
+    PENDING_APPROVAL = "PENDING_APPROVAL"  # 승인 요청 (결재 대기)
+    APPROVED = "APPROVED"  # 승인 완료 (제안서 확정)
+    REJECTED = "REJECTED"  # 반려 (보완 요청)
+    DISPATCHED = "DISPATCHED"  # 기업에 제안서 최종 발송
+
+
+PROPOSAL_STATUS_LABELS = {
+    ProposalStatus.DRAFT: "임시저장",
+    ProposalStatus.SURVEY_SUBMITTED: "설문 제출",
+    ProposalStatus.MD_CALCULATED: "M/D 산정",
+    ProposalStatus.COST_APPLIED: "심사비 확정",
+    ProposalStatus.AUDITOR_ASSIGNED: "심사원 배정",
+    ProposalStatus.PENDING_APPROVAL: "결재 대기",
+    ProposalStatus.APPROVED: "승인 완료",
+    ProposalStatus.REJECTED: "반려(보완)",
+    ProposalStatus.DISPATCHED: "제안서 발송",
+}
+
+PROPOSAL_STATUS_TRANSITIONS = {
+    ProposalStatus.DRAFT: {ProposalStatus.SURVEY_SUBMITTED},
+    ProposalStatus.SURVEY_SUBMITTED: {ProposalStatus.MD_CALCULATED},
+    ProposalStatus.MD_CALCULATED: {ProposalStatus.COST_APPLIED},
+    ProposalStatus.COST_APPLIED: {ProposalStatus.AUDITOR_ASSIGNED},
+    ProposalStatus.AUDITOR_ASSIGNED: {ProposalStatus.PENDING_APPROVAL},
+    ProposalStatus.PENDING_APPROVAL: {
+        ProposalStatus.APPROVED,
+        ProposalStatus.REJECTED,
+    },
+    ProposalStatus.APPROVED: {ProposalStatus.DISPATCHED},
+    ProposalStatus.REJECTED: {
+        ProposalStatus.SURVEY_SUBMITTED,
+        ProposalStatus.MD_CALCULATED,
+        ProposalStatus.COST_APPLIED,
+        ProposalStatus.AUDITOR_ASSIGNED,
+        ProposalStatus.PENDING_APPROVAL,
+    },
+    ProposalStatus.DISPATCHED: set(),
+}
+
+
+def can_transition_proposal_status(from_status: str, to_status: str) -> bool:
+    try:
+        src = ProposalStatus(from_status)
+        dst = ProposalStatus(to_status)
+    except ValueError:
+        return False
+    return dst in PROPOSAL_STATUS_TRANSITIONS.get(src, set())
+
+
 class CompanyStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"       # 정상
     SUSPENDED = "SUSPENDED" # 휴업
@@ -142,14 +211,20 @@ class AuditorApprovalHistoryActionType(str, enum.Enum):
 class AuditorApprovalHistoryFromGrade(str, enum.Enum):
     TRAINEE = "trainee"
     AUDITOR = "auditor"
-    SENIOR = "senior"
-    VERIFIER = "verifier"
+    LEAD_AUDITOR = "lead_auditor"
+    VERIFIED_AUDITOR = "verified_auditor"
+    # legacy aliases
+    SENIOR = "lead_auditor"
+    VERIFIER = "verified_auditor"
 
 class AuditorApprovalHistoryToGrade(str, enum.Enum):
     TRAINEE = "trainee"
     AUDITOR = "auditor"
-    SENIOR = "senior"
-    VERIFIER = "verifier"
+    LEAD_AUDITOR = "lead_auditor"
+    VERIFIED_AUDITOR = "verified_auditor"
+    # legacy aliases
+    SENIOR = "lead_auditor"
+    VERIFIER = "verified_auditor"
 
 class AuditorApprovalHistoryResult(str, enum.Enum):
     APPROVED = "approved"
@@ -178,18 +253,26 @@ class AuditorCbMembershipsStatus(str, enum.Enum):
     APPROVED = "approved"
     REJECTED = "rejected"
     TERMINATED = "terminated"
+    SUSPENDED = "suspended"
+    EXPIRED = "expired"
 
 class AuditorCbMembershipsApplyGrade(str, enum.Enum):
     TRAINEE = "trainee"
     AUDITOR = "auditor"
-    SENIOR = "senior"
-    VERIFIER = "verifier"
+    LEAD_AUDITOR = "lead_auditor"
+    VERIFIED_AUDITOR = "verified_auditor"
+    # legacy aliases
+    SENIOR = "lead_auditor"
+    VERIFIER = "verified_auditor"
 
 class AuditorCbMembershipsApprovedGrade(str, enum.Enum):
     TRAINEE = "trainee"
     AUDITOR = "auditor"
-    SENIOR = "senior"
-    VERIFIER = "verifier"
+    LEAD_AUDITOR = "lead_auditor"
+    VERIFIED_AUDITOR = "verified_auditor"
+    # legacy aliases
+    SENIOR = "lead_auditor"
+    VERIFIER = "verified_auditor"
 
 class AuditorConflictHistoryConflictType(str, enum.Enum):
     EMPLOYMENT = "employment"
@@ -210,24 +293,31 @@ class AuditorEnvCompetencyEnvGrade(str, enum.Enum):
 class AuditorExternalCertsGrade(str, enum.Enum):
     TRAINEE = "trainee"
     AUDITOR = "auditor"
-    SENIOR = "senior"
-    VERIFIER = "verifier"
+    LEAD_AUDITOR = "lead_auditor"
+    VERIFIED_AUDITOR = "verified_auditor"
+    SENIOR = "lead_auditor"
+    VERIFIER = "verified_auditor"
 
 class AuditorGradeRequirementsFromGrade(str, enum.Enum):
     TRAINEE = "trainee"
     AUDITOR = "auditor"
-    SENIOR = "senior"
+    LEAD_AUDITOR = "lead_auditor"
+    SENIOR = "lead_auditor"
 
 class AuditorGradeRequirementsToGrade(str, enum.Enum):
     AUDITOR = "auditor"
-    SENIOR = "senior"
-    VERIFIER = "verifier"
+    LEAD_AUDITOR = "lead_auditor"
+    VERIFIED_AUDITOR = "verified_auditor"
+    SENIOR = "lead_auditor"
+    VERIFIER = "verified_auditor"
 
 class AuditorQualificationsGrade(str, enum.Enum):
     TRAINEE = "trainee"
     AUDITOR = "auditor"
-    SENIOR = "senior"
-    VERIFIER = "verifier"
+    LEAD_AUDITOR = "lead_auditor"
+    VERIFIED_AUDITOR = "verified_auditor"
+    SENIOR = "lead_auditor"
+    VERIFIER = "verified_auditor"
 
 class AuditorScopeGrantsGrantType(str, enum.Enum):
     EDUCATION = "education"
@@ -243,8 +333,10 @@ class AuditorScopeRequestsRequestType(str, enum.Enum):
 class AuditorScopeRequestsTargetGrade(str, enum.Enum):
     TRAINEE = "trainee"
     AUDITOR = "auditor"
-    SENIOR = "senior"
-    VERIFIER = "verifier"
+    LEAD_AUDITOR = "lead_auditor"
+    VERIFIED_AUDITOR = "verified_auditor"
+    SENIOR = "lead_auditor"
+    VERIFIER = "verified_auditor"
 
 class AuditorScopeRequestsStatus(str, enum.Enum):
     PENDING = "pending"
@@ -269,10 +361,14 @@ class AuditorWitnessRecordsResult(str, enum.Enum):
     PENDING = "pending"
 
 class AuditorsGrade(str, enum.Enum):
+    """심사원 등급 — 표준 정의는 app.core.constants.AuditorGrade 와 동일."""
     TRAINEE = "trainee"
     AUDITOR = "auditor"
-    SENIOR = "senior"
-    VERIFIER = "verifier"
+    LEAD_AUDITOR = "lead_auditor"
+    VERIFIED_AUDITOR = "verified_auditor"
+    # legacy aliases
+    SENIOR = "lead_auditor"
+    VERIFIER = "verified_auditor"
 
 class AuditorsEmploymentType(str, enum.Enum):
     FULLTIME = "fulltime"
@@ -550,10 +646,12 @@ class KarCpdRecordsStatus(str, enum.Enum):
 class KarQualificationsGrade(str, enum.Enum):
     JUNIOR = "junior"
     AUDITOR = "auditor"
-    SENIOR = "senior"
-    VERIFIER = "verifier"
     LEAD_AUDITOR = "lead_auditor"
+    VERIFIED_AUDITOR = "verified_auditor"
     TRAINEE = "trainee"
+    # legacy aliases
+    SENIOR = "lead_auditor"
+    VERIFIER = "verified_auditor"
 
 class KarQualificationsStatus(str, enum.Enum):
     ACTIVE = "active"

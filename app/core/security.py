@@ -1,16 +1,9 @@
-"""인증 유틸 + 임시 인증 스텁 (Auth Stub).
-
-JWT 발급/검증·비밀번호 해시·역할 체크는 아래에 구현되어 있다.
-엔드포인트의 `get_current_user`는 아직 `X-User-Id` 헤더 스텁이며,
-JWT 로그인 도입 시 Bearer 검증으로 교체하면 된다.
-
-TODO(auth): get_current_user를 Authorization: Bearer <JWT> 기반으로 교체.
-"""
+"""인증 유틸 — JWT 발급/검증 + RBAC dependency."""
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional
 
 import jwt
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from pydantic import BaseModel
@@ -41,8 +34,11 @@ def create_access_token(
     subject: Any,
     role: str,
     entity_id: Optional[int] = None,
+    cb_id: Optional[int] = None,
+    company_id: Optional[int] = None,
     expires_delta: Optional[timedelta] = None,
 ) -> str:
+    """JWT 발급 — PHP 세션의 user_id/role/cb_id 고정에 대응."""
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
@@ -53,6 +49,8 @@ def create_access_token(
         "sub": str(subject),
         "role": role,
         "entity_id": entity_id,
+        "cb_id": cb_id,
+        "company_id": company_id,
     }
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -87,7 +85,7 @@ class RoleChecker:
         return payload
 
 
-# 역할별 접근 제한 (UsersRole 값과 일치)
+# 역할별 접근 제한 (UsersRole 값과 일치) — JWT payload 기준
 require_admin = RoleChecker([UsersRole.PLATFORM_ADMIN.value])
 require_cb = RoleChecker([UsersRole.PLATFORM_ADMIN.value, UsersRole.CB_ADMIN.value])
 require_auditor = RoleChecker([UsersRole.PLATFORM_ADMIN.value, UsersRole.AUDITOR.value])
@@ -95,40 +93,78 @@ require_company = RoleChecker([UsersRole.PLATFORM_ADMIN.value, UsersRole.CLIENT_
 
 
 class CurrentUser(BaseModel):
-    """인증된 사용자 컨텍스트. 실제 로그인 도입 후에도 동일한 필드로 유지한다."""
+    """인증된 사용자 컨텍스트."""
 
     id: int
     role: str
     cb_id: Optional[int] = None
     company_id: Optional[int] = None
+    entity_id: Optional[int] = None
 
 
 def get_current_user(
-    x_user_id: Optional[int] = Header(
-        default=None,
-        alias="X-User-Id",
-        description="[임시 인증 스텁] 실제 로그인 붙이기 전까지 사용하는 로그인 사용자 ID 헤더",
-    ),
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> CurrentUser:
-    if x_user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="인증이 필요합니다. (임시 인증 스텁: X-User-Id 헤더를 전달하세요)",
-        )
+    """Authorization: Bearer <JWT> 를 검증하고 DB 사용자를 로드한다."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="자격 증명을 검증할 수 없습니다.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id_raw = payload.get("sub")
+        if user_id_raw is None:
+            raise credentials_exception
+        user_id = int(user_id_raw)
+    except (jwt.PyJWTError, ValueError, TypeError) as exc:
+        raise credentials_exception from exc
 
-    # users 테이블 스키마 드리프트 방지를 위해 필요한 컬럼만 명시적으로 조회한다.
     row = (
-        db.query(Users.id, Users.role, Users.cb_id, Users.company_id, Users.is_active)
-        .filter(Users.id == x_user_id)
+        db.query(
+            Users.id,
+            Users.role,
+            Users.cb_id,
+            Users.company_id,
+            Users.is_active,
+            Users.status,
+            Users.membership_status,
+        )
+        .filter(Users.id == user_id)
         .first()
     )
     if row is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"사용자(id={x_user_id})를 찾을 수 없습니다.")
-    if not row.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="비활성화된 계정입니다.")
+        raise credentials_exception
+    if not row.is_active or row.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="비활성화되거나 승인 대기 중인 계정입니다.",
+        )
+    membership_status = getattr(row, "membership_status", "approved") or "approved"
+    if membership_status == "pending":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="소속 기관(기업) 대표 관리자의 승인 대기 중입니다.",
+        )
+    if membership_status == "rejected":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="가입 승인이 거절되었습니다. 관리자에게 문의하세요.",
+        )
 
-    return CurrentUser(id=row.id, role=row.role, cb_id=row.cb_id, company_id=row.company_id)
+    # JWT에 고정된 cb_id가 있으면 DB 값과 불일치 시 JWT 스코프를 우선하지 않고 DB를 신뢰
+    # (세션 하이재킹/토큰 변조 대비). CB 역할은 DB.cb_id 필수.
+    cb_id = row.cb_id
+    company_id = row.company_id
+
+    return CurrentUser(
+        id=row.id,
+        role=row.role,
+        cb_id=cb_id,
+        company_id=company_id,
+        entity_id=payload.get("entity_id"),
+    )
 
 
 def require_cb_scope(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
@@ -143,15 +179,48 @@ def require_cb_scope(current_user: CurrentUser = Depends(get_current_user)) -> C
     return current_user
 
 
-def require_platform_admin(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
-    """플랫폼 관리자 전용 리소스(CB 인정서 승인, 산출 지침 수정 등)에 접근을 제한한다.
+# 향후 CB 포털 역할이 같은 PATCH API를 재사용한다. 현재는 platform_admin이 주 사용자.
+_CB_REVIEW_ROLES = frozenset(
+    {
+        UsersRole.CB_ADMIN.value,
+        UsersRole.CB_STAFF.value,
+        UsersRole.CB_MANAGER.value,
+        UsersRole.CB_REVIEWER.value,
+    }
+)
 
-    `require_cb_scope`와 달리 CB 소속 사용자는 role에 관계없이 접근할 수 없고,
-    반드시 `role == "platform_admin"`인 사용자만 통과한다.
+
+def require_cb_review_access(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """기업 인증신청 MD 제안검토(PATCH): platform_admin 또는 CB 역할(+cb_id).
+
+    CB 포털이 아직 없으므로 지금은 platform_admin이 주 진입점이다.
     """
+    role = (current_user.role or "").lower()
+    if role == UsersRole.PLATFORM_ADMIN.value:
+        return current_user
+    if role in _CB_REVIEW_ROLES:
+        if current_user.cb_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="소속 인증원(CB) 정보가 없어 이 리소스에 접근할 수 없습니다.",
+            )
+        return current_user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="MD 제안검토 권한이 없습니다. (platform_admin 또는 CB 역할 필요)",
+    )
+
+
+def require_platform_admin(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """플랫폼 관리자 전용 리소스 접근 제한."""
     if current_user.role != UsersRole.PLATFORM_ADMIN.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="플랫폼 관리자만 접근할 수 있는 리소스입니다.",
         )
     return current_user
+
+
+# 문서/가이드용 별칭 — admin.py의 /cb-contracts 등에서 사용
+get_current_admin_user = require_platform_admin
+get_current_platform_admin = require_platform_admin

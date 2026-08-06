@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>인증기관(CB) 관리 - complAIs</title>
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <style>
+    body { margin:0; background:#f5f7fb; font-family:system-ui,-apple-system,sans-serif; color:#0f172a; }
+    .page { width:min(1280px,100%); margin:0 auto; padding:20px 16px 48px; }
+    .card { background:#fff; border-radius:12px; padding:18px 20px; box-shadow:0 8px 28px rgba(15,23,42,.08); }
+    .head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; flex-wrap:wrap; margin-bottom:14px; }
+    .head h1 { margin:0 0 6px; font-size:1.35rem; }
+    .lead { margin:0; color:#64748b; }
+    .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+    input, select { padding:9px 12px; border:1px solid #d0d7e2; border-radius:8px; }
+    button, .btn { padding:9px 14px; border:0; border-radius:8px; background:#2563eb; color:#fff; font-weight:700; cursor:pointer; }
+    button.ghost, .btn.ghost { background:#fff; color:#2563eb; border:1px solid #bfdbfe; }
+    button.danger { background:#fff; color:#b91c1c; border:1px solid #fecaca; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    table { width:100%; border-collapse:collapse; font-size:.86rem; }
+    th, td { padding:10px 11px; border-bottom:1px solid #eef2f7; text-align:left; vertical-align:top; }
+    th { background:#f8fafc; color:#334155; position:sticky; top:0; z-index:1; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:.72rem; font-weight:700; }
+    .badge.ok { background:#ecfdf5; color:#047857; }
+    .badge.warn { background:#fff7ed; color:#c2410c; }
+    .badge.no { background:#fef2f2; color:#b91c1c; }
+    .badge.tier { background:#eff6ff; color:#1d4ed8; }
+    .muted { color:#64748b; font-size:.78rem; }
+    .error { color:#dc2626; margin-top:8px; }
+    .success { color:#047857; margin-top:8px; white-space:pre-wrap; }
+    .pager { display:flex; gap:8px; align-items:center; margin-top:12px; }
+    .modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; padding:20px; z-index:1000; }
+    .modal-backdrop.show { display:flex; }
+    .modal { width:min(560px,100%); background:#fff; border-radius:12px; max-height:92vh; overflow:auto; }
+    .modal.lg { width:min(920px,100%); }
+    .modal-h, .modal-f { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:14px 16px; border-bottom:1px solid #e2e8f0; }
+    .modal-f { border-bottom:0; border-top:1px solid #e2e8f0; justify-content:flex-end; }
+    .modal-b { padding:16px; }
+    .dropzone { border:2px dashed #94a3b8; border-radius:12px; padding:36px 18px; text-align:center; background:#f8fafc; cursor:pointer; }
+    .dropzone.dragover { border-color:#2563eb; background:#eff6ff; }
+    .file-chip { margin-top:12px; padding:8px 12px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; display:none; text-align:left; }
+    .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+    .tabs button { background:#fff; color:#334155; border:1px solid #d0d7e2; }
+    .tabs button.active { background:#eff6ff; color:#1d4ed8; border-color:#2563eb; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 14px; }
+    @media (max-width:720px){ .grid{grid-template-columns:1fr;} }
+    .field label { display:block; font-size:.8rem; font-weight:700; margin-bottom:5px; color:#334155; }
+    .field input, .field select { width:100%; box-sizing:border-box; }
+    .matrix-wrap { overflow:auto; border:1px solid #e2e8f0; border-radius:10px; max-height:420px; }
+    .matrix { font-size:.75rem; }
+    .matrix th, .matrix td { padding:5px; text-align:center; white-space:nowrap; }
+    .matrix th.std { text-align:left; min-width:100px; }
+    .hint { color:#64748b; font-size:.82rem; margin:0 0 10px; }
+    .std-acc-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .std-acc-table th, .std-acc-table td { padding:8px; border-bottom:1px solid #eef2f7; text-align:left; vertical-align:middle; }
+    .std-acc-table th { background:#f8fafc; }
+    .std-acc-table select, .std-acc-table input { width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #d0d7e2; border-radius:8px; }
+  </style>
+  <script src="/static/js/validation.js"></script>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <div class="head">
+        <div>
+          <h1>인증기관(CB) 관리</h1>
+          <p class="lead">고유 70여 개 CB 마스터 · 표준별 Scope · 상세 관리</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <a class="btn ghost" href="/platform_admin_dashboard.html#cb-contracts" style="text-decoration:none;">통합 관리 탭</a>
+          <a class="btn ghost" href="/admin/dashboard" style="text-decoration:none;">어드민 홈</a>
+          <button type="button" id="upload-open-btn">엑셀/ODS 업로드</button>
+          <button type="button" class="danger" id="reset-upload-open-btn">초기화 후 재시딩</button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <input id="q" placeholder="기관명 / 코드 / 등록번호" style="min-width:220px;" />
+        <select id="status">
+          <option value="">전체 상태</option>
+          <option value="active">active</option>
+          <option value="suspended">suspended</option>
+          <option value="inactive">inactive</option>
+        </select>
+        <button type="button" id="search-btn">검색</button>
+        <button type="button" class="ghost" id="reload-btn">새로고침</button>
+        <button type="button" class="ghost" id="create-btn">신규 등록</button>
+        <a class="btn ghost" href="/platform_admin_dashboard.html" style="text-decoration:none;">대시보드</a>
+      </div>
+      <div class="error" id="list-error"></div>
+      <div class="success" id="list-success"></div>
+
+      <div style="overflow:auto; max-height:68vh;">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>코드</th>
+              <th>인증기관명</th>
+              <th>상태</th>
+              <th>보유 표준 / 인정기관</th>
+              <th>계약연도</th>
+              <th>티어</th>
+              <th>관리</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"><tr><td colspan="8">불러오는 중…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button type="button" class="ghost" id="prev-page">이전</button>
+        <span id="page-info">-</span>
+        <button type="button" class="ghost" id="next-page">다음</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload modal -->
+  <div class="modal-backdrop" id="upload-modal">
+    <div class="modal">
+      <div class="modal-h">
+        <h2 style="margin:0;font-size:1.05rem;" id="upload-title">엑셀/ODS 업로드</h2>
+        <button type="button" class="ghost" id="upload-close">닫기</button>
+      </div>
+      <div class="modal-b">
+        <p class="hint" id="upload-hint">`.xlsx` / `.ods` 파일을 드래그하거나 클릭하세요.</p>
+        <div class="dropzone" id="dropzone" tabindex="0" role="button">
+          <strong>파일을 여기에 놓거나 클릭</strong>
+          <div class="muted" style="margin-top:6px;">institutionData.ods 권장</div>
+          <div class="file-chip" id="file-chip"></div>
+        </div>
+        <input type="file" id="excel-file" accept=".xlsx,.xls,.ods" style="display:none;" />
+        <div class="error" id="upload-error"></div>
+        <div class="success" id="upload-success"></div>
+      </div>
+      <div class="modal-f">
+        <button type="button" class="ghost" id="upload-cancel">취소</button>
+        <button type="button" id="upload-submit" disabled>업로드</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="cbDetailScopeModal" aria-hidden="true">
+    <div class="modal lg">
+      <div class="modal-h">
+        <div>
+          <h2 id="modal-title" style="margin:0;font-size:1.05rem;">상세 및 Scope 관리</h2>
+          <div class="muted" id="modal-sub"></div>
+        </div>
+        <button type="button" class="ghost" id="modal-close">닫기</button>
+      </div>
+      <div class="modal-b">
+        <div class="tabs">
+          <button type="button" class="active" data-panel="basic">탭1. 법인 기본 정보</button>
+          <button type="button" data-panel="stdacc">탭2. 보유 표준 (15) · 인정기관/인정번호</button>
+          <button type="button" data-panel="scopes">탭3. 인증수행범위</button>
+        </div>
+
+        <div id="panel-basic">
+          <div class="grid">
+            <div class="field"><label>기관 코드 *</label><input id="f-code" /></div>
+            <div class="field"><label>기관명 *</label><input id="f-name" /></div>
+            <div class="field"><label>영문명</label><input id="f-name-en" /></div>
+            <div class="field"><label>이니셜</label><input id="f-initial" /></div>
+            <div class="field"><label>기본 인정기관(레거시)</label><input id="f-acc-body" placeholder="KAB" /></div>
+            <div class="field"><label>사업자번호</label><input id="f-biz" placeholder="000-00-00000" data-validate="biz" inputmode="numeric" maxlength="12" autocomplete="off" /></div>
+            <div class="field"><label>대표자</label><input id="f-ceo" /></div>
+            <div class="field" style="grid-column:1/-1;"><label>주소</label><input id="f-address" /></div>
+            <div class="field"><label>전화번호</label><input id="f-tel" placeholder="02-1234-5678" data-validate="phone" inputmode="tel" maxlength="13" /></div>
+            <div class="field"><label>이메일</label><input id="f-email" data-validate="email" autocomplete="email" /></div>
+            <div class="field"><label>웹사이트</label><input id="f-web" /></div>
+            <div class="field"><label>상태</label>
+              <select id="f-status">
+                <option value="active">active</option>
+                <option value="suspended">suspended</option>
+                <option value="inactive">inactive</option>
+              </select>
+            </div>
+            <div class="field"><label>티어</label>
+              <select id="f-tier">
+                <option value="SMALL">SMALL</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="LARGE">LARGE</option>
+              </select>
+            </div>
+            <div class="field"><label>기본료</label><input id="f-base-fee" type="number" /></div>
+            <div class="field"><label>MD단가</label><input id="f-md" type="number" /></div>
+            <div class="field"><label>계약연도</label><input id="f-year" type="number" /></div>
+          </div>
+        </div>
+
+        <div id="panel-stdacc" style="display:none;">
+          <p class="hint">플랫폼 운용 14개 ISO 표준별로 보유 여부 · 인정기관(AB) · 인정번호를 DB에 저장합니다. 인증수행범위는 표준별 택소노미(IAF39 / MDQMS / FSMS / NQMS / BCMS / 없음)이며 탭3에서 편집합니다. (기업 포털에는 AB/인정번호 미표시)</p>
+          <div style="overflow:auto;max-height:420px;">
+            <table class="std-acc-table">
+              <thead>
+                <tr>
+                  <th style="width:7%;">보유</th>
+                  <th style="width:26%;">ISO 표준</th>
+                  <th style="width:28%;">인정기관</th>
+                  <th style="width:22%;">인정번호</th>
+                  <th>인증수행범위</th>
+                </tr>
+              </thead>
+              <tbody id="std-acc-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="panel-scopes" style="display:none;">
+          <p class="hint">IAF 01–39는 9001/14001/45001만. 기타 표준은 전용 코드 체크리스트(또는 코드 없음). 체크 해제 후 저장 시 비활성화됩니다.</p>
+          <div id="scope-matrix"></div>
+        </div>
+        <div class="error" id="modal-error"></div>
+      </div>
+      <div class="modal-f">
+        <button type="button" class="ghost" id="modal-cancel">취소</button>
+        <button type="button" id="modal-save">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = "/api/v1";
+    const token = localStorage.getItem("access_token");
+    const role = localStorage.getItem("role") || "";
+    if (!token || role !== "platform_admin") {
+      alert("플랫폼 관리자 로그인이 필요합니다.");
+      window.location.href = "/login.html";
+    }
+
+        const state = {
+      page: 1, limit: 100, total: 0,
+      editingId: null,
+      legacyRegNo: null,
+      pendingFile: null,
+      uploadMode: "upload-excel", // or reset-and-upload
+      standards: [],
+      standardOptions: [],
+      standardScopeOptions: [],
+      taxonomies: {},
+      iaf39Standards: [],
+      abBodies: [],
+      iafCodes: Array.from({length:39}, (_,i)=>String(i+1).padStart(2,"0")),
+      activeScopes: new Set(),
+      stdAccMap: {},
+    };
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+    function statusBadge(st) {
+      if (st === "active") return '<span class="badge ok">active</span>';
+      if (st === "suspended") return '<span class="badge warn">suspended</span>';
+      return `<span class="badge no">${esc(st || "-")}</span>`;
+    }
+
+    async function loadList() {
+      const err = document.getElementById("list-error");
+      err.textContent = "";
+      const q = document.getElementById("q").value.trim();
+      const st = document.getElementById("status").value;
+      const params = new URLSearchParams({ page: String(state.page), limit: String(state.limit) });
+      if (q) params.set("q", q);
+      if (st) params.set("status", st);
+      try {
+        const res = await fetch(`${API}/admin/certification-bodies?${params}`, {
+          headers: { Authorization: `Bearer ${token}` }, cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `조회 실패 (${res.status})`);
+        state.total = data.total || 0;
+        const tbody = document.getElementById("tbody");
+        if (!data.data?.length) {
+          tbody.innerHTML = '<tr><td colspan="8">등록된 인증기관이 없습니다. 초기화 후 재시딩으로 institutionData.ods를 업로드하세요.</td></tr>';
+        } else {
+          tbody.innerHTML = data.data.map((r) => {
+            const heldCnt = r.held_standard_count ?? r.standard_count ?? 0;
+            const heldLabel = heldCnt
+              ? `${heldCnt}개 표준`
+              : `${r.scope_count ?? 0}개 Scope`;
+            const abLine = r.ab_summary
+              ? `<div class="muted">AB: ${esc(r.ab_summary)}</div>`
+              : (r.held_standards?.length
+                ? `<div class="muted">${esc((r.held_standards || []).slice(0, 3).join(", "))}${(r.held_standards || []).length > 3 ? "…" : ""}</div>`
+                : "");
+            return `
+            <tr>
+              <td>${r.id}</td>
+              <td>${esc(r.cb_code)}</td>
+              <td><strong>${esc(r.cb_name)}</strong>
+                ${r.cb_name_en ? `<div class="muted">${esc(r.cb_name_en)}</div>` : ""}</td>
+              <td>${statusBadge(r.status)}</td>
+              <td><button type="button" class="badge tier" style="cursor:pointer;border:0;" onclick="openDetail(${r.id})">${esc(heldLabel)}</button>${abLine}</td>
+              <td>${esc(r.contract_year ?? "-")}</td>
+              <td><span class="badge tier">${esc(r.billing_tier || "MEDIUM")}</span></td>
+              <td><button type="button" class="ghost" onclick="openDetail(${r.id})">상세 및 Scope 관리</button></td>
+            </tr>`;
+          }).join("");
+        }
+        const pages = Math.max(1, Math.ceil(state.total / state.limit));
+        document.getElementById("page-info").textContent = `${state.page} / ${pages} (총 ${state.total})`;
+      } catch (e) {
+        err.textContent = e.message;
+      }
+    }
+
+    function switchPanel(name) {
+      document.querySelectorAll("#cbDetailScopeModal .tabs button").forEach((b) => {
+        b.classList.toggle("active", b.dataset.panel === name);
+      });
+      document.getElementById("panel-basic").style.display = name === "basic" ? "block" : "none";
+      document.getElementById("panel-stdacc").style.display = name === "stdacc" ? "block" : "none";
+      document.getElementById("panel-scopes").style.display = name === "scopes" ? "block" : "none";
+    }
+
+    function abOptionsHtml(selected) {
+      const cur = selected || "";
+      const opts = [`<option value="">— 선택 —</option>`]
+        .concat(state.abBodies.map((ab) => {
+          const code = ab.code || ab.name;
+          const label = ab.name_en ? `${code} · ${ab.name_en}` : code;
+          return `<option value="${esc(code)}" ${code === cur ? "selected" : ""}>${esc(label)}</option>`;
+        }));
+      return opts.join("");
+    }
+
+    function scopeMetaFor(std) {
+      const fromOpt = (state.standardScopeOptions || []).find((x) => x.standard_code === std);
+      if (fromOpt) return fromOpt;
+      const tax = (state.iaf39Standards || []).includes(std) ? "iaf39" : "none";
+      return {
+        standard_code: std,
+        taxonomy: tax,
+        taxonomy_label: (state.taxonomies[tax] || {}).label || tax,
+        has_scope_codes: tax !== "none",
+        codes: ((state.taxonomies[tax] || {}).codes) || [],
+      };
+    }
+
+    function renderStdAccTable() {
+      const tbody = document.getElementById("std-acc-tbody");
+      const list = state.standardOptions.length
+        ? state.standardOptions
+        : state.standards.map((c) => ({ standard_code: c, standard_name: "" }));
+      tbody.innerHTML = list.map((s) => {
+        const code = s.standard_code || s;
+        const name = s.standard_name || "";
+        const row = state.stdAccMap[code] || {};
+        const meta = scopeMetaFor(code);
+        const scopes = Array.isArray(row.scope_codes) ? row.scope_codes
+          : Array.isArray(row.iaf_codes) ? row.iaf_codes : [];
+        let scopeSummary = "없음";
+        if (!meta.has_scope_codes) scopeSummary = "코드 불필요";
+        else if (scopes.length) scopeSummary = `${scopes.length}개 (${scopes.slice(0, 6).join(", ")}${scopes.length > 6 ? "…" : ""})`;
+        const held = row.is_active || row.ab_code || row.registration_no || scopes.length;
+        const editBtn = meta.has_scope_codes
+          ? `<button type="button" class="ghost" data-edit-scope="${esc(code)}" style="padding:4px 8px;font-size:.75rem;">범위 편집</button>`
+          : `<span class="muted">—</span>`;
+        return `<tr data-std="${esc(code)}">
+          <td style="text-align:center;"><input type="checkbox" data-held ${held ? "checked" : ""} /></td>
+          <td><strong>${esc(code)}</strong>${name ? `<div class="muted">${esc(name)}</div>` : ""}
+            <div class="muted" style="font-size:.72rem;">${esc(meta.taxonomy_label || "")}</div></td>
+          <td><select data-ab>${abOptionsHtml(row.ab_code || "")}</select></td>
+          <td><input data-reg type="text" value="${esc(row.registration_no || "")}" placeholder="인정번호" /></td>
+          <td>
+            <div class="muted" style="margin-bottom:4px;">${esc(scopeSummary)}</div>
+            ${editBtn}
+          </td>
+        </tr>`;
+      }).join("");
+      tbody.querySelectorAll("[data-edit-scope]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          switchPanel("scopes");
+          const std = btn.getAttribute("data-edit-scope");
+          const block = document.querySelector(`#scope-matrix [data-scope-std="${CSS.escape(std)}"]`);
+          if (block) block.scrollIntoView({ block: "center", behavior: "smooth" });
+        });
+      });
+    }
+
+    function collectStdAcc() {
+      return [...document.querySelectorAll("#std-acc-tbody tr")].map((tr) => ({
+        standard_code: tr.dataset.std,
+        ab_code: tr.querySelector("[data-ab]").value || null,
+        registration_no: tr.querySelector("[data-reg]").value.trim() || null,
+        is_active: tr.querySelector("[data-held]").checked,
+      }));
+    }
+
+    function renderMatrix() {
+      const host = document.getElementById("scope-matrix");
+      if (!host) return;
+      const list = state.standardOptions.length
+        ? state.standardOptions
+        : state.standards.map((c) => ({ standard_code: c, standard_name: "" }));
+      const sections = [];
+      const iafStds = list.filter((s) => scopeMetaFor(s.standard_code || s).taxonomy === "iaf39");
+      if (iafStds.length) {
+        const thead = `<tr><th class="std">표준 \\ IAF</th>${state.iafCodes.map((c)=>`<th>${c}</th>`).join("")}</tr>`;
+        const body = iafStds.map((s) => {
+          const std = s.standard_code || s;
+          const cells = state.iafCodes.map((iaf) => {
+            const key = `${std}|${iaf}`;
+            return `<td><input type="checkbox" data-key="${key}" ${state.activeScopes.has(key) ? "checked" : ""} /></td>`;
+          }).join("");
+          return `<tr data-scope-std="${esc(std)}"><th class="std">${esc(std)}</th>${cells}</tr>`;
+        }).join("");
+        sections.push(`<div style="margin-bottom:16px;"><h4 style="margin:0 0 8px;font-size:.9rem;">IAF 01–39 — ISO 9001 / 14001 / 45001 전용</h4>
+          <div class="matrix-wrap"><table class="matrix"><thead>${thead}</thead><tbody>${body}</tbody></table></div></div>`);
+      }
+      list.forEach((s) => {
+        const std = s.standard_code || s;
+        const name = s.standard_name || "";
+        const meta = scopeMetaFor(std);
+        if (meta.taxonomy === "iaf39") return;
+        if (!meta.has_scope_codes) {
+          sections.push(`<div data-scope-std="${esc(std)}" style="margin-bottom:12px;padding:10px;border:1px solid #e2e8f0;border-radius:8px;">
+            <strong>${esc(std)}</strong>${name ? ` · ${esc(name)}` : ""}
+            <div class="muted" style="margin-top:4px;">인증수행범위 코드 없음 — 보유·인정기관·인정번호만 관리</div></div>`);
+          return;
+        }
+        const codes = meta.codes || (state.taxonomies[meta.taxonomy] || {}).codes || [];
+        const checks = codes.map((c) => {
+          const code = c.code || c;
+          const label = c.name_ko ? `${code} — ${c.name_ko}` : code;
+          const key = `${std}|${code}`;
+          return `<label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:.78rem;">
+            <input type="checkbox" data-key="${esc(key)}" ${state.activeScopes.has(key) ? "checked" : ""} />
+            <span>${esc(label)}</span></label>`;
+        }).join("");
+        sections.push(`<div data-scope-std="${esc(std)}" style="margin-bottom:14px;">
+          <h4 style="margin:0 0 6px;font-size:.9rem;">${esc(std)}${name ? ` · ${esc(name)}` : ""}</h4>
+          <div class="muted" style="margin-bottom:6px;">${esc(meta.taxonomy_label || "")}</div>
+          <div style="max-height:200px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px;">${checks}</div></div>`);
+      });
+      host.innerHTML = sections.join("") || '<p class="muted">표시할 수행범위가 없습니다.</p>';
+    }
+
+    function collectScopes() {
+      const root = document.getElementById("scope-matrix");
+      if (!root) return [];
+      return [...root.querySelectorAll("input[type=checkbox][data-key]:checked")].map((el) => {
+        const [standard_code, scope_code] = el.dataset.key.split("|");
+        return { standard_code, scope_code, iaf_code: scope_code, is_active: true };
+      });
+    }
+
+    function fillForm(d = {}) {
+      document.getElementById("f-code").value = d.cb_code || "";
+      document.getElementById("f-name").value = d.cb_name || "";
+      document.getElementById("f-name-en").value = d.cb_name_en || "";
+      document.getElementById("f-initial").value = d.cb_initial || "";
+      document.getElementById("f-acc-body").value = d.accreditation_body || "KAB";
+      state.legacyRegNo = d.reg_no || null;
+      document.getElementById("f-biz").value = d.biz_reg_no || "";
+      document.getElementById("f-ceo").value = d.ceo_name || "";
+      document.getElementById("f-address").value = d.address || "";
+      document.getElementById("f-tel").value = d.tel || "";
+      document.getElementById("f-email").value = d.email || "";
+      document.getElementById("f-web").value = d.website || "";
+      document.getElementById("f-status").value = d.status || "active";
+      const contract = d.contract || {};
+      document.getElementById("f-year").value = contract.contract_year || new Date().getFullYear();
+      document.getElementById("f-tier").value = contract.tier || d.billing_tier || "MEDIUM";
+      document.getElementById("f-base-fee").value = contract.annual_base_fee ?? "";
+      document.getElementById("f-md").value = contract.price_per_md ?? "";
+      state.activeScopes = new Set(
+        (d.scopes || []).filter((s) => s.is_active !== false).map((s) => {
+          let code = String(s.scope_code || s.iaf_code || "").trim();
+          if (/^\d+$/.test(code)) code = code.padStart(2, "0");
+          return `${s.standard_code}|${code}`;
+        })
+      );
+      state.stdAccMap = {};
+      (d.standard_accreditations || []).forEach((row) => {
+        if (row.standard_code) state.stdAccMap[row.standard_code] = row;
+      });
+      renderStdAccTable();
+      renderMatrix();
+    }
+
+    function openModal() {
+      document.getElementById("cbDetailScopeModal").classList.add("show");
+      document.getElementById("cbDetailScopeModal").setAttribute("aria-hidden", "false");
+      switchPanel("basic");
+    }
+    function closeModal() {
+      document.getElementById("cbDetailScopeModal").classList.remove("show");
+      document.getElementById("cbDetailScopeModal").setAttribute("aria-hidden", "true");
+      state.editingId = null;
+    }
+
+    async function openDetail(id) {
+      try {
+        const res = await fetch(`${API}/admin/certification-bodies/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }, cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `상세 조회 실패 (${res.status})`);
+        state.editingId = id;
+        document.getElementById("modal-title").textContent = `상세 및 Scope 관리 — ${data.cb_name}`;
+        document.getElementById("modal-sub").textContent =
+          `${data.cb_code || ""} · 보유표준 ${(data.standard_accreditations || []).filter((x) => x.is_active).length || 0}/15 · 수행범위 ${data.scope_count || 0}`;
+        fillForm(data);
+        openModal();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+    window.openDetail = openDetail;
+
+    document.getElementById("create-btn").addEventListener("click", () => {
+      state.editingId = null;
+      document.getElementById("modal-title").textContent = "CB 신규 등록";
+      document.getElementById("modal-sub").textContent = "";
+      fillForm({ status: "active", accreditation_body: "KAB", scopes: [] });
+      openModal();
+    });
+
+    document.querySelectorAll("#cbDetailScopeModal .tabs button").forEach((b) => {
+      b.addEventListener("click", () => switchPanel(b.dataset.panel));
+    });
+    document.getElementById("modal-close").addEventListener("click", closeModal);
+    document.getElementById("modal-cancel").addEventListener("click", closeModal);
+    document.getElementById("cbDetailScopeModal").addEventListener("click", (e) => {
+      if (e.target.id === "cbDetailScopeModal") closeModal();
+    });
+
+    document.getElementById("modal-save").addEventListener("click", async () => {
+      const err = document.getElementById("modal-error");
+      err.textContent = "";
+      if (window.ComplaisValidation) {
+        const v = ComplaisValidation.validateFields([
+          { el: document.getElementById("f-biz"), kind: "biz", required: false },
+          { el: document.getElementById("f-tel"), kind: "phone", required: false },
+          { el: document.getElementById("f-email"), kind: "email", required: false },
+        ]);
+        if (!v.ok) {
+          err.textContent = v.message;
+          switchPanel("basic");
+          if (v.field?.el) {
+            try { v.field.el.focus(); v.field.el.select?.(); } catch (_) {}
+          }
+          return;
+        }
+      }
+      const payload = {
+        cb_code: document.getElementById("f-code").value.trim(),
+        cb_name: document.getElementById("f-name").value.trim(),
+        cb_name_en: document.getElementById("f-name-en").value.trim() || null,
+        cb_initial: document.getElementById("f-initial").value.trim() || null,
+        accreditation_body: document.getElementById("f-acc-body").value.trim() || "KAB",
+        reg_no: state.legacyRegNo,
+        biz_reg_no: document.getElementById("f-biz").value.trim() || null,
+        ceo_name: document.getElementById("f-ceo").value.trim() || null,
+        address: document.getElementById("f-address").value.trim() || null,
+        tel: document.getElementById("f-tel").value.trim() || null,
+        email: document.getElementById("f-email").value.trim() || null,
+        website: document.getElementById("f-web").value.trim() || null,
+        status: document.getElementById("f-status").value,
+        scopes: collectScopes(),
+        standard_accreditations: collectStdAcc(),
+        contract: {
+          contract_year: Number(document.getElementById("f-year").value) || undefined,
+          tier: document.getElementById("f-tier").value,
+          annual_base_fee: document.getElementById("f-base-fee").value
+            ? Number(document.getElementById("f-base-fee").value)
+            : undefined,
+          price_per_md: document.getElementById("f-md").value
+            ? Number(document.getElementById("f-md").value)
+            : undefined,
+        },
+      };
+      if (!payload.cb_code || !payload.cb_name) {
+        err.textContent = "기관 코드와 기관명은 필수입니다.";
+        return;
+      }
+      try {
+        const url = state.editingId
+          ? `${API}/admin/certification-bodies/${state.editingId}`
+          : `${API}/admin/certification-bodies`;
+        const res = await fetch(url, {
+          method: state.editingId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `저장 실패 (${res.status})`);
+        closeModal();
+        document.getElementById("list-success").textContent = "저장되었습니다.";
+        loadList();
+      } catch (e) {
+        err.textContent = e.message;
+      }
+    });
+
+    /* Upload */
+    const dropzone = document.getElementById("dropzone");
+    const excelInput = document.getElementById("excel-file");
+    const uploadSubmit = document.getElementById("upload-submit");
+
+    function setPendingFile(file) {
+      const err = document.getElementById("upload-error");
+      const ok = document.getElementById("upload-success");
+      const chip = document.getElementById("file-chip");
+      err.textContent = ""; ok.textContent = "";
+      if (!file) {
+        state.pendingFile = null;
+        chip.style.display = "none";
+        uploadSubmit.disabled = true;
+        return;
+      }
+      if (!/\.(xlsx|xls|ods)$/i.test(file.name || "")) {
+        err.textContent = "ODS/Excel만 가능합니다.";
+        state.pendingFile = null;
+        chip.style.display = "none";
+        uploadSubmit.disabled = true;
+        return;
+      }
+      state.pendingFile = file;
+      chip.style.display = "block";
+      chip.textContent = `${file.name} (${Math.round(file.size / 1024)} KB)`;
+      uploadSubmit.disabled = false;
+    }
+
+    function openUploadModal(mode) {
+      state.uploadMode = mode;
+      setPendingFile(null);
+      excelInput.value = "";
+      document.getElementById("upload-title").textContent =
+        mode === "reset-and-upload" ? "초기화 후 재시딩" : "엑셀/ODS 업로드";
+      document.getElementById("upload-hint").textContent =
+        mode === "reset-and-upload"
+          ? "주의: 기존 CB/Scope 데이터를 모두 삭제하고 institutionData만 다시 등록합니다."
+          : "Upsert 방식입니다. 중복 정리가 필요하면 '초기화 후 재시딩'을 사용하세요.";
+      document.getElementById("upload-modal").classList.add("show");
+    }
+    function closeUploadModal() {
+      document.getElementById("upload-modal").classList.remove("show");
+      setPendingFile(null);
+      excelInput.value = "";
+    }
+
+    document.getElementById("upload-open-btn").addEventListener("click", () => openUploadModal("upload-excel"));
+    document.getElementById("reset-upload-open-btn").addEventListener("click", () => {
+      if (!confirm("기존 인증기관 데이터를 모두 삭제하고 엑셀로 재등록합니다. 계속할까요?")) return;
+      openUploadModal("reset-and-upload");
+    });
+    document.getElementById("upload-close").addEventListener("click", closeUploadModal);
+    document.getElementById("upload-cancel").addEventListener("click", closeUploadModal);
+    document.getElementById("upload-modal").addEventListener("click", (e) => {
+      if (e.target.id === "upload-modal") closeUploadModal();
+    });
+    dropzone.addEventListener("click", () => excelInput.click());
+    excelInput.addEventListener("change", (e) => setPendingFile(e.target.files?.[0] || null));
+    ["dragenter","dragover"].forEach((ev) => dropzone.addEventListener(ev, (e) => {
+      e.preventDefault(); dropzone.classList.add("dragover");
+    }));
+    ["dragleave","drop"].forEach((ev) => dropzone.addEventListener(ev, (e) => {
+      e.preventDefault(); dropzone.classList.remove("dragover");
+    }));
+    dropzone.addEventListener("drop", (e) => setPendingFile(e.dataTransfer?.files?.[0] || null));
+
+    document.getElementById("upload-submit").addEventListener("click", async () => {
+      const err = document.getElementById("upload-error");
+      const ok = document.getElementById("upload-success");
+      err.textContent = ""; ok.textContent = "";
+      if (!state.pendingFile) return;
+      uploadSubmit.disabled = true;
+      uploadSubmit.textContent = "처리 중…";
+      try {
+        const form = new FormData();
+        form.append("file", state.pendingFile);
+        const endpoint = state.uploadMode === "reset-and-upload" ? "reset-and-upload" : "upload-excel";
+        const res = await fetch(`${API}/admin/certification-bodies/${endpoint}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `실패 (${res.status})`);
+        const msg = `${data.message || "완료"}\nimported_count=${data.imported_count} (신규 ${data.created}/갱신 ${data.updated})`;
+        ok.textContent = msg;
+        document.getElementById("list-success").textContent = msg;
+        state.page = 1;
+        await loadList();
+        setTimeout(closeUploadModal, 900);
+      } catch (ex) {
+        err.textContent = ex.message;
+      } finally {
+        uploadSubmit.textContent = "업로드";
+        if (state.pendingFile) uploadSubmit.disabled = false;
+      }
+    });
+
+    document.getElementById("search-btn").addEventListener("click", () => { state.page = 1; loadList(); });
+    document.getElementById("reload-btn").addEventListener("click", loadList);
+    document.getElementById("prev-page").addEventListener("click", () => {
+      if (state.page > 1) { state.page -= 1; loadList(); }
+    });
+    document.getElementById("next-page").addEventListener("click", () => {
+      const pages = Math.max(1, Math.ceil(state.total / state.limit));
+      if (state.page < pages) { state.page += 1; loadList(); }
+    });
+
+    async function boot() {
+      try {
+        const res = await fetch(`${API}/admin/certification-bodies/meta/matrix-options`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const meta = await res.json();
+          if (meta.standards?.length) state.standards = meta.standards;
+          if (meta.standard_options?.length) state.standardOptions = meta.standard_options;
+          if (meta.standard_scope_options?.length) state.standardScopeOptions = meta.standard_scope_options;
+          if (meta.taxonomies) state.taxonomies = meta.taxonomies;
+          if (meta.iaf39_standards?.length) state.iaf39Standards = meta.iaf39_standards;
+          if (meta.iaf_codes?.length) state.iafCodes = meta.iaf_codes;
+          if (meta.accreditation_bodies?.length) state.abBodies = meta.accreditation_bodies;
+        }
+      } catch (_) {}
+      if (window.ComplaisValidation) {
+        ComplaisValidation.bindField(document.getElementById("f-biz"), "biz");
+        ComplaisValidation.bindField(document.getElementById("f-tel"), "phone");
+        ComplaisValidation.bindField(document.getElementById("f-email"), "email");
+      }
+      loadList();
+    }
+    boot();
+  </script>
+</body>
+</html>

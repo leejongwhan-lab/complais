@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>계약 목록 — CB Portal</title>
+  <style>
+    body { font-family: Pretendard, system-ui, sans-serif; margin: 24px; background: #f5f6f8; color: #111; }
+    .card { background: #fff; padding: 24px; max-width: 1000px; border: 1px solid #e5e7eb; border-radius: 10px; }
+    h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    .lead { color: #64748b; margin: 0 0 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: left; }
+    th { background: #f8fafc; }
+    button, a.btn {
+      display: inline-block; padding: 8px 12px; background: #185fa5; color: #fff;
+      border: 0; border-radius: 8px; cursor: pointer; text-decoration: none; font-weight: 700; margin-right: 8px;
+    }
+    a.ghost, button.ghost { background: #fff; color: #185fa5; border: 1px solid #185fa5; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #eff6ff; color: #1d4ed8; }
+    .error { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>계약 목록</h1>
+    <p class="lead">CB 스코프 내 심사 계약(Draft / Scheduled 등)입니다.</p>
+    <button type="button" class="ghost" onclick="loadContracts()">새로고침</button>
+    <a class="btn ghost" href="/cb-portal">CB 포털</a>
+    <a class="btn ghost" href="/static/cb_md_review.html">MD 검토</a>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>신청 / 고객사</th>
+          <th>표준</th>
+          <th>MD</th>
+          <th>금액</th>
+          <th>계약일</th>
+          <th>상태</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tb"><tr><td colspan="8">불러오는 중…</td></tr></tbody>
+    </table>
+    <p id="msg" class="error"></p>
+  </div>
+
+  <script src="/static/js/cb_admin_api.js"></script>
+  <script>
+    if (!localStorage.getItem("access_token")) {
+      alert("로그인이 필요합니다.");
+      location.href = "/login.html";
+    }
+
+    async function loadContracts() {
+      const tb = document.getElementById("tb");
+      const msg = document.getElementById("msg");
+      msg.textContent = "";
+      try {
+        const rows = await CBAdminAPI.listContracts();
+        if (!rows.length) {
+          tb.innerHTML = '<tr><td colspan="8">계약이 없습니다. MD 검토 → 승인 → 배정을 진행하세요.</td></tr>';
+          return;
+        }
+        tb.innerHTML = "";
+        rows.forEach((c) => {
+          const tr = document.createElement("tr");
+          const period = c.contract_date
+            ? String(c.contract_date).substring(0, 10)
+            : "-";
+          tr.innerHTML =
+            `<td>${c.id}</td>` +
+            `<td>${c.application_id}${c.company_name ? " · " + c.company_name : ""}</td>` +
+            `<td>${(c.audit_standards && c.audit_standards.length) ? c.audit_standards.join(", ") : "-"}</td>` +
+            `<td>${c.total_md != null ? Number(c.total_md).toFixed(1) : "-"}</td>` +
+            `<td>${c.total_amount != null ? Number(c.total_amount).toLocaleString() : "-"}</td>` +
+            `<td>${period}</td>` +
+            `<td><span class="badge">${c.status || "-"}</span></td>` +
+            `<td><a class="btn ghost" href="/cb-portal/assign.html?id=${c.application_id}">배정</a></td>`;
+          tb.appendChild(tr);
+        });
+      } catch (e) {
+        tb.innerHTML = '<tr><td colspan="8">로드 실패</td></tr>';
+        msg.textContent = String(e.message || e);
+      }
+    }
+
+    loadContracts();
+  </script>
+</body>
+</html>

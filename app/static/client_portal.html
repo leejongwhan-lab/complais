@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>기업 포털 - complAIs</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+  <link rel="stylesheet" href="/static/css/components/sidebar.css">
+  <link rel="stylesheet" href="/static/css/pages/enterprise.css">
+  <style>
+    body {
+      min-height: 100vh; margin: 0; background: var(--bg-secondary, #f5f7fb);
+      font-family: system-ui, -apple-system, sans-serif; padding: 24px 16px 40px;
+      box-sizing: border-box;
+    }
+    .wrap { width: min(860px, 100%); margin: 0 auto; }
+    .brand-wrap {
+      display: flex; justify-content: center; margin-bottom: 16px;
+      padding: 8px; background: #fff; border-radius: 10px;
+    }
+    .brand-wrap .brand-logo { height: 34px; }
+    .card {
+      background: #fff; border-radius: 12px; padding: 24px;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08); margin-bottom: 16px;
+    }
+    h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    h2 { margin: 0 0 12px; font-size: 1.1rem; }
+    h3 { margin: 18px 0 10px; font-size: 0.98rem; }
+    .lead { margin: 0 0 14px; color: #64748b; font-size: 0.95rem; }
+    .meta { font-size: 0.92rem; color: #334155; line-height: 1.6; margin-bottom: 12px; }
+    .field { margin-bottom: 14px; }
+    .field label, .form-label {
+      display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 6px;
+    }
+    input[type="text"], select, textarea {
+      width: 100%; box-sizing: border-box; padding: 10px 12px;
+      border: 1px solid #d0d7e2; border-radius: 8px; background: #fff; font-size: 0.95rem;
+    }
+    .radio-row, .check-row { display: flex; flex-wrap: wrap; gap: 12px 18px; }
+    .radio-row label, .check-row label {
+      display: inline-flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer;
+    }
+    button, .btn {
+      padding: 10px 14px; border-radius: 8px; border: 0; cursor: pointer; font-weight: 700;
+      background: var(--primary-purple, #6366f1); color: #fff; font-size: 0.92rem;
+    }
+    button.ghost, .btn.ghost {
+      background: #fff; color: var(--font-primary, #222); border: 1px solid var(--gray-line-2, #eee);
+    }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .error { color: #dc2626; margin-top: 10px; font-size: 0.9rem; min-height: 1.2em; }
+    .success { color: #047857; margin-top: 10px; white-space: pre-wrap; }
+    .hint { color: #64748b; font-size: 0.82rem; margin-top: 6px; }
+    .banner {
+      margin: 0 0 14px; padding: 10px 12px; border-radius: 8px;
+      background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 0.9rem;
+    }
+    .std-block {
+      border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 12px;
+      background: #f8fafc;
+    }
+    .std-block h4 { margin: 0 0 10px; font-size: 0.95rem; }
+    .grid-2 {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px;
+    }
+    @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+    .history-item {
+      border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px;
+      font-size: 0.9rem;
+    }
+    .history-item small { color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand-wrap">
+      <img src="/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
+    </div>
+
+    <div class="card">
+      <h1>기업 포털</h1>
+      <p class="lead">인증 심사 신청 및 이전 차수 설문 이력을 관리합니다. <a href="/enterprise_dashboard.html">기업 대시보드</a></p>
+      <div class="meta" id="session-meta"></div>
+      <div class="actions">
+        <button type="button" class="ghost" id="logout-btn">로그아웃</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>인증 심사 신청</h2>
+      <div class="actions" style="margin-top:0; margin-bottom:14px;">
+        <button type="button" class="ghost" id="load-previous-survey">이전 심사 설문 불러오기</button>
+      </div>
+      <div id="prefill-banner" class="banner" style="display:none;"></div>
+
+      <form id="audit-request-form">
+        <div class="field">
+          <label class="form-label">심사 주기 선택</label>
+          <div class="radio-row">
+            <label>
+              <input type="radio" name="audit_cycle_months" value="12" checked />
+              12개월 (기본/연 1회)
+            </label>
+            <label>
+              <input type="radio" name="audit_cycle_months" value="6" />
+              6개월 (반기 1회)
+            </label>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label class="form-label" for="cb-id">인증기관(CB) ID</label>
+            <input type="text" id="cb-id" placeholder="예: 1" required />
+            <p class="hint">소속/계약 CB의 숫자 ID를 입력하세요.</p>
+          </div>
+          <div class="field">
+            <label class="form-label" for="audit-type">심사 유형</label>
+            <select id="audit-type">
+              <option value="initial">최초심사</option>
+              <option value="surveillance" selected>사후심사</option>
+              <option value="recertification">갱신심사</option>
+              <option value="special">특별심사</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="form-label">신청 표준</label>
+          <div class="check-row" id="iso-standards">
+            <label><input type="checkbox" value="ISO 9001" data-std="ISO 9001" /> ISO 9001</label>
+            <label><input type="checkbox" value="ISO 14001" data-std="ISO 14001" /> ISO 14001</label>
+            <label><input type="checkbox" value="ISO 45001" data-std="ISO 45001" /> ISO 45001</label>
+            <label><input type="checkbox" value="ISO 27001" data-std="ISO 27001" /> ISO 27001</label>
+          </div>
+        </div>
+
+        <h3>공통 설문</h3>
+        <div class="grid-2">
+          <div class="field">
+            <label class="form-label" for="common-shift">교대 근무</label>
+            <select id="common-shift">
+              <option value="">선택</option>
+              <option value="주간">주간</option>
+              <option value="2교대">2교대</option>
+              <option value="3교대">3교대</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="form-label" for="common-outsourcing">외주 여부</label>
+            <select id="common-outsourcing">
+              <option value="">선택</option>
+              <option value="yes">있음</option>
+              <option value="no">없음</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="form-label" for="common-integrated">통합심사 여부</label>
+            <select id="common-integrated">
+              <option value="">선택</option>
+              <option value="yes">예</option>
+              <option value="no">아니오</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="form-label" for="common-remote">원격근무/원격사이트</label>
+            <select id="common-remote">
+              <option value="">선택</option>
+              <option value="yes">있음</option>
+              <option value="no">없음</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="standard-surveys"></div>
+
+        <div class="field">
+          <label class="form-label" for="note">비고</label>
+          <textarea id="note" rows="2" placeholder="추가 메모 (선택)"></textarea>
+        </div>
+
+        <input type="hidden" id="previous-request-id" value="" />
+
+        <div class="actions">
+          <button type="submit" class="btn" id="submit-btn">자격/심사 신청 제출</button>
+        </div>
+        <div class="error" id="form-error"></div>
+        <div class="success" id="form-success"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>신청 이력</h2>
+      <div id="history-list">불러오는 중…</div>
+      <div class="error" id="history-error"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = "/api/v1";
+    const token = localStorage.getItem("access_token");
+    const role = localStorage.getItem("role") || "";
+
+    if (!token || !["client_admin", "client_staff"].includes(role)) {
+      alert(!token ? "로그인이 필요합니다." : "기업 포털 접근 권한이 없습니다.");
+      window.location.href = "/login.html";
+    }
+
+    const state = {
+      previousRequestId: null,
+    };
+
+    const STD_FIELDS = {
+      "ISO 9001": [
+        { key: "has_rnd", label: "설계/R&D 포함", type: "select", options: ["", "yes", "no"] },
+        { key: "process_steps", label: "주요 공정 단계", type: "text", placeholder: "예: 4단계" },
+        { key: "sku_count", label: "SKU 수", type: "text", placeholder: "예: 180" },
+      ],
+      "ISO 14001": [
+        { key: "env_aspects", label: "중요 환경측면 수", type: "text", placeholder: "예: 12" },
+        { key: "has_hazardous", label: "유해화학물질", type: "select", options: ["", "yes", "no"] },
+      ],
+      "ISO 45001": [
+        { key: "high_risk_work", label: "고위험 작업", type: "select", options: ["", "yes", "no"] },
+        { key: "contractor_workers", label: "협력사 근로자 상시 투입", type: "select", options: ["", "yes", "no"] },
+      ],
+      "ISO 27001": [
+        { key: "cloud_usage", label: "클라우드 이용", type: "select", options: ["", "yes", "no"] },
+        { key: "pii_processing", label: "개인정보 처리", type: "select", options: ["", "yes", "no"] },
+      ],
+    };
+
+    document.getElementById("session-meta").innerHTML = [
+      `이름: ${localStorage.getItem("user_name") || "-"}`,
+      `역할: ${role}`,
+      `company_id: ${localStorage.getItem("client_company_id") || localStorage.getItem("company_id") || "-"}`,
+    ].join("<br>");
+
+    document.getElementById("logout-btn").addEventListener("click", () => {
+      ["access_token","user_id","user_name","role","cb_id","company_id","client_company_id","membership_status"]
+        .forEach((k) => localStorage.removeItem(k));
+      window.location.href = "/login.html";
+    });
+
+    function selectedStandards() {
+      return [...document.querySelectorAll("#iso-standards input:checked")].map((el) => el.value);
+    }
+
+    function renderStandardSurveys(prefill = {}) {
+      const box = document.getElementById("standard-surveys");
+      const standards = selectedStandards();
+      if (!standards.length) {
+        box.innerHTML = '<p class="hint">표준을 선택하면 표준별 설문이 표시됩니다.</p>';
+        return;
+      }
+      box.innerHTML = standards.map((std) => {
+        const fields = STD_FIELDS[std] || [];
+        const answers = prefill[std] || {};
+        return `
+          <div class="std-block" data-standard="${std}">
+            <h4>${std} 설문</h4>
+            <div class="grid-2">
+              ${fields.map((f) => {
+                const val = answers[f.key] ?? "";
+                if (f.type === "select") {
+                  return `
+                    <div class="field">
+                      <label class="form-label">${f.label}</label>
+                      <select data-std-field="${std}::${f.key}">
+                        ${f.options.map((o) => `<option value="${o}" ${String(val) === String(o) ? "selected" : ""}>${o || "선택"}</option>`).join("")}
+                      </select>
+                    </div>`;
+                }
+                return `
+                  <div class="field">
+                    <label class="form-label">${f.label}</label>
+                    <input type="text" data-std-field="${std}::${f.key}" value="${String(val).replace(/"/g, "&quot;")}" placeholder="${f.placeholder || ""}" />
+                  </div>`;
+              }).join("")}
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    document.getElementById("iso-standards").addEventListener("change", () => {
+      const current = collectSurveyResponses();
+      renderStandardSurveys(current);
+    });
+
+    function setCycle(months) {
+      const val = String(months === 6 ? 6 : 12);
+      document.querySelectorAll('input[name="audit_cycle_months"]').forEach((el) => {
+        el.checked = el.value === val;
+      });
+    }
+
+    function setCommon(common = {}) {
+      document.getElementById("common-shift").value = common.shift_work || "";
+      document.getElementById("common-outsourcing").value = common.outsourcing || "";
+      document.getElementById("common-integrated").value = common.is_integrated_audit || "";
+      document.getElementById("common-remote").value = common.remote_work || "";
+    }
+
+    function setStandardsChecks(list = []) {
+      document.querySelectorAll("#iso-standards input").forEach((el) => {
+        el.checked = list.some((s) => String(s).includes(el.value.replace("ISO ", "")) || s === el.value);
+      });
+    }
+
+    function collectSurveyResponses() {
+      const common = {
+        shift_work: document.getElementById("common-shift").value || null,
+        outsourcing: document.getElementById("common-outsourcing").value || null,
+        is_integrated_audit: document.getElementById("common-integrated").value || null,
+        remote_work: document.getElementById("common-remote").value || null,
+      };
+      const out = { common };
+      selectedStandards().forEach((std) => {
+        out[std] = {};
+        document.querySelectorAll(`[data-std-field^="${std}::"]`).forEach((el) => {
+          const key = el.getAttribute("data-std-field").split("::")[1];
+          out[std][key] = el.value || null;
+        });
+      });
+      // keep other standard answers if still in DOM
+      document.querySelectorAll("[data-std-field]").forEach((el) => {
+        const [std, key] = el.getAttribute("data-std-field").split("::");
+        if (!out[std]) out[std] = {};
+        out[std][key] = el.value || null;
+      });
+      return out;
+    }
+
+    function applyPrefill(data) {
+      const banner = document.getElementById("prefill-banner");
+      if (!data || !data.has_previous) {
+        banner.style.display = "block";
+        banner.textContent = data?.message || "이전 차수 설문 데이터가 없습니다. 새로 입력해 주세요.";
+        state.previousRequestId = null;
+        document.getElementById("previous-request-id").value = "";
+        return;
+      }
+
+      setCycle(data.audit_cycle_months);
+      if (data.audit_type) document.getElementById("audit-type").value = data.audit_type;
+      if (data.cb_id) document.getElementById("cb-id").value = data.cb_id;
+      if (data.iso_standards?.length) setStandardsChecks(data.iso_standards);
+
+      const survey = data.survey_responses || {};
+      setCommon(survey.common || {});
+      renderStandardSurveys(survey);
+
+      state.previousRequestId = data.request_id || null;
+      document.getElementById("previous-request-id").value = data.request_id || "";
+
+      banner.style.display = "block";
+      banner.textContent = data.message || `이전 차수(#${data.request_id}) 설문을 불러왔습니다. 변경 항목만 수정 후 제출하세요.`;
+    }
+
+    async function loadPreviousSurvey() {
+      const err = document.getElementById("form-error");
+      err.textContent = "";
+      try {
+        const res = await fetch(`${API}/client/audit-requests/latest-survey`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `불러오기 실패 (${res.status})`);
+        applyPrefill(data);
+      } catch (e) {
+        err.textContent = e.message;
+      }
+    }
+
+    document.getElementById("load-previous-survey").addEventListener("click", loadPreviousSurvey);
+
+    document.getElementById("audit-request-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const err = document.getElementById("form-error");
+      const ok = document.getElementById("form-success");
+      err.textContent = "";
+      ok.textContent = "";
+
+      const cbId = Number(document.getElementById("cb-id").value);
+      const standards = selectedStandards();
+      const cycle = Number(document.querySelector('input[name="audit_cycle_months"]:checked')?.value || 12);
+      if (!cbId) {
+        err.textContent = "인증기관(CB) ID를 입력하세요.";
+        return;
+      }
+      if (!standards.length) {
+        err.textContent = "신청 표준을 1개 이상 선택하세요.";
+        return;
+      }
+
+      const payload = {
+        cb_id: cbId,
+        iso_standards: standards,
+        audit_type: document.getElementById("audit-type").value,
+        audit_cycle_months: cycle,
+        previous_request_id: state.previousRequestId || null,
+        survey_responses: collectSurveyResponses(),
+        note: document.getElementById("note").value.trim() || null,
+      };
+
+      try {
+        const res = await fetch(`${API}/client/audit-requests`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(typeof data.detail === "string" ? data.detail : `제출 실패 (${res.status})`);
+        }
+        ok.textContent = `신청이 접수되었습니다. (request_id=${data.id}, 주기=${data.audit_cycle_months}개월)`;
+        state.previousRequestId = data.id;
+        document.getElementById("previous-request-id").value = String(data.id);
+        loadHistory();
+      } catch (ex) {
+        err.textContent = ex.message;
+      }
+    });
+
+    async function loadHistory() {
+      const el = document.getElementById("history-list");
+      const err = document.getElementById("history-error");
+      err.textContent = "";
+      try {
+        const res = await fetch(`${API}/client/audit-requests?limit=20`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => []);
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `조회 실패 (${res.status})`);
+        if (!data.length) {
+          el.innerHTML = "<p class='lead'>아직 신청 이력이 없습니다.</p>";
+          return;
+        }
+        el.innerHTML = data.map((r) => `
+          <div class="history-item">
+            <strong>#${r.id}</strong> · ${ (r.iso_standards || []).join(", ") || "-" }
+            <small style="display:block;margin-top:4px;">
+              유형: ${r.audit_type} · 주기: ${r.audit_cycle_months}개월 · 상태: ${r.status}
+              ${r.previous_request_id ? ` · 이전차수 #${r.previous_request_id}` : ""}
+              · ${r.submitted_at || r.created_at || ""}
+            </small>
+          </div>`).join("");
+      } catch (e) {
+        err.textContent = e.message;
+        el.textContent = "";
+      }
+    }
+
+    renderStandardSurveys();
+    loadPreviousSurvey();
+    loadHistory();
+  </script>
+</body>
+</html>

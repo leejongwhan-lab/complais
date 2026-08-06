@@ -13,8 +13,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.cb import CertificationBodies
-from app.schemas.cb import CertificationBodiesResponse, CertificationBodiesUpdate
+from app.models.cb import CertificationBodies, CbOperationalRules
+from app.schemas.cb import (
+    CertificationBodiesResponse,
+    CertificationBodiesUpdate,
+    CbOperationalRulesResponse,
+    CbOperationalRulesUpdate,
+)
 
 router = APIRouter(prefix="/cb-entities", tags=["CB Entities"])
 
@@ -29,9 +34,12 @@ class CBEntityCreate(BaseModel):
     accreditation: Optional[str] = None
     address: Optional[str] = None
     tel: Optional[str] = None
+    phone: Optional[str] = None
     email: Optional[str] = None
     website: Optional[str] = None
     logo_path: Optional[str] = None
+    intro: Optional[str] = None
+    owner_user_id: Optional[int] = None
     ceo_name: Optional[str] = None
     biz_no: Optional[str] = None
     corp_no: Optional[str] = None
@@ -42,8 +50,11 @@ class CBEntityCreate(BaseModel):
     fee_per_md: Decimal = Decimal("0")
     fee_travel: Decimal = Decimal("0")
     fee_cert: Decimal = Decimal("0")
-    max_consecutive: int = 0
-    impartiality_cycle_months: int = 0
+    max_consecutive: int = 3
+    impartiality_cycle_months: int = 12
+    doc_rule_contract: Optional[str] = "CB-QE-{YYMMDD}-{SEQ3}"
+    doc_rule_report: Optional[str] = None
+    doc_rule_ncr: Optional[str] = None
     reg_no: Optional[str] = None
     is_active: bool = True
     accreditation_region: Optional[str] = None
@@ -104,21 +115,82 @@ def get_cb_entity(code: str, db: Session = Depends(get_db)) -> CertificationBodi
     return _get_cb_by_code_or_404(db, code)
 
 
+def _sync_legacy_fee_columns(cb: CertificationBodies, rules: CbOperationalRules) -> None:
+    """하위 호환: certification_bodies 레거시 수수료/문서 컬럼 동기화."""
+    cb.doc_rule_contract = rules.doc_rule_contract
+    cb.doc_rule_report = rules.doc_rule_report
+    cb.doc_rule_ncr = rules.doc_rule_ncr
+    cb.fee_per_md = Decimal(rules.fee_per_md or 0)
+    cb.fee_travel = Decimal(rules.fee_travel or 0)
+    cb.fee_cert = Decimal(rules.fee_cert or 0)
+    cb.max_consecutive = rules.max_consecutive_audits or 3
+    cb.impartiality_cycle_months = rules.impartiality_cycle_months or 12
+
+
+def _ensure_operational_rules(db: Session, cb: CertificationBodies) -> CbOperationalRules:
+    rules = db.query(CbOperationalRules).filter(CbOperationalRules.cb_id == cb.id).first()
+    if rules:
+        return rules
+    now = datetime.now()
+    rules = CbOperationalRules(
+        cb_id=cb.id,
+        doc_rule_contract=cb.doc_rule_contract or "CB-QE-{YYMMDD}-{SEQ3}",
+        doc_rule_report=cb.doc_rule_report,
+        doc_rule_ncr=cb.doc_rule_ncr,
+        fee_per_md=int(cb.fee_per_md or 0),
+        fee_travel=int(cb.fee_travel or 0),
+        fee_cert=int(cb.fee_cert or 0),
+        max_consecutive_audits=cb.max_consecutive or 3,
+        impartiality_cycle_months=cb.impartiality_cycle_months or 12,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(rules)
+    db.flush()
+    return rules
+
+
 @router.post("", response_model=CBEntityResponse, status_code=status.HTTP_201_CREATED)
 def create_cb_entity(payload: CBEntityCreate, db: Session = Depends(get_db)) -> CertificationBodies:
-    """인증기관 신규 등록."""
+    """인증기관 신규 등록 + 기본 운용규칙 생성."""
     existing = db.query(CertificationBodies).filter(CertificationBodies.code == payload.code).first()
     if existing:
         raise HTTPException(status_code=400, detail="이미 존재하는 기관 코드입니다.")
 
     now = datetime.now()
     data = payload.model_dump()
+    # phone 미입력 시 tel 사용
+    if not data.get("phone") and data.get("tel"):
+        data["phone"] = data["tel"]
+    if not data.get("tel") and data.get("phone"):
+        data["tel"] = data["phone"]
+
     cb = CertificationBodies(
         **{k: _serialize(v) for k, v in data.items()},
         created_at=now,
         updated_at=now,
     )
     db.add(cb)
+    db.flush()
+
+    rules = CbOperationalRules(
+        cb_id=cb.id,
+        doc_rule_contract=payload.doc_rule_contract or "CB-QE-{YYMMDD}-{SEQ3}",
+        doc_rule_report=payload.doc_rule_report,
+        doc_rule_ncr=payload.doc_rule_ncr,
+        fee_per_md=int(payload.fee_per_md or 0),
+        fee_travel=int(payload.fee_travel or 0),
+        fee_cert=int(payload.fee_cert or 0),
+        max_consecutive_audits=payload.max_consecutive or 3,
+        impartiality_cycle_months=payload.impartiality_cycle_months or 12,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(rules)
+    _sync_legacy_fee_columns(cb, rules)
+    from app.services.cb_billing import ensure_default_cb_contract
+
+    ensure_default_cb_contract(db, cb, year=now.year)
     db.commit()
     db.refresh(cb)
     return cb
@@ -130,15 +202,93 @@ def update_cb_entity(
     payload: CertificationBodiesUpdate,
     db: Session = Depends(get_db),
 ) -> CertificationBodies:
+    from app.core.validators import sanitize_contact_fields
+
     cb = _get_cb_by_code_or_404(db, code)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    cleaned = sanitize_contact_fields(
+        biz_no=data.get("biz_no") if "biz_no" in data else None,
+        tel=data.get("tel") if "tel" in data else None,
+        phone=data.get("phone") if "phone" in data else None,
+        email=data.get("email") if "email" in data else None,
+        website=data.get("website") if "website" in data else None,
+    )
+    data.update(cleaned)
+    for field, value in data.items():
         if field in {"created_at", "updated_at", "code"}:
             continue
         setattr(cb, field, _serialize(value))
+
+    # phone/tel 상호 보정
+    if "phone" in data and data["phone"] and not data.get("tel"):
+        cb.tel = data["phone"]
+    if "tel" in data and data["tel"] and not data.get("phone"):
+        cb.phone = data["tel"]
+
+    # 레거시 수수료 필드가 직접 수정되면 operational_rules에도 반영
+    fee_fields = {
+        "doc_rule_contract",
+        "doc_rule_report",
+        "doc_rule_ncr",
+        "fee_per_md",
+        "fee_travel",
+        "fee_cert",
+        "max_consecutive",
+        "impartiality_cycle_months",
+    }
+    if fee_fields.intersection(data.keys()):
+        rules = _ensure_operational_rules(db, cb)
+        if "doc_rule_contract" in data:
+            rules.doc_rule_contract = data["doc_rule_contract"]
+        if "doc_rule_report" in data:
+            rules.doc_rule_report = data["doc_rule_report"]
+        if "doc_rule_ncr" in data:
+            rules.doc_rule_ncr = data["doc_rule_ncr"]
+        if "fee_per_md" in data:
+            rules.fee_per_md = int(data["fee_per_md"] or 0)
+        if "fee_travel" in data:
+            rules.fee_travel = int(data["fee_travel"] or 0)
+        if "fee_cert" in data:
+            rules.fee_cert = int(data["fee_cert"] or 0)
+        if "max_consecutive" in data:
+            rules.max_consecutive_audits = int(data["max_consecutive"] or 3)
+        if "impartiality_cycle_months" in data:
+            rules.impartiality_cycle_months = int(data["impartiality_cycle_months"] or 12)
+        rules.updated_at = datetime.now()
+
     cb.updated_at = datetime.now()
     db.commit()
     db.refresh(cb)
     return cb
+
+
+@router.get("/{code}/operational-rules", response_model=CbOperationalRulesResponse)
+def get_cb_operational_rules(code: str, db: Session = Depends(get_db)) -> CbOperationalRules:
+    """CB 운용/수수료 규칙 조회 (없으면 레거시 값으로 생성)."""
+    cb = _get_cb_by_code_or_404(db, code)
+    rules = _ensure_operational_rules(db, cb)
+    db.commit()
+    db.refresh(rules)
+    return rules
+
+
+@router.put("/{code}/operational-rules", response_model=CbOperationalRulesResponse)
+def update_cb_operational_rules(
+    code: str,
+    payload: CbOperationalRulesUpdate,
+    db: Session = Depends(get_db),
+) -> CbOperationalRules:
+    """CB 운용/수수료 규칙 갱신 + 레거시 컬럼 동기화."""
+    cb = _get_cb_by_code_or_404(db, code)
+    rules = _ensure_operational_rules(db, cb)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(rules, field, value)
+    rules.updated_at = datetime.now()
+    _sync_legacy_fee_columns(cb, rules)
+    cb.updated_at = datetime.now()
+    db.commit()
+    db.refresh(rules)
+    return rules
 
 
 @router.delete("/{code}", status_code=status.HTTP_204_NO_CONTENT)

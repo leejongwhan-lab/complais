@@ -1,0 +1,36 @@
+/* ComplAIs brand logo utilities */
+.brand-logo {
+  display: inline-block;
+  height: 32px;
+  width: auto;
+  max-width: 100%;
+  vertical-align: middle;
+  object-fit: contain;
+  background: transparent;
+}
+
+.brand-logo-sm { height: 22px; }
+.brand-logo-md { height: 28px; }
+.brand-logo-lg { height: 36px; }
+.brand-logo-xl { height: 44px; }
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 로그인/회원가입 카드 상단 로고 영역 */
+.brand-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border-radius: 10px;
+}
+
+.brand-wrap .brand-logo {
+  height: 36px;
+}

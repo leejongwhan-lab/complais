@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ComplAIs - Application Review</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 p-8">
+  <div class="max-w-5xl mx-auto space-y-6">
+
+    <div class="flex justify-between items-center">
+      <a href="/cb-portal/dashboard" class="text-sm font-semibold text-slate-500 hover:text-slate-800">← 대시보드로 돌아가기</a>
+      <h1 class="text-xl font-bold">인증 신청 검토 및 MD 확정 <span id="app-id-label" class="text-slate-400 font-medium text-base"></span></h1>
+    </div>
+
+    <!-- Application Summary -->
+    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <p class="text-xs text-slate-400">신청 기업</p>
+        <p id="app-company" class="text-base font-bold text-slate-800 mt-1">로딩 중...</p>
+      </div>
+      <div>
+        <p class="text-xs text-slate-400">신청 표준 / IAF 코드</p>
+        <p id="app-standards" class="text-base font-bold text-slate-800 mt-1">로딩 중...</p>
+      </div>
+      <div>
+        <p class="text-xs text-slate-400">전체 상주 인원 수</p>
+        <p id="app-employees" class="text-base font-bold text-slate-800 mt-1">- 명</p>
+      </div>
+    </div>
+
+    <!-- MD Calculator Card -->
+    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+      <h2 class="text-lg font-bold text-slate-900 border-b pb-3">IAF MD5:2019 기반 MD 조정</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-4 rounded-lg">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">기본 MD (Base MD)</label>
+          <input type="text" id="base-md-display" value="0.0" readonly class="w-full bg-slate-200 border-0 rounded p-2 text-center font-bold text-slate-700">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">가율 (+ %)</label>
+          <select id="plus-pct" class="w-full border rounded p-2 text-center font-semibold text-blue-600 bg-white" onchange="calculateMD()">
+            <option value="0">0%</option>
+            <option value="10">+10%</option>
+            <option value="20">+20%</option>
+            <option value="30">+30% (최대)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">감율 (- %)</label>
+          <select id="minus-pct" class="w-full border rounded p-2 text-center font-semibold text-rose-600 bg-white" onchange="calculateMD()">
+            <option value="0">0%</option>
+            <option value="10">-10%</option>
+            <option value="20">-20%</option>
+            <option value="30">-30% (최대)</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">가감 사유 및 검토 메모</label>
+        <textarea id="calc-note" rows="3" class="w-full border border-slate-300 rounded p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="복수 사업장 / 위험도 조정 등 산정 근거 인용 작성"></textarea>
+      </div>
+
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-4 border-t border-slate-100">
+        <div>
+          <span class="text-sm font-medium text-slate-500">최종 확정 MD: </span>
+          <span id="final-md-display" class="text-2xl font-extrabold text-blue-600 ml-2">0.0</span>
+          <span class="text-xs text-slate-400 font-normal"> M/D (0.5 단위 절상 반영)</span>
+        </div>
+        <button type="button" onclick="saveMDReview()" class="px-4 py-2 bg-slate-800 text-white font-medium text-sm rounded hover:bg-slate-900">
+          💾 MD 검토 저장
+        </button>
+      </div>
+    </div>
+
+    <!-- Final Approval Action Card -->
+    <div class="bg-slate-900 text-white p-6 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div>
+        <h3 class="font-bold text-base">CB 인정범위 검증 및 승인</h3>
+        <p class="text-xs text-slate-400 mt-1">신청 표준이 CB Scope에 포함되어 있는지 자동 검증 후 승인 처리 및 Draft 계약을 생성합니다.</p>
+      </div>
+      <button type="button" onclick="approveApp()" class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 font-bold text-sm text-white rounded-lg shadow-lg whitespace-nowrap">
+        ✅ 최종 승인 및 Draft 계약 생성
+      </button>
+    </div>
+
+  </div>
+
+  <script src="/static/js/cb_admin_api.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const appId = urlParams.get("id") || urlParams.get("app_id") || "";
+
+    if (!localStorage.getItem("access_token")) {
+      alert("로그인이 필요합니다.");
+      location.href = "/login.html";
+    }
+
+    document.getElementById("app-id-label").textContent = appId ? `#${appId}` : "";
+
+    function baseMdOf(app) {
+      const t = String(app.audit_type || "").toUpperCase();
+      if (t.startsWith("SURV")) return Number(app.base_surveillance_md || 0);
+      if (t.includes("RECERT")) return Number(app.base_recertification_md || 0);
+      return Number(app.base_stage1_md || 0) + Number(app.base_stage2_md || 0);
+    }
+
+    function calculateMD() {
+      const base = parseFloat(document.getElementById("base-md-display").value) || 0;
+      const plus = parseInt(document.getElementById("plus-pct").value, 10) || 0;
+      const minus = parseInt(document.getElementById("minus-pct").value, 10) || 0;
+
+      let raw = base * (1 + (plus - minus) / 100);
+      let rounded = Math.ceil(raw * 2) / 2; // 0.5 M/D 단위 절상
+      if (rounded < 0.5 && base > 0) rounded = 0.5;
+      if (base <= 0) rounded = 0;
+
+      document.getElementById("final-md-display").textContent = rounded.toFixed(1);
+    }
+
+    async function loadApplication() {
+      if (!appId) {
+        document.getElementById("app-company").textContent = "app id 없음 (?id=)";
+        return;
+      }
+      try {
+        const detail = await CBAdminAPI.getApplication(appId);
+
+        document.getElementById("app-company").textContent =
+          detail.company_name || `기업 ID ${detail.enterprise_id || "-"}`;
+
+        const standards = Array.isArray(detail.applied_standards)
+          ? detail.applied_standards.join(", ")
+          : String(detail.standards_json || detail.applied_standards || "-");
+        document.getElementById("app-standards").textContent =
+          `${standards} / IAF ${detail.iaf_scope_code || "-"}`;
+        document.getElementById("app-employees").textContent =
+          `${detail.active_employee_count != null ? detail.active_employee_count : "-"} 명`;
+
+        const base = detail.base_md != null
+          ? Number(detail.base_md)
+          : (detail.final_audit_md != null && Number(detail.cb_adjustment_ratio || 0) === 0
+            ? Number(detail.final_audit_md)
+            : baseMdOf(detail));
+        document.getElementById("base-md-display").value = Number(base).toFixed(1);
+
+        const ratio = Number(detail.cb_adjustment_ratio || 0);
+        document.getElementById("plus-pct").value = String(ratio > 0 ? Math.min(30, Math.round(ratio)) : 0);
+        document.getElementById("minus-pct").value = String(ratio < 0 ? Math.min(30, Math.round(Math.abs(ratio))) : 0);
+        // snap select to nearest option
+        ["plus-pct", "minus-pct"].forEach((id) => {
+          const el = document.getElementById(id);
+          const v = parseInt(el.value, 10) || 0;
+          const opts = [0, 10, 20, 30];
+          const nearest = opts.reduce((a, b) => (Math.abs(b - v) < Math.abs(a - v) ? b : a), 0);
+          el.value = String(nearest);
+        });
+        document.getElementById("calc-note").value = detail.cb_adjustment_reason || "";
+        calculateMD();
+      } catch (e) {
+        document.getElementById("app-company").textContent = "로드 실패";
+        document.getElementById("app-standards").textContent = e.message || String(e);
+      }
+    }
+
+    async function saveMDReview() {
+      if (!appId) return;
+      const plusPct = document.getElementById("plus-pct").value;
+      const minusPct = document.getElementById("minus-pct").value;
+      const note = document.getElementById("calc-note").value;
+
+      try {
+        const res = await CBAdminAPI.reviewMD(appId, plusPct, minusPct, note, "under_review");
+        if (res && res.final_md != null) {
+          document.getElementById("final-md-display").textContent = Number(res.final_md).toFixed(1);
+        }
+        alert("💾 MD 산정 정보가 저장되었습니다.");
+      } catch (e) {}
+    }
+
+    async function approveApp() {
+      if (!appId) return;
+      if (!confirm("신청을 승인하고 Draft 계약을 생성하시겠습니까?")) return;
+      const memo = document.getElementById("calc-note").value;
+
+      try {
+        // 승인 전 MD 저장을 한 번 더 보장
+        await CBAdminAPI.reviewMD(
+          appId,
+          document.getElementById("plus-pct").value,
+          document.getElementById("minus-pct").value,
+          memo,
+          "approved"
+        );
+        await CBAdminAPI.approveApplication(appId, memo);
+        alert("🎉 성공적으로 승인되었습니다! 심사원 배정 단계로 이동합니다.");
+        window.location.href = `/cb-portal/assign.html?id=${appId}`;
+      } catch (e) {}
+    }
+
+    document.addEventListener("DOMContentLoaded", loadApplication);
+  </script>
+</body>
+</html>
