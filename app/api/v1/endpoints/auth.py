@@ -864,16 +864,18 @@ def login(
     user.updated_at = datetime.utcnow()
     db.commit()
 
-    # 역할별 리다이렉트
+    # 역할별 리다이렉트 (4대 포탈 체계)
     role = user.role or ""
     if role in {"cb_admin", "cb_manager", "cb_staff", "cb_reviewer"}:
-        redirect_to = "/cb_portal.html"
-    elif role in {"client_admin", "client_staff"}:
-        redirect_to = "/client_portal.html"
+        redirect_to = "/cb-portal"
+    elif role in {"client_admin", "client_staff", "enterprise_admin", "enterprise_user"}:
+        redirect_to = "/enterprise"
     elif role == "auditor":
-        redirect_to = "/auditor_portal.html"
+        redirect_to = "/auditor-portal"
+    elif role in {"platform_admin", "admin"}:
+        redirect_to = "/admin"
     else:
-        redirect_to = "/platform_admin_dashboard.html"
+        redirect_to = "/admin"
 
     # 로그인 성공 및 세션 할당 ($_SESSION 대응)
     return {

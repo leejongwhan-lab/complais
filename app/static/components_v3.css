@@ -118,28 +118,31 @@ body {
    Badge & Label Components
    ========================================================================== */
 .badge {
-  display: inline-flex;
+  display: inline;
   align-items: center;
   justify-content: center;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
   font-weight: var(--font-weight-semibold);
-  color: #ffffff;
+  color: var(--font-primary, #1e2a24);
+  background: transparent;
 }
 
-.badge-purple { background-color: var(--bg-badge-purple); }
-.badge-red { background-color: var(--bg-badge-red-light); }
+.badge-purple { background-color: transparent; color: var(--font-primary, #1e2a24); }
+.badge-red { background-color: transparent; color: var(--font-primary, #1e2a24); }
 
 .label-chip {
-  display: inline-flex;
+  display: inline;
   align-items: center;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 12px;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
   font-weight: var(--font-weight-medium);
+  background: transparent;
+  color: var(--font-primary, #1e2a24);
 }
 
-.label-chip-blue { background-color: var(--bg-label-blue); color: var(--sec-blue); }
-.label-chip-purple { background-color: var(--bg-label-purple); color: var(--primary-purple); }
-.label-chip-red { background-color: var(--bg-label-red); color: var(--sec-red); }
+.label-chip-blue { background-color: transparent; color: var(--font-primary, #1e2a24); }
+.label-chip-purple { background-color: transparent; color: var(--font-primary, #1e2a24); }
+.label-chip-red { background-color: transparent; color: var(--font-primary, #1e2a24); }

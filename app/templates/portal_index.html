@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ComplAIs — 포탈 체계</title>
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/portal.css" />
+</head>
+<body class="portal-page min-h-screen bg-slate-50 text-slate-800">
+  <header class="border-b border-slate-200 bg-white">
+    <div class="mx-auto flex max-w-5xl items-center gap-3 px-6 py-4">
+      <a href="/">
+        <img src="/static/brand/complais-logo.png" alt="complAIs" class="brand-logo brand-logo-md" />
+      </a>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl space-y-6 px-6 py-8">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight text-slate-900">포털 체계</h1>
+      <p class="mt-1 text-sm text-slate-500">
+        플랫폼 전체 어드민 → CB 포털 → 기업 포털 → 인증심사원 포털
+      </p>
+      <p class="mt-2 text-xs text-slate-500">
+        마스터: <code>cb_id</code>/<code>cb_name</code> · <code>company_id</code>/<code>company_name</code>
+        · 단계: Application → MD Calculation → Review → Assignment → Contract
+      </p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <section class="rounded-xl border border-indigo-200 bg-white p-6 shadow-sm md:col-span-2">
+        <p class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">1 · 플랫폼 전체 어드민</p>
+        <h2 class="mt-1 text-lg font-bold">/admin</h2>
+        <p class="mt-2 text-sm text-slate-500">플랫폼 최상위 관리자 · CB 70 · 기업 1,134 마스터 조회</p>
+        <ul class="mt-4 space-y-2 text-sm">
+          <li><a class="font-semibold text-indigo-700 hover:underline" href="/admin">/admin</a></li>
+          <li><a class="font-semibold text-indigo-700 hover:underline" href="/login?next=/admin">/login</a></li>
+        </ul>
+      </section>
+
+      <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">2 · CB 포털</p>
+        <h2 class="mt-1 text-lg font-bold">/cb-portal</h2>
+        <p class="mt-2 text-sm text-slate-500">인증기관 업무용 · cb_id 기준</p>
+        <ul class="mt-4 space-y-2 text-sm">
+          <li><a class="font-semibold text-indigo-700 hover:underline" href="/cb-portal">/cb-portal</a></li>
+        </ul>
+      </section>
+
+      <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">3 · 기업 포털</p>
+        <h2 class="mt-1 text-lg font-bold">/enterprise</h2>
+        <p class="mt-2 text-sm text-slate-500">신청 기업용 · company_id 기준</p>
+        <ul class="mt-4 space-y-2 text-sm">
+          <li><a class="font-semibold text-indigo-700 hover:underline" href="/enterprise">/enterprise</a></li>
+          <li><a class="font-semibold text-indigo-700 hover:underline" href="/apply">/apply</a> — Application</li>
+        </ul>
+      </section>
+
+      <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2">
+        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">4 · 인증심사원 포털</p>
+        <h2 class="mt-1 text-lg font-bold">/auditor-portal</h2>
+        <p class="mt-2 text-sm text-slate-500">심사원용 · Assignment 이후 업무</p>
+        <ul class="mt-4 space-y-2 text-sm">
+          <li><a class="font-semibold text-indigo-700 hover:underline" href="/auditor-portal">/auditor-portal</a></li>
+        </ul>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

@@ -28,6 +28,17 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.company import Companies
 
+
+STRING_LIMITS = {
+    "company_no": 50, "cert_no": 50, "name": 200, "name_en": 200, "biz_no": 30,
+    "corp_no": 20, "ceo_name": 100, "biz_type": 100, "biz_class": 100,
+    "address": 500, "detail_address": 255, "address_en": 500, "tel": 50,
+    "email": 200, "website": 300, "iaf_code": 255, "ksic_code": 255,
+    "scope_kr": 1000, "scope_en": 1000, "entity_type": 50, "status": 20,
+    "tax_contact_name": 100, "tax_email": 100,
+}
+
+
 DEFAULT_CANDIDATES = [
     BASE_DIR / "data" / "companies_full.json",
     BASE_DIR / "data" / "companies_full.csv",
@@ -129,7 +140,11 @@ def _normalize_row(raw: dict) -> dict | None:
         "headcount_non_regular", "headcount_outsourced", "headcount_certified",
         "status", "tax_contact_name", "tax_email",
     }
-    return {k: v for k, v in data.items() if k in allowed}
+    cleaned = {k: v for k, v in data.items() if k in allowed}
+    for k, lim in STRING_LIMITS.items():
+        if k in cleaned and isinstance(cleaned[k], str):
+            cleaned[k] = cleaned[k][:lim]
+    return cleaned
 
 
 def _load_from_excel(path: Path) -> list[dict]:

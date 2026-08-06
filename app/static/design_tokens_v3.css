@@ -6,37 +6,38 @@
   /* ==========================================================================
      1. Color System
      ========================================================================== */
-  /* Primary Color */
-  --primary-purple: #4D37DF;
+  /* Primary Color — calm forest/sage (name kept for compatibility) */
+  --primary-purple: #2F6B4F;
+  --primary-green: #2F6B4F;
 
   /* Secondary Colors */
-  --sec-blue: #1A5FDF;
-  --sec-light-blue: #23A9FC;
-  --sec-pink: #FF3360;
-  --sec-red: #FF5A5F;
+  --sec-blue: #2A6B5F;
+  --sec-light-blue: #3D8F7A;
+  --sec-pink: #D4535A;
+  --sec-red: #C94C52;
 
-  /* Gray Scale - Border & Line */
-  --gray-line-1: #F7F7F3;
-  --gray-line-2: #EEEEEE;
-  --gray-line-3: #E9E0E9;
-  --gray-line-4: #D9D9D9;
+  /* Gray Scale - Border & Line (cool green-gray, no lilac) */
+  --gray-line-1: #F4F6F4;
+  --gray-line-2: #E8ECE9;
+  --gray-line-3: #DDE5E0;
+  --gray-line-4: #C9D2CC;
 
   /* Gray Scale - Disabled & Pressed */
-  --gray-disabled-bg: #F2F2F2;
-  --gray-disabled-text: #D8D8D8;
-  --gray-pressed: rgba(0, 0, 0, 0.15);
+  --gray-disabled-bg: #F0F2F0;
+  --gray-disabled-text: #C5CBC7;
+  --gray-pressed: rgba(0, 0, 0, 0.12);
 
   /* Gray Scale - Font Colors */
-  --font-primary: #222222;
-  --font-secondary: #666666;
-  --font-tertiary: #999999;
+  --font-primary: #1E2A24;
+  --font-secondary: #5A675F;
+  --font-tertiary: #8A948D;
 
-  /* Badge & Background Colors */
-  --bg-badge-red-light: #FF5A5F;
-  --bg-badge-purple: #995AF5;
-  --bg-label-blue: #E5F6FF;
-  --bg-label-purple: #F4E0FF;
-  --bg-label-red: #FBEDED;
+  /* Badge & Background Colors — soft sage / mint (not neon, not purple) */
+  --bg-badge-red-light: #C94C52;
+  --bg-badge-purple: #3D7A5C;
+  --bg-label-blue: #E6F3EF;
+  --bg-label-purple: #E8F1EB;
+  --bg-label-red: #F8ECEC;
 
   /* ==========================================================================
      2. Typography (1안 Pretendard 표준)

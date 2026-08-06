@@ -1,27 +1,16 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>계약 목록 — CB Portal</title>
-  <style>
-    body { font-family: Pretendard, system-ui, sans-serif; margin: 24px; background: #f5f6f8; color: #111; }
-    .card { background: #fff; padding: 24px; max-width: 1000px; border: 1px solid #e5e7eb; border-radius: 10px; }
-    h1 { margin: 0 0 8px; font-size: 1.35rem; }
-    .lead { color: #64748b; margin: 0 0 20px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: left; }
-    th { background: #f8fafc; }
-    button, a.btn {
-      display: inline-block; padding: 8px 12px; background: #185fa5; color: #fff;
-      border: 0; border-radius: 8px; cursor: pointer; text-decoration: none; font-weight: 700; margin-right: 8px;
-    }
-    a.ghost, button.ghost { background: #fff; color: #185fa5; border: 1px solid #185fa5; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #eff6ff; color: #1d4ed8; }
-    .error { color: #b91c1c; }
-  </style>
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/components/sidebar.css" />
+  <link rel="stylesheet" href="/static/css/pages/enterprise.css" />
+  <link rel="stylesheet" href="/static/css/portal.css" />
 </head>
-<body>
+<body class="portal-page">
   <div class="card">
     <h1>계약 목록</h1>
     <p class="lead">CB 스코프 내 심사 계약(Draft / Scheduled 등)입니다.</p>

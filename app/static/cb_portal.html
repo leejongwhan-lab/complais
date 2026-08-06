@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CB 포털 - complAIs</title>
   <link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/portal.css" />
   <style>
     body {
       min-height: 100vh; margin: 0; background: var(--bg-secondary, #f5f7fb);
@@ -100,10 +102,10 @@
   <script src="/static/js/validation.js"></script>
   <script src="/static/js/cb_admin_api.js"></script>
 </head>
-<body>
+<body class="portal-page">
   <div class="wrap">
     <div class="brand-wrap">
-      <img src="/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
+      <img src="/static/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
     </div>
     <div class="card">
       <h1>인증기관(CB) 포털</h1>
@@ -121,7 +123,7 @@
         <p class="lead">인정 Scope는 ‘인정 Scope’ 탭, 소속 신청은 ‘구성원 / 승인’ 탭에서 처리하세요.</p>
         <div class="actions">
           <a class="btn primary" href="#" onclick="switchTab('profile');return false;">Scope 관리</a>
-          <a class="btn ghost" href="/platform_admin_dashboard.html">관리 화면</a>
+          <a class="btn ghost" href="/admin">관리 화면</a>
           <a class="btn ghost" href="#" id="logout-btn">로그아웃</a>
         </div>
       </section>

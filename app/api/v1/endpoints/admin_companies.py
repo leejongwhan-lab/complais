@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -18,6 +18,12 @@ router = APIRouter(prefix="/admin/companies", tags=["Admin Companies"])
 # ─── List schemas ─────────────────────────────────────────────────
 
 class CompanySummaryResponse(BaseModel):
+    """기업 마스터 요약.
+
+    DB 컬럼은 companies.id / companies.name 을 유지하고,
+    API·UI 표준 용어는 company_id / company_name 으로 함께 노출합니다.
+    """
+
     id: int
     name: str
     name_en: Optional[str] = None
@@ -34,6 +40,16 @@ class CompanySummaryResponse(BaseModel):
     status: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def company_id(self) -> int:
+        return self.id
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def company_name(self) -> str:
+        return self.name
 
 
 class CompanyListResponse(BaseModel):
@@ -96,6 +112,8 @@ class StaffBulkIn(BaseModel):
 
 
 class CompanyDetailResponse(BaseModel):
+    """기업 마스터 상세 — company_id / company_name 표준 용어 포함."""
+
     id: int
     cert_no: Optional[str] = None
     name: str
@@ -128,9 +146,19 @@ class CompanyDetailResponse(BaseModel):
     departments: List[DeptOut] = Field(default_factory=list)
     staff: List[StaffOut] = Field(default_factory=list)
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def company_id(self) -> int:
+        return self.id
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def company_name(self) -> str:
+        return self.name
+
 
 class CompanyProfileUpdate(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(default=None, validation_alias=AliasChoices("name", "company_name"))
     name_en: Optional[str] = None
     biz_no: Optional[str] = None
     corp_no: Optional[str] = None
@@ -154,6 +182,8 @@ class CompanyProfileUpdate(BaseModel):
     iaf_code: Optional[str] = None
     status: Optional[str] = None
     headcount_year: Optional[int] = Field(default=None, ge=2000, le=2100)
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # ─── List ─────────────────────────────────────────────────────────

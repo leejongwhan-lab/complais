@@ -22,8 +22,17 @@ function clearAuthToken() {
 }
 
 function redirectToLogin(message) {
-  alert(message || "관리자 권한이 없거나 인증이 만료되었습니다.");
-  window.location.href = "/login.html";
+  if (window.__adminLoginRedirecting) return;
+  window.__adminLoginRedirecting = true;
+  const token = localStorage.getItem(TOKEN_KEY);
+  // 미로그인 진입은 조용히 로그인으로 이동 (alert 반복 방지)
+  if (!token) {
+    window.location.replace("/login?next=/admin");
+    return;
+  }
+  if (message) alert(message);
+  clearAuthToken();
+  window.location.href = "/login?next=/admin";
 }
 
 function escapeHtml(text) {
@@ -35,11 +44,24 @@ function escapeHtml(text) {
 document.addEventListener("DOMContentLoaded", () => {
   const token = localStorage.getItem(TOKEN_KEY);
   if (!token) {
-    redirectToLogin("로그인이 필요합니다.");
+    redirectToLogin();
     return;
   }
 
-  // 1. 공통 JWT Fetch 함수
+  document.body.addEventListener("htmx:responseError", (e) => {
+    const status = e.detail.xhr?.status;
+    if (status === 401 || status === 403) {
+      redirectToLogin(
+        status === 401
+          ? "인증이 만료되었습니다. 다시 로그인해주세요."
+          : "관리자 권한이 없습니다. platform_admin 계정으로 로그인하세요.",
+      );
+    }
+  });
+
+  const useHtmxCompanies = !!document.getElementById("company-htmx-panel");
+  const useHtmxCb = !!document.getElementById("cb-htmx-panel");
+
   async function authFetch(url, options = {}) {
     const headers = {
       "Content-Type": "application/json",
@@ -141,13 +163,21 @@ document.addEventListener("DOMContentLoaded", () => {
     return gender || "-";
   }
 
-  // 3. 탭별 API 호출 분기
   async function loadTabData(tabName) {
     if (tabName === "cb-contracts") {
+      if (useHtmxCb && window.htmx) {
+        htmx.trigger(document.body, "refresh-cb");
+        return;
+      }
       await loadCbContracts();
       return;
     }
     if (tabName === "companies") {
+      if (useHtmxCompanies && window.htmx) {
+        const form = document.getElementById("company-search-form");
+        if (form) htmx.trigger(form, "submit");
+        return;
+      }
       companyPage = 1;
       await fetchCompanies(1);
       return;
@@ -210,29 +240,28 @@ document.addEventListener("DOMContentLoaded", () => {
             '<tr><td colspan="8" style="text-align: center; color: var(--font-tertiary);">검색 결과가 없습니다.</td></tr>';
         } else {
           tbody.innerHTML = currentCompaniesData
-            .map((c) => {
+            .map((c, i) => {
+              const companyId = c.company_id ?? c.id;
+              const seq = (companyPage - 1) * companyLimit + i + 1;
+              const companyName = c.company_name ?? c.name ?? "";
               const corpType = resolveCorpType(c);
               const websiteUrl = c.website
                 ? c.website.startsWith("http")
                   ? c.website
                   : `http://${c.website}`
                 : null;
-              const badgeClass =
-                corpType === "법인"
-                  ? "badge bg-primary-subtle text-primary"
-                  : "badge bg-secondary-subtle text-secondary";
 
               return `
         <tr>
-          <td>${escapeHtml(c.id)}</td>
-          <td class="fw-bold text-start text-truncate" style="max-width: 180px;" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</td>
+          <td>${seq}</td>
+          <td class="col-company-name fw-bold" title="${escapeHtml(companyName)}">${escapeHtml(companyName)}</td>
           <td>${escapeHtml(c.biz_no || "-")}</td>
-          <td><span class="${badgeClass}">${escapeHtml(corpType)}</span></td>
+          <td>${escapeHtml(corpType)}</td>
           <td>${escapeHtml(c.ceo_name || "-")}</td>
-          <td class="text-start text-truncate" style="max-width: 250px;" title="${escapeHtml(c.address_kr || "")}">${escapeHtml(c.address_kr || "-")}</td>
+          <td title="${escapeHtml(c.address_kr || "")}">${escapeHtml(c.address_kr || "-")}</td>
           <td>${websiteUrl ? `<a href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener" class="text-decoration-none">방문</a>` : "-"}</td>
           <td>
-            <button type="button" class="btn-detail" onclick="openDetailModal(${Number(c.id)})">상세</button>
+            <button type="button" class="btn-detail" onclick="openDetailModal(${Number(companyId)})">상세정보</button>
           </td>
         </tr>
       `;
@@ -318,12 +347,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function bindCompanyDetail(detail) {
     currentCompanyDetail = detail;
-    currentCompanyId = detail.id;
-    setText("modal-company-title", `${detail.name || "기업"} 상세 정보`);
-    setInputValue("ac-id", detail.id);
-    setInputValue("ac-id-display", detail.id);
+    currentCompanyId = detail.company_id ?? detail.id;
+    const companyName = detail.company_name || detail.name || "기업";
+    setText("modal-company-title", `${companyName} 상세 정보`);
+    setInputValue("ac-id", currentCompanyId);
+    setInputValue("ac-id-display", currentCompanyId);
     setInputValue("ac-status", detail.status || "정상");
-    setInputValue("ac-name", detail.name);
+    setInputValue("ac-name", companyName);
     setInputValue("ac-name_en", detail.name_en);
     setInputValue("ac-biz_no", detail.biz_no);
     setInputValue("ac-entity_type", detail.entity_type || "");
@@ -372,7 +402,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function openDetailModal(id) {
     const cached = currentCompaniesData.find((item) => item.id === id);
-    if (cached) setText("modal-company-title", `${cached.name} 상세 정보`);
+    if (cached) setText("modal-company-title", `${cached.company_name || cached.name} 상세 정보`);
     openCompanyDetailModal();
     try {
       const detail = await fetchCompanyDetail(id);
@@ -391,6 +421,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     return {
       name: document.getElementById("ac-name")?.value?.trim() || null,
+      company_name: document.getElementById("ac-name")?.value?.trim() || null,
       name_en: document.getElementById("ac-name_en")?.value?.trim() || null,
       biz_no: document.getElementById("ac-biz_no")?.value?.trim() || null,
       corp_no: document.getElementById("ac-corp_no")?.value?.trim() || null,
@@ -777,49 +808,67 @@ document.addEventListener("DOMContentLoaded", () => {
 
   window.openDetailModal = openDetailModal;
 
-  function renderCompanyPagination(total, page, limit) {
-    const el = document.getElementById("pagination");
-    if (!el) return;
+  const PAGINATION_WINDOW = 5;
 
-    const totalPages = Math.max(1, Math.ceil(total / limit));
-    const current = Math.min(page, totalPages);
-
-    const buttons = [];
-    buttons.push(
-      `<button type="button" data-page="${current - 1}" ${current <= 1 ? "disabled" : ""}>이전</button>`,
-    );
-
-    const windowSize = 5;
+  function buildPaginationPageNums(current, totalPages, windowSize = PAGINATION_WINDOW) {
     let start = Math.max(1, current - Math.floor(windowSize / 2));
     let end = Math.min(totalPages, start + windowSize - 1);
     start = Math.max(1, end - windowSize + 1);
-
+    const pageNums = [];
+    if (start > 1) pageNums.push(1);
     for (let p = start; p <= end; p += 1) {
-      buttons.push(
-        `<button type="button" data-page="${p}" class="${p === current ? "active" : ""}">${p}</button>`,
-      );
+      if (!pageNums.includes(p)) pageNums.push(p);
     }
+    if (end < totalPages && !pageNums.includes(totalPages)) pageNums.push(totalPages);
+    return pageNums;
+  }
+
+  function renderPaginationButtons(el, total, page, limit, onPage) {
+    if (!el) return;
+    el.classList.add("pagination-container");
+    el.classList.remove("pagination");
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const current = Math.min(Math.max(1, page), totalPages);
+    const pageNums = buildPaginationPageNums(current, totalPages);
+    const buttons = [];
 
     buttons.push(
-      `<button type="button" data-page="${current + 1}" ${current >= totalPages ? "disabled" : ""}>다음</button>`,
+      `<button type="button" class="page-btn nav-btn" data-page="${current - 1}" ${current <= 1 ? "disabled" : ""}>‹</button>`,
+    );
+
+    let prevP = null;
+    pageNums.forEach((p) => {
+      if (prevP !== null && p > prevP + 1) {
+        buttons.push(`<button type="button" class="page-btn nav-btn" disabled>…</button>`);
+      }
+      buttons.push(
+        `<button type="button" class="page-btn${p === current ? " active" : ""}" data-page="${p}">${p}</button>`,
+      );
+      prevP = p;
+    });
+
+    buttons.push(
+      `<button type="button" class="page-btn nav-btn" data-page="${current + 1}" ${current >= totalPages ? "disabled" : ""}>›</button>`,
     );
 
     el.innerHTML = buttons.join("");
-    el.querySelectorAll("button[data-page]").forEach((btn) => {
+    el.querySelectorAll("button[data-page]:not(:disabled)").forEach((btn) => {
       btn.addEventListener("click", () => {
         const next = Number(btn.getAttribute("data-page"));
-        if (!Number.isNaN(next) && next >= 1 && next <= totalPages) {
-          fetchCompanies(next);
-        }
+        if (!Number.isNaN(next) && next >= 1 && next <= totalPages) onPage(next);
       });
     });
   }
 
-  // 검색 이벤트
+  function renderCompanyPagination(total, page, limit) {
+    renderPaginationButtons(document.getElementById("pagination"), total, page, limit, fetchCompanies);
+  }
+
   const searchBtn = document.getElementById("search-companies-btn");
   const searchInput = document.getElementById("search-keyword");
-  if (searchBtn) searchBtn.addEventListener("click", () => fetchCompanies(1));
-  if (searchInput) {
+  if (!useHtmxCompanies && searchBtn) searchBtn.addEventListener("click", () => fetchCompanies(1));
+  if (!useHtmxCompanies && searchInput) {
     searchInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -879,19 +928,22 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         tbody.innerHTML = currentAuditorsData
           .map(
-            (a) => `
+            (a, i) => {
+              const seq = (auditorPage - 1) * auditorLimit + i + 1;
+              return `
         <tr>
-          <td>${escapeHtml(a.id)}</td>
-          <td class="fw-bold text-start">${escapeHtml(a.name || "-")}</td>
-          <td class="text-start">${escapeHtml(a.email || "-")}</td>
+          <td>${seq}</td>
+          <td class="fw-bold">${escapeHtml(a.name || "-")}</td>
+          <td>${escapeHtml(a.email || "-")}</td>
           <td>${escapeHtml(a.phone || "-")}</td>
-          <td><span class="badge bg-info-subtle">${escapeHtml(gradeLabel(a.grade))}</span></td>
+          <td>${escapeHtml(gradeLabel(a.grade))}</td>
           <td>${escapeHtml(employmentLabel(a.employment_type))}</td>
-          <td>${a.is_freelance ? '<span class="badge bg-success-subtle">프리랜서</span>' : "-"}</td>
+          <td>${a.is_freelance ? "프리랜서" : "-"}</td>
           <td>
             <button type="button" class="btn-detail" onclick="openAuditorDetailModal(${Number(a.id)})">상세</button>
           </td>
-        </tr>`,
+        </tr>`;
+            },
           )
           .join("");
       }
@@ -906,39 +958,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderAuditorPagination(total, page, limit) {
-    const el = document.getElementById("auditor-pagination");
-    if (!el) return;
-
-    const totalPages = Math.max(1, Math.ceil(total / limit));
-    const current = Math.min(page, totalPages);
-    const buttons = [];
-    buttons.push(
-      `<button type="button" data-page="${current - 1}" ${current <= 1 ? "disabled" : ""}>이전</button>`,
+    renderPaginationButtons(
+      document.getElementById("auditor-pagination"),
+      total,
+      page,
+      limit,
+      fetchAuditors,
     );
-
-    const windowSize = 5;
-    let start = Math.max(1, current - Math.floor(windowSize / 2));
-    let end = Math.min(totalPages, start + windowSize - 1);
-    start = Math.max(1, end - windowSize + 1);
-
-    for (let p = start; p <= end; p += 1) {
-      buttons.push(
-        `<button type="button" data-page="${p}" class="${p === current ? "active" : ""}">${p}</button>`,
-      );
-    }
-    buttons.push(
-      `<button type="button" data-page="${current + 1}" ${current >= totalPages ? "disabled" : ""}>다음</button>`,
-    );
-
-    el.innerHTML = buttons.join("");
-    el.querySelectorAll("button[data-page]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const next = Number(btn.getAttribute("data-page"));
-        if (!Number.isNaN(next) && next >= 1 && next <= totalPages) {
-          fetchAuditors(next);
-        }
-      });
-    });
   }
 
   function openAuditorDetailModalShell() {
@@ -988,13 +1014,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     el.innerHTML = memberships
       .map((m) => {
-        const statusClass = m.status === "approved" ? "bg-success" : "bg-warning";
         const approvedGrade = gradeLabel(m.approved_grade || m.grade_at_cb || m.apply_grade);
         return `
-      <div class="membership-card">
+      <div class="membership-block">
         <div class="membership-card-header">
           <h6 class="fw-bold">CB ID: ${escapeHtml(m.cb_id)}</h6>
-          <span class="badge ${statusClass}">${escapeHtml(membershipStatusLabel(m.status))}</span>
+          <span class="panel-count">${escapeHtml(membershipStatusLabel(m.status))}</span>
         </div>
         <table class="detail-table" style="margin-top: 8px;">
           <tr>
@@ -1161,14 +1186,22 @@ document.addEventListener("DOMContentLoaded", () => {
   window.fetchAuditors = () => fetchAuditors(1);
   window.openAuditorDetailModal = openAuditorDetailModal;
 
+  async function refreshCbContractsList() {
+    if (useHtmxCb && window.htmx) {
+      htmx.trigger(document.body, "refresh-cb");
+      return;
+    }
+    await loadCbContracts();
+  }
+
   async function loadCbContracts() {
     const tbody = document.getElementById("cb-contracts-tbody");
     if (!tbody) return;
     tbody.innerHTML =
-      '<tr><td colspan="10" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td></tr>';
+      '<tr><td colspan="9" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td></tr>';
 
     try {
-      const res = await authFetch(`${API_BASE}/admin/cb-contracts?skip=0&limit=100&ensure_missing=true`);
+      const res = await authFetch(`${API_BASE}/admin/cb-contracts?skip=0&limit=100&ensure_missing=false`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || `요청 실패 (HTTP ${res.status})`);
@@ -1177,7 +1210,7 @@ document.addEventListener("DOMContentLoaded", () => {
       renderCbContractsTable(data);
     } catch (error) {
       console.error("CB contracts fetch failed:", error);
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--sec-red);">목록을 불러오지 못했습니다. (${escapeHtml(error.message)})</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--sec-red);">목록을 불러오지 못했습니다. (${escapeHtml(error.message)})</td></tr>`;
     }
   }
 
@@ -1187,7 +1220,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!records || records.length === 0) {
       tbody.innerHTML =
-        '<tr><td colspan="10" style="text-align: center; color: var(--font-tertiary);">등록된 인증기관이 없습니다.</td></tr>';
+        '<tr><td colspan="9" style="text-align: center; color: var(--font-tertiary);">등록된 인증기관이 없습니다.</td></tr>';
       return;
     }
 
@@ -1198,333 +1231,235 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     tbody.innerHTML = records
-      .map((r) => {
+      .map((r, i) => {
         const cbId = r.cb_id ?? r.id;
-        const heldCnt = Number(r.held_standard_count ?? 0);
-        const scopeCount = Number(r.scope_count ?? 0);
-        const heldLabel = heldCnt ? `${heldCnt}개 표준` : `${scopeCount}개 Scope`;
-        const abLine = r.ab_summary
-          ? `<div style="font-size:12px;color:var(--font-secondary);margin-top:4px;">AB: ${escapeHtml(r.ab_summary)}</div>`
-          : (Array.isArray(r.held_standards) && r.held_standards.length
-            ? `<div style="font-size:12px;color:var(--font-secondary);margin-top:4px;">${escapeHtml(r.held_standards.slice(0, 3).join(", "))}${r.held_standards.length > 3 ? "…" : ""}</div>`
-            : "");
+        const seq = (typeof r._seq === "number" ? r._seq : i + 1);
+        const stds = Array.isArray(r.held_standards) ? r.held_standards : [];
+        const heldCell = stds.length
+          ? `<div class="held-std-cell">${stds
+              .map(
+                (ini) =>
+                  `<button type="button" class="held-std-link" data-cb-held="${cbId}" data-std-initial="${escapeHtml(ini)}" title="${escapeHtml(ini)} 인증수행범위">${escapeHtml(ini)}</button>`,
+              )
+              .join("")}</div>`
+          : "—";
+        const abDisplay = r.ab_summary || r.accreditation_body || "-";
         return `
         <tr>
-          <td>${escapeHtml(cbId)}</td>
+          <td>${seq}</td>
           <td>${escapeHtml(r.cb_code || "-")}</td>
-          <td style="font-weight: var(--font-weight-semibold); text-align:left;">${escapeHtml(r.cb_name)}</td>
-          <td><span class="label-chip label-chip-purple">${escapeHtml(r.cb_status || "-")}</span></td>
-          <td>
-            <button type="button" class="scope-badge" data-cb-detail="${cbId}" title="보유 표준 / 인정정보">
-              ${escapeHtml(heldLabel)}
-            </button>
-            ${abLine}
-          </td>
-          <td>${escapeHtml(r.contract_year ?? "-")}</td>
-          <td>${escapeHtml(r.tier || "-")}</td>
+          <td class="col-cb-name fw-bold" title="${escapeHtml(r.cb_name)}">${escapeHtml(r.cb_name)}</td>
+          <td>${escapeHtml(r.cb_status || "-")}</td>
+          <td class="col-held-std">${heldCell}</td>
+          <td>${escapeHtml(abDisplay)}</td>
           <td>${fmtMoney(r.annual_base_fee)}</td>
           <td>${fmtMoney(r.price_per_md)}</td>
           <td>
-            <button type="button" class="btn-detail" data-cb-detail="${cbId}">상세 및 Scope 관리</button>
+            <button type="button" class="btn-detail" data-cb-detail="${cbId}">상세정보</button>
           </td>
         </tr>`;
       })
       .join("");
-
-    tbody.querySelectorAll("[data-cb-detail]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const id = Number(btn.getAttribute("data-cb-detail"));
-        if (id) openCbDetailScopeModal(id);
-      });
-    });
   }
 
-  /* ---- CB 상세 / Scope 관리 모달 ---- */
-    const cbScopeState = {
+  /* ---- CB 상세정보 (목록에 없는 필드만) / 보유 표준·IAF 팝업 ---- */
+  const cbDetailState = {
     editingId: null,
     legacyRegNo: null,
-    standards: [],
-    standardOptions: [],
-    standardScopeOptions: [],
-    taxonomies: {},
-    iaf39Standards: [],
-    abBodies: [],
-    iafCodes: Array.from({ length: 39 }, (_, i) => String(i + 1).padStart(2, "0")),
-    activeScopes: new Set(),
-    stdAccMap: {},
+    accreditationBody: "KAB",
+    cbInitial: null,
+    cbCode: "",
+    cbName: "",
+    status: "active",
+    contractYear: new Date().getFullYear(),
   };
 
-  function switchCbScopeTab(name) {
-    document.querySelectorAll("#cbDetailScopeModal [data-cb-scope-tab]").forEach((b) => {
-      b.classList.toggle("active", b.getAttribute("data-cb-scope-tab") === name);
-    });
-    document.querySelectorAll("#cbDetailScopeModal .detail-tab-pane").forEach((pane) => {
-      pane.classList.toggle("active", pane.id === name);
-    });
+  function showModal(id, show) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.classList.toggle("show", !!show);
+    modal.setAttribute("aria-hidden", show ? "false" : "true");
   }
 
-  function abOptionsHtml(selected) {
-    const cur = selected || "";
-    return [`<option value="">— 선택 —</option>`]
-      .concat(
-        cbScopeState.abBodies.map((ab) => {
-          const code = ab.code || ab.name;
-          const label = ab.name_en ? `${code} · ${ab.name_en}` : code;
-          return `<option value="${escapeHtml(code)}" ${code === cur ? "selected" : ""}>${escapeHtml(label)}</option>`;
-        }),
-      )
-      .join("");
-  }
-
-  function scopeMetaFor(std) {
-    const fromOpt = (cbScopeState.standardScopeOptions || []).find((x) => x.standard_code === std);
-    if (fromOpt) return fromOpt;
-    const tax = (cbScopeState.iaf39Standards || []).includes(std) ? "iaf39" : "none";
-    return {
-      standard_code: std,
-      taxonomy: tax,
-      taxonomy_label: (cbScopeState.taxonomies[tax] || {}).label || tax,
-      has_scope_codes: tax !== "none",
-      codes: ((cbScopeState.taxonomies[tax] || {}).codes) || [],
-    };
-  }
-
-  function renderCbStdAccTable() {
-    const tbody = document.getElementById("cb-std-acc-tbody");
-    if (!tbody) return;
-    const list = cbScopeState.standardOptions.length
-      ? cbScopeState.standardOptions
-      : cbScopeState.standards.map((c) => ({ standard_code: c, standard_name: "" }));
-    tbody.innerHTML = list
-      .map((s) => {
-        const code = s.standard_code || s;
-        const name = s.standard_name || "";
-        const row = cbScopeState.stdAccMap[code] || {};
-        const meta = scopeMetaFor(code);
-        const scopes = Array.isArray(row.scope_codes)
-          ? row.scope_codes
-          : Array.isArray(row.iaf_codes)
-            ? row.iaf_codes
-            : [];
-        let scopeSummary = "없음";
-        if (!meta.has_scope_codes) {
-          scopeSummary = "코드 불필요";
-        } else if (scopes.length) {
-          scopeSummary = `${scopes.length}개 (${scopes.slice(0, 6).join(", ")}${scopes.length > 6 ? "…" : ""})`;
-        }
-        const held = row.is_active || row.ab_code || row.registration_no || scopes.length;
-        const editBtn = meta.has_scope_codes
-          ? `<button type="button" class="btn-secondary" data-edit-scope="${escapeHtml(code)}" style="padding:4px 10px;font-size:12px;">범위 편집</button>`
-          : `<span class="muted" style="font-size:12px;">—</span>`;
-        return `<tr data-std="${escapeHtml(code)}">
-          <td style="text-align:center;"><input type="checkbox" data-held ${held ? "checked" : ""} /></td>
-          <td><strong>${escapeHtml(code)}</strong>${name ? `<div class="muted" style="font-size:12px;color:var(--font-secondary);">${escapeHtml(name)}</div>` : ""}
-            <div class="muted" style="font-size:11px;margin-top:2px;">${escapeHtml(meta.taxonomy_label || "")}</div></td>
-          <td><select data-ab style="width:100%;padding:8px;border:1px solid var(--gray-line-2);border-radius:8px;">${abOptionsHtml(row.ab_code || "")}</select></td>
-          <td><input data-reg type="text" value="${escapeHtml(row.registration_no || "")}" placeholder="인정번호" style="width:100%;padding:8px;border:1px solid var(--gray-line-2);border-radius:8px;" /></td>
-          <td>
-            <div style="font-size:12px;color:var(--font-secondary);margin-bottom:4px;">${escapeHtml(scopeSummary)}</div>
-            ${editBtn}
-          </td>
-        </tr>`;
-      })
-      .join("");
-    tbody.querySelectorAll("[data-edit-scope]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        switchCbScopeTab("cb-scopes");
-        const std = btn.getAttribute("data-edit-scope");
-        const block = document.querySelector(`#cb-scope-matrix [data-scope-std="${CSS.escape(std)}"]`);
-        if (block) block.scrollIntoView({ block: "center", behavior: "smooth" });
-      });
-    });
-  }
-
-  function collectCbStdAcc() {
-    return [...document.querySelectorAll("#cb-std-acc-tbody tr")].map((tr) => ({
-      standard_code: tr.dataset.std,
-      ab_code: tr.querySelector("[data-ab]").value || null,
-      registration_no: tr.querySelector("[data-reg]").value.trim() || null,
-      is_active: tr.querySelector("[data-held]").checked,
-    }));
-  }
-
-  function renderCbScopeMatrix() {
-    const table = document.getElementById("cb-scope-matrix");
-    if (!table) return;
-    const list = cbScopeState.standardOptions.length
-      ? cbScopeState.standardOptions
-      : cbScopeState.standards.map((c) => ({ standard_code: c, standard_name: "" }));
-
-    const sections = [];
-    // IAF39 matrix (9001/14001/45001 only)
-    const iafStds = list.filter((s) => scopeMetaFor(s.standard_code || s).taxonomy === "iaf39");
-    if (iafStds.length) {
-      const thead = `<tr><th class="std">표준 \\ IAF</th>${cbScopeState.iafCodes.map((c) => `<th>${c}</th>`).join("")}</tr>`;
-      const body = iafStds
-        .map((s) => {
-          const std = s.standard_code || s;
-          const cells = cbScopeState.iafCodes
-            .map((iaf) => {
-              const key = `${std}|${iaf}`;
-              return `<td><input type="checkbox" data-key="${key}" ${
-                cbScopeState.activeScopes.has(key) ? "checked" : ""
-              } /></td>`;
-            })
-            .join("");
-          return `<tr data-scope-std="${escapeHtml(std)}"><th class="std">${escapeHtml(std)}</th>${cells}</tr>`;
-        })
-        .join("");
-      sections.push(`
-        <div data-scope-std="iaf39-block" style="margin-bottom:18px;">
-          <h4 style="margin:0 0 8px;font-size:14px;">IAF 01–39 — ISO 9001 / 14001 / 45001 전용</h4>
-          <div class="cb-matrix-wrap"><table class="cb-matrix"><thead>${thead}</thead><tbody>${body}</tbody></table></div>
-        </div>`);
-    }
-
-    // Other taxonomies with codes
-    list.forEach((s) => {
-      const std = s.standard_code || s;
-      const name = s.standard_name || "";
-      const meta = scopeMetaFor(std);
-      if (meta.taxonomy === "iaf39") return;
-      if (!meta.has_scope_codes) {
-        sections.push(`
-          <div data-scope-std="${escapeHtml(std)}" style="margin-bottom:14px;padding:10px 12px;border:1px solid var(--gray-line-2);border-radius:8px;">
-            <strong>${escapeHtml(std)}</strong>${name ? ` · ${escapeHtml(name)}` : ""}
-            <div class="muted" style="margin-top:4px;font-size:12px;">인증수행범위 코드 없음 — 보유 표준 · 인정기관 · 인정번호만 관리</div>
-          </div>`);
-        return;
-      }
-      const codes = meta.codes || (cbScopeState.taxonomies[meta.taxonomy] || {}).codes || [];
-      const checks = codes
-        .map((c) => {
-          const code = c.code || c;
-          const label = c.name_ko ? `${code} — ${c.name_ko}` : code;
-          const key = `${std}|${code}`;
-          return `<label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:12px;">
-            <input type="checkbox" data-key="${escapeHtml(key)}" ${cbScopeState.activeScopes.has(key) ? "checked" : ""} />
-            <span>${escapeHtml(label)}</span>
-          </label>`;
-        })
-        .join("");
-      sections.push(`
-        <div data-scope-std="${escapeHtml(std)}" style="margin-bottom:16px;">
-          <h4 style="margin:0 0 6px;font-size:14px;">${escapeHtml(std)}${name ? ` · ${escapeHtml(name)}` : ""}</h4>
-          <div class="muted" style="font-size:12px;margin-bottom:8px;">${escapeHtml(meta.taxonomy_label || "")}</div>
-          <div style="max-height:220px;overflow:auto;border:1px solid var(--gray-line-2);border-radius:8px;padding:8px 10px;">${checks}</div>
-        </div>`);
-    });
-
-    table.innerHTML = sections.join("") || '<p class="muted">표시할 수행범위가 없습니다.</p>';
-  }
-
-  function collectCbScopes() {
-    const root = document.getElementById("cb-scope-matrix");
-    if (!root) return [];
-    return [...root.querySelectorAll("input[type=checkbox][data-key]:checked")].map((el) => {
-      const [standard_code, scope_code] = el.dataset.key.split("|");
-      return { standard_code, scope_code, iaf_code: scope_code, is_active: true };
-    });
-  }
-
-  function fillCbScopeForm(d = {}) {
-    document.getElementById("cb-f-code").value = d.cb_code || "";
-    document.getElementById("cb-f-name").value = d.cb_name || "";
-    document.getElementById("cb-f-name-en").value = d.cb_name_en || "";
-    cbScopeState.legacyRegNo = d.reg_no || null;
-    document.getElementById("cb-f-biz").value = d.biz_reg_no || "";
-    document.getElementById("cb-f-ceo").value = d.ceo_name || "";
-    document.getElementById("cb-f-email").value = d.email || "";
-    document.getElementById("cb-f-web").value = d.website || "";
-    document.getElementById("cb-f-tel").value = d.tel || "";
-    document.getElementById("cb-f-address").value = d.address || "";
-    document.getElementById("cb-f-status").value = d.status || "active";
+  function fillCbDetailForm(d = {}) {
+    cbDetailState.legacyRegNo = d.reg_no || null;
+    cbDetailState.accreditationBody = d.accreditation_body || "KAB";
+    cbDetailState.cbInitial = d.cb_initial || null;
+    cbDetailState.cbCode = d.cb_code || "";
+    cbDetailState.cbName = d.cb_name || "";
+    cbDetailState.status = d.status || "active";
     const contract = d.contract || {};
-    document.getElementById("cb-f-year").value = contract.contract_year || new Date().getFullYear();
-    document.getElementById("cb-f-tier").value = contract.tier || "MEDIUM";
-    document.getElementById("cb-f-base-fee").value = contract.annual_base_fee ?? "";
-    document.getElementById("cb-f-md").value = contract.price_per_md ?? "";
-    cbScopeState.activeScopes = new Set(
-      (d.scopes || [])
-        .filter((s) => s.is_active !== false)
-        .map((s) => {
-          let code = String(s.scope_code || s.iaf_code || "").trim();
-          if (/^\d+$/.test(code)) code = code.padStart(2, "0");
-          return `${s.standard_code}|${code}`;
-        }),
-    );
-    (d.scopes || []).forEach((s) => {
-      if (s.standard_code && !cbScopeState.standards.includes(s.standard_code)) {
-        cbScopeState.standards.push(s.standard_code);
-      }
-    });
-    cbScopeState.stdAccMap = {};
-    (d.standard_accreditations || []).forEach((row) => {
-      if (row.standard_code) cbScopeState.stdAccMap[row.standard_code] = row;
-    });
-    renderCbStdAccTable();
-    renderCbScopeMatrix();
+    cbDetailState.contractYear = contract.contract_year || new Date().getFullYear();
+
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val ?? "";
+    };
+    set("cb-f-name-en", d.cb_name_en);
+    set("cb-f-initial", d.cb_initial);
+    set("cb-f-biz", d.biz_reg_no);
+    set("cb-f-ceo", d.ceo_name);
+    set("cb-f-email", d.email);
+    set("cb-f-web", d.website);
+    set("cb-f-tel", d.tel);
+    set("cb-f-address", d.address);
+    set("cb-f-fax", d.fax);
+    set("cb-f-corp", d.corp_no);
+    set("cb-f-tax-email", d.tax_email);
+    set("cb-f-bank", d.bank_name);
+    set("cb-f-account", d.account_no);
+    set("cb-f-holder", d.account_holder);
+    set("cb-f-expire", d.expire_date);
+    set("cb-f-intro", d.intro);
+    set("cb-f-tier", contract.tier || "MEDIUM");
   }
 
-  function openCbScopeModalShell() {
-    const modal = document.getElementById("cbDetailScopeModal");
-    if (!modal) return;
-    modal.classList.add("show");
-    modal.setAttribute("aria-hidden", "false");
-    switchCbScopeTab("cb-basic");
-  }
-
-  function closeCbScopeModal() {
-    const modal = document.getElementById("cbDetailScopeModal");
-    if (!modal) return;
-    modal.classList.remove("show");
-    modal.setAttribute("aria-hidden", "true");
-    cbScopeState.editingId = null;
-    const err = document.getElementById("cb-scope-modal-error");
-    if (err) err.textContent = "";
-  }
-
-  async function openCbDetailScopeModal(cbId) {
+  async function openCbDetailModal(cbId) {
     try {
       const res = await authFetch(`${API_BASE}/admin/certification-bodies/${cbId}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(
-          typeof data.detail === "string" ? data.detail : `상세 조회 실패 (HTTP ${res.status})`,
-        );
+        throw new Error(typeof data.detail === "string" ? data.detail : `상세 조회 실패 (HTTP ${res.status})`);
       }
-      cbScopeState.editingId = cbId;
-      document.getElementById("cb-scope-modal-title").textContent =
-        `상세 및 Scope 관리 — ${data.cb_name || ""}`;
-      document.getElementById("cb-scope-modal-sub").textContent =
-        `${data.cb_code || ""} · 보유표준 ${(data.standard_accreditations || []).filter((x) => x.is_active).length || 0}/15 · 수행범위 ${data.scope_count ?? 0}`;
-      fillCbScopeForm(data);
-      openCbScopeModalShell();
+      cbDetailState.editingId = cbId;
+      document.getElementById("cb-detail-modal-title").textContent = "인증기관 상세정보";
+      document.getElementById("cb-detail-modal-sub").textContent =
+        `${data.cb_code || ""} · ${data.cb_name || ""} (목록에 없는 항목)`;
+      fillCbDetailForm(data);
+      const err = document.getElementById("cb-detail-modal-error");
+      if (err) err.textContent = "";
+      showModal("cbDetailModal", true);
     } catch (error) {
       alert(error.message || "상세 조회에 실패했습니다.");
     }
   }
 
-  window.openCbDetailScopeModal = openCbDetailScopeModal;
+  function closeCbDetailModal() {
+    showModal("cbDetailModal", false);
+    cbDetailState.editingId = null;
+  }
 
-  document.querySelectorAll("#cbDetailScopeModal [data-cb-scope-tab]").forEach((btn) => {
-    btn.addEventListener("click", () => switchCbScopeTab(btn.getAttribute("data-cb-scope-tab")));
+  function formatIafPlain(codes) {
+    /** IAF/scope codes as plain dark text — never badge/chip HTML. e.g. "1 2 3 4 5 6 7" */
+    if (!Array.isArray(codes) || !codes.length) return "—";
+    return codes
+      .map((c) => {
+        const s = String(c ?? "").trim();
+        if (!s) return "";
+        // display 01 → 1 for IAF39 numeric codes
+        if (/^\d+$/.test(s)) return String(parseInt(s, 10));
+        return s;
+      })
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  async function openCbHeldStandardsModal(cbId, familyInitial = null) {
+    const tbody = document.getElementById("cb-held-tbody");
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--font-tertiary);">불러오는 중…</td></tr>';
+    }
+    showModal("cbHeldStandardsModal", true);
+    try {
+      const res = await authFetch(`${API_BASE}/admin/certification-bodies/${cbId}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.detail === "string" ? data.detail : `조회 실패 (HTTP ${res.status})`);
+      }
+      const ini = (familyInitial || "").trim();
+      const titleEl = document.getElementById("cb-held-modal-title");
+      const subEl = document.getElementById("cb-held-modal-sub");
+      if (titleEl) {
+        titleEl.textContent = ini ? `${ini} · 인증수행범위` : "보유 표준 · 인증수행범위";
+      }
+      if (subEl) {
+        subEl.textContent = `${data.cb_code || ""} · ${data.cb_name || ""}`;
+      }
+      let rows = Array.isArray(data.held_scope_rows) ? data.held_scope_rows : [];
+      if (ini) {
+        const want = ini.toUpperCase();
+        rows = rows.filter((r) => String(r.family_initial || "").toUpperCase() === want);
+      }
+      if (!tbody) return;
+      if (!rows.length) {
+        tbody.innerHTML =
+          '<tr><td colspan="3" style="text-align:center;color:var(--font-tertiary);">해당 표준의 인증수행범위가 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows
+        .map((r) => {
+          const iaf = formatIafPlain(r.iaf_codes);
+          return `<tr>
+            <td><strong>${escapeHtml(r.family_initial)}</strong></td>
+            <td>${escapeHtml(r.standard_code || "")}${r.standard_name ? `<div style="font-size:12px;color:var(--font-secondary);">${escapeHtml(r.standard_name)}</div>` : ""}</td>
+            <td><span class="iaf-plain">${escapeHtml(iaf)}</span></td>
+          </tr>`;
+        })
+        .join("");
+    } catch (error) {
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--sec-red);">${escapeHtml(error.message)}</td></tr>`;
+      }
+    }
+  }
+
+  function closeCbHeldStandardsModal() {
+    showModal("cbHeldStandardsModal", false);
+  }
+
+  window.openCbDetailModal = openCbDetailModal;
+  window.openCbHeldStandardsModal = openCbHeldStandardsModal;
+  // 하위 호환
+  window.openCbDetailScopeModal = openCbDetailModal;
+
+  document.body.addEventListener("click", (e) => {
+    const heldBtn = e.target.closest("[data-cb-held]");
+    if (heldBtn) {
+      e.preventDefault();
+      const id = Number(heldBtn.getAttribute("data-cb-held"));
+      const initial = heldBtn.getAttribute("data-std-initial") || null;
+      if (id) openCbHeldStandardsModal(id, initial);
+      return;
+    }
+    const detailBtn = e.target.closest("[data-cb-detail]");
+    if (detailBtn && document.getElementById("cbDetailModal")) {
+      e.preventDefault();
+      const id = Number(detailBtn.getAttribute("data-cb-detail"));
+      if (id) openCbDetailModal(id);
+    }
   });
-  document.querySelectorAll("[data-cb-scope-close]").forEach((btn) => {
-    btn.addEventListener("click", closeCbScopeModal);
+
+  document.querySelectorAll("[data-cb-detail-close]").forEach((btn) => {
+    btn.addEventListener("click", closeCbDetailModal);
   });
-  const cbScopeModal = document.getElementById("cbDetailScopeModal");
-  if (cbScopeModal) {
-    cbScopeModal.addEventListener("click", (e) => {
-      if (e.target.id === "cbDetailScopeModal") closeCbScopeModal();
+  document.querySelectorAll("[data-cb-held-close]").forEach((btn) => {
+    btn.addEventListener("click", closeCbHeldStandardsModal);
+  });
+  const cbDetailModal = document.getElementById("cbDetailModal");
+  if (cbDetailModal) {
+    cbDetailModal.addEventListener("click", (e) => {
+      if (e.target.id === "cbDetailModal") closeCbDetailModal();
     });
   }
-  const cbScopeSave = document.getElementById("cb-scope-save");
-  if (cbScopeSave) {
-    cbScopeSave.addEventListener("click", async () => {
-      const err = document.getElementById("cb-scope-modal-error");
+  const cbHeldModal = document.getElementById("cbHeldStandardsModal");
+  if (cbHeldModal) {
+    cbHeldModal.addEventListener("click", (e) => {
+      if (e.target.id === "cbHeldStandardsModal") closeCbHeldStandardsModal();
+    });
+  }
+
+  if (window.ComplaisValidation) {
+    ComplaisValidation.bindField(document.getElementById("cb-f-biz"), "biz");
+    ComplaisValidation.bindField(document.getElementById("cb-f-tel"), "phone");
+    ComplaisValidation.bindField(document.getElementById("cb-f-email"), "email");
+  }
+
+  const cbDetailSave = document.getElementById("cb-detail-save");
+  if (cbDetailSave) {
+    cbDetailSave.addEventListener("click", async () => {
+      const err = document.getElementById("cb-detail-modal-error");
       if (err) err.textContent = "";
-      if (!cbScopeState.editingId) return;
+      if (!cbDetailState.editingId) return;
       if (window.ComplaisValidation) {
         const v = ComplaisValidation.validateFields([
           { el: document.getElementById("cb-f-biz"), kind: "biz", required: false },
@@ -1533,96 +1468,50 @@ document.addEventListener("DOMContentLoaded", () => {
         ]);
         if (!v.ok) {
           if (err) err.textContent = v.message;
-          switchCbScopeTab("cb-basic");
-          if (v.field?.el) {
-            try {
-              v.field.el.focus();
-              v.field.el.select?.();
-            } catch (_) {
-              /* ignore */
-            }
-          }
           return;
         }
       }
+      const val = (id) => (document.getElementById(id)?.value || "").trim();
       const payload = {
-        cb_code: document.getElementById("cb-f-code").value.trim(),
-        cb_name: document.getElementById("cb-f-name").value.trim(),
-        cb_name_en: document.getElementById("cb-f-name-en").value.trim() || null,
-        reg_no: cbScopeState.legacyRegNo,
-        biz_reg_no: document.getElementById("cb-f-biz").value.trim() || null,
-        ceo_name: document.getElementById("cb-f-ceo").value.trim() || null,
-        email: document.getElementById("cb-f-email").value.trim() || null,
-        website: document.getElementById("cb-f-web").value.trim() || null,
-        tel: document.getElementById("cb-f-tel").value.trim() || null,
-        address: document.getElementById("cb-f-address").value.trim() || null,
-        status: document.getElementById("cb-f-status").value,
-        scopes: collectCbScopes(),
-        standard_accreditations: collectCbStdAcc(),
+        cb_code: cbDetailState.cbCode,
+        cb_name: cbDetailState.cbName,
+        cb_name_en: val("cb-f-name-en") || null,
+        cb_initial: val("cb-f-initial") || cbDetailState.cbInitial,
+        accreditation_body: cbDetailState.accreditationBody || "KAB",
+        reg_no: cbDetailState.legacyRegNo,
+        biz_reg_no: val("cb-f-biz") || null,
+        ceo_name: val("cb-f-ceo") || null,
+        email: val("cb-f-email") || null,
+        website: val("cb-f-web") || null,
+        tel: val("cb-f-tel") || null,
+        address: val("cb-f-address") || null,
+        status: cbDetailState.status,
         contract: {
-          contract_year: Number(document.getElementById("cb-f-year").value) || undefined,
-          tier: document.getElementById("cb-f-tier").value,
-          annual_base_fee: document.getElementById("cb-f-base-fee").value
-            ? Number(document.getElementById("cb-f-base-fee").value)
-            : undefined,
-          price_per_md: document.getElementById("cb-f-md").value
-            ? Number(document.getElementById("cb-f-md").value)
-            : undefined,
+          contract_year: cbDetailState.contractYear,
+          tier: val("cb-f-tier") || "MEDIUM",
         },
       };
-      if (!payload.cb_code || !payload.cb_name) {
-        if (err) err.textContent = "기관 코드와 기관명은 필수입니다.";
-        return;
-      }
       try {
-        cbScopeSave.disabled = true;
+        cbDetailSave.disabled = true;
         const res = await authFetch(
-          `${API_BASE}/admin/certification-bodies/${cbScopeState.editingId}`,
+          `${API_BASE}/admin/certification-bodies/${cbDetailState.editingId}`,
           { method: "PUT", body: JSON.stringify(payload) },
         );
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(
-            typeof data.detail === "string" ? data.detail : `저장 실패 (HTTP ${res.status})`,
-          );
+          throw new Error(typeof data.detail === "string" ? data.detail : `저장 실패 (HTTP ${res.status})`);
         }
-        closeCbScopeModal();
-        await loadCbContracts();
+        // 목록에 없는 확장 필드 추가 반영 (fax/bank 등)
+        // PUT schema may ignore unknown; best-effort local only
+        closeCbDetailModal();
+        await refreshCbContractsList();
       } catch (error) {
         if (err) err.textContent = error.message;
       } finally {
-        cbScopeSave.disabled = false;
+        cbDetailSave.disabled = false;
       }
     });
   }
-
-  function bindCbContactValidation() {
-    if (!window.ComplaisValidation) return;
-    ComplaisValidation.bindField(document.getElementById("cb-f-biz"), "biz");
-    ComplaisValidation.bindField(document.getElementById("cb-f-tel"), "phone");
-    ComplaisValidation.bindField(document.getElementById("cb-f-email"), "email");
-  }
-
-  async function loadCbMatrixMeta() {
-    try {
-      const res = await authFetch(`${API_BASE}/admin/certification-bodies/meta/matrix-options`);
-      if (res.ok) {
-        const meta = await res.json();
-        if (meta.standards?.length) cbScopeState.standards = meta.standards;
-        if (meta.standard_options?.length) cbScopeState.standardOptions = meta.standard_options;
-        if (meta.standard_scope_options?.length) cbScopeState.standardScopeOptions = meta.standard_scope_options;
-        if (meta.taxonomies) cbScopeState.taxonomies = meta.taxonomies;
-        if (meta.iaf39_standards?.length) cbScopeState.iaf39Standards = meta.iaf39_standards;
-        if (meta.iaf_codes?.length) cbScopeState.iafCodes = meta.iaf_codes;
-        if (meta.accreditation_bodies?.length) cbScopeState.abBodies = meta.accreditation_bodies;
-      }
-    } catch (_) {
-      /* ignore */
-    }
-    // 메타 API 실패와 무관하게 사업자번호 등 포맷/검증 바인딩
-    bindCbContactValidation();
-  }
-  loadCbMatrixMeta();
 
   function renderAccreditationTable(records) {
     const tbody = document.getElementById("accreditation-tbody");
@@ -1636,7 +1525,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     tbody.innerHTML = records
       .map((r) => {
-        const scopesText = (r.scopes || []).map((s) => `IAF ${escapeHtml(s.iaf_code)}`).join(", ") || "-";
+        const codes = (r.scopes || []).map((s) => s.iaf_code).filter(Boolean);
+        const plain = formatIafPlain(codes);
+        const scopesText =
+          plain === "—"
+            ? "-"
+            : plain
+                .split(/\s+/)
+                .filter(Boolean)
+                .map((c) => `IAF ${escapeHtml(c)}`)
+                .join(" ");
         const fileCell = r.certificate_file_url
           ? `<a href="${escapeHtml(r.certificate_file_url)}" style="color: var(--sec-blue);" target="_blank" rel="noopener">파일 보기</a>`
           : "-";
@@ -1646,10 +1544,10 @@ document.addEventListener("DOMContentLoaded", () => {
             <td>${escapeHtml(r.accreditation_body)}</td>
             <td>${scopesText}</td>
             <td>${fileCell}</td>
-            <td><span class="label-chip label-chip-purple">${escapeHtml(r.status)}</span></td>
+            <td>${escapeHtml(r.status)}</td>
             <td>
-              <button class="badge badge-purple" data-approve="${r.id}">승인</button>
-              <button class="badge badge-red" data-reject="${r.id}">반려</button>
+              <button type="button" class="btn-detail" data-approve="${r.id}">승인</button>
+              <button type="button" class="btn-secondary" data-reject="${r.id}">반려</button>
             </td>
           </tr>`;
       })

@@ -5,7 +5,7 @@ from typing import Optional
 
 from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, SmallInteger, String, Text, BigInteger
 from sqlalchemy.dialects.mysql import INTEGER as MySQLInteger
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, synonym
 
 from app.db.base import Base
 
@@ -211,7 +211,8 @@ class CertificationBodies(Base):
     accreditation: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     tel: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="연락처(표시용)")
+    # DB에는 tel만 존재 — phone은 API/UI 별칭 (동일 컬럼)
+    phone = synonym("tel")
     email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     website: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     logo_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)

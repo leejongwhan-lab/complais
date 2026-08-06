@@ -1,0 +1,348 @@
+/* ComplAIs — Portal visual layer (shared chrome + safe Tailwind-compat)
+ * Load AFTER /static/css/main.css (+ sidebar/enterprise when needed)
+ * Does NOT change JS/API behavior — class names only for look & layout.
+ */
+:root {
+  --portal-canvas: var(--gray-line-1, #f4f6f4);
+  --portal-card: #ffffff;
+  --portal-border: var(--gray-line-2, #e8ece9);
+  --portal-primary: var(--primary-purple, #2f6b4f);
+  --portal-blue: var(--sec-blue, #2a6b5f);
+  --portal-red: var(--sec-red, #c94c52);
+  --portal-ink: var(--font-primary, #1e2a24);
+  --portal-muted: var(--font-secondary, #5a675f);
+  --portal-faint: var(--font-tertiary, #8a948d);
+}
+
+/* ---- Layout shells ---- */
+.portal-page,
+body.portal-page {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--portal-canvas);
+  color: var(--portal-ink);
+  font-family: var(--font-family-main, Pretendard, system-ui, sans-serif);
+}
+
+.portal-shell {
+  width: min(1280px, 100%);
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+.portal-shell-sm {
+  width: min(960px, 100%);
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+.portal-card,
+.card {
+  background: var(--portal-card);
+  border: 1px solid var(--portal-border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.portal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--portal-card);
+  border: 1px solid var(--portal-border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.portal-header h1 {
+  margin: 0;
+  font: var(--font-h2, 700 24px/1.4 inherit);
+}
+
+.portal-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (min-width: 768px) {
+  .portal-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .portal-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .portal-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.portal-kpi {
+  background: var(--portal-card);
+  border: 1px solid var(--portal-border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.portal-kpi .label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--portal-faint);
+}
+
+.portal-kpi .value {
+  margin: 8px 0 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--portal-primary);
+}
+
+/* ---- Buttons (design tokens) ----
+   Exclude plain text action buttons (held-std / detail / close) so they
+   are NOT white-on-primary (transparent bg + white text = invisible). */
+button:not(.ghost):not([class*="bg-"]):not(.btn-ghost):not(.held-std-link):not(.held-std-text):not(.scope-badge):not(.btn-detail):not(.btn-close):not(.btn-secondary):not(.nav-link),
+.btn-primary,
+a.btn-primary {
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--portal-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: background 0.15s ease;
+}
+
+button:not(.ghost):not(.held-std-link):not(.held-std-text):not(.scope-badge):not(.btn-detail):not(.btn-close):not(.btn-secondary):not(.nav-link):hover,
+.btn-primary:hover {
+  filter: brightness(0.95);
+}
+
+button.ghost,
+.btn-ghost {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--portal-primary);
+  border: 1px solid var(--portal-primary);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* ---- Forms ---- */
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--portal-muted);
+  margin-bottom: 4px;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="email"],
+input[type="password"],
+select,
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--portal-border);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--portal-ink);
+  background: #fff;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--portal-primary);
+  box-shadow: 0 0 0 3px rgba(77, 55, 223, 0.12);
+}
+
+input[readonly] {
+  background: var(--gray-disabled-bg, #f2f2f2);
+}
+
+/* ---- Tables ---- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--portal-border);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+thead th,
+thead.bg-slate-50 th {
+  background: var(--portal-canvas);
+  color: var(--portal-muted);
+  font-weight: 600;
+}
+
+.bg-indigo-50 { background: #e8f1eb; }
+.bg-blue-100 { background: #e6f3ef; color: var(--portal-blue); }
+.bg-emerald-100 { background: #ecfdf5; color: #047857; }
+.bg-amber-100 { background: #fffbeb; color: #b45309; }
+.bg-red-100,
+.bg-rose-100 { background: #fef2f2; color: #b91c1c; }
+.bg-indigo-600,
+.bg-blue-600 { background: var(--portal-primary); color: #fff; }
+.bg-emerald-500,
+.bg-emerald-600 { background: #059669; color: #fff; }
+.bg-slate-50 { background: var(--portal-canvas); }
+.bg-slate-100 { background: #f1f5f9; }
+.bg-slate-200 { background: #e2e8f0; }
+.bg-slate-400 { background: #94a3b8; }
+.bg-slate-800,
+.bg-slate-900 { background: #0f172a; color: #fff; }
+.bg-white { background: #fff; }
+.bg-secondary { background: var(--sec-blue); color: #fff; }
+
+/* ---- Safe Tailwind-compat (only classes used in portal HTML) ---- */
+.min-h-screen { min-height: 100vh; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+.max-w-5xl { max-width: 64rem; }
+.max-w-7xl { max-width: 80rem; }
+.w-full { width: 100%; }
+.w-9 { width: 2.25rem; }
+.h-9 { height: 2.25rem; }
+.h-2 { height: 0.5rem; }
+.w-2 { width: 0.5rem; }
+
+.flex { display: flex; }
+.inline-flex { display: inline-flex; }
+.flex-col { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+.gap-6 { gap: 1.5rem; }
+.grid { display: grid; }
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.space-y-2 > * + * { margin-top: 0.5rem; }
+.space-y-6 > * + * { margin-top: 1.5rem; }
+.divide-y > * + * { border-top: 1px solid var(--portal-border); }
+.divide-slate-100 > * + * { border-top-color: #f1f5f9; }
+
+@media (min-width: 640px) {
+  .sm\:flex-row { flex-direction: row; }
+  .sm\:items-center { align-items: center; }
+}
+@media (min-width: 768px) {
+  .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.p-2 { padding: 0.5rem; }
+.p-3 { padding: 0.75rem; }
+.p-4 { padding: 1rem; }
+.p-5 { padding: 1.25rem; }
+.p-6 { padding: 1.5rem; }
+.p-8 { padding: 2rem; }
+.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+.px-2\.5 { padding-left: 0.625rem; padding-right: 0.625rem; }
+.px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+.py-0\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
+.py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.py-1\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+.mt-0\.5 { margin-top: 0.125rem; }
+.mt-1 { margin-top: 0.25rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-4 { margin-top: 1rem; }
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-3 { margin-bottom: 0.75rem; }
+.ml-2 { margin-left: 0.5rem; }
+.ml-3 { margin-left: 0.75rem; }
+.mr-2 { margin-right: 0.5rem; }
+
+.rounded { border-radius: 0.25rem; }
+.rounded-lg { border-radius: 0.5rem; }
+.rounded-xl { border-radius: 0.75rem; }
+.rounded-full { border-radius: 9999px; }
+.border { border: 1px solid var(--portal-border); }
+.border-0 { border: 0; }
+.border-b { border-bottom: 1px solid var(--portal-border); }
+.border-t { border-top: 1px solid var(--portal-border); }
+.border-slate-100 { border-color: #f1f5f9; }
+.border-slate-200 { border-color: #e2e8f0; }
+.border-slate-300 { border-color: #cbd5e1; }
+.border-indigo-100 { border-color: #dde5e0; }
+.shadow-sm { box-shadow: 0 1px 2px rgb(15 23 42 / 0.05); }
+.shadow-md { box-shadow: 0 4px 12px rgb(15 23 42 / 0.08); }
+.shadow-lg { box-shadow: 0 10px 24px rgb(15 23 42 / 0.12); }
+.overflow-hidden { overflow: hidden; }
+.overflow-x-auto { overflow-x: auto; }
+
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.font-extrabold { font-weight: 800; }
+.font-normal { font-weight: 400; }
+.text-xs { font-size: 0.75rem; line-height: 1.4; }
+.text-sm { font-size: 0.875rem; line-height: 1.45; }
+.text-base { font-size: 1rem; }
+.text-lg { font-size: 1.125rem; }
+.text-xl { font-size: 1.25rem; }
+.text-2xl { font-size: 1.5rem; }
+.text-3xl { font-size: 1.875rem; }
+.text-\[11px\] { font-size: 11px; }
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-nowrap { white-space: nowrap; }
+.uppercase { text-transform: uppercase; }
+.tracking-wider { letter-spacing: 0.05em; }
+.tracking-tight { letter-spacing: -0.02em; }
+
+.text-white { color: #fff; }
+.text-slate-400 { color: #94a3b8; }
+.text-slate-500 { color: #64748b; }
+.text-slate-700 { color: #334155; }
+.text-slate-800 { color: #1e293b; }
+.text-slate-900 { color: #0f172a; }
+.text-blue-600,
+.text-blue-800 { color: var(--portal-blue); }
+.text-indigo-600,
+.text-indigo-700,
+.text-primary { color: var(--portal-primary); }
+.text-indigo-950 { color: #1e2a24; }
+.text-emerald-600,
+.text-emerald-800 { color: #2f6b4f; }
+.text-amber-500 { color: #f59e0b; }
+.text-purple-600 { color: #2f6b4f; }
+.text-red-500,
+.text-rose-500,
+.text-rose-600 { color: var(--portal-red); }
+
+a.text-blue-600:hover,
+a.hover\:underline:hover,
+.hover\:underline:hover {
+  text-decoration: underline;
+}
+
+.block { display: block; }
+/* keep form onsubmit / ids untouched — visual only */

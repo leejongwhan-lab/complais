@@ -3,6 +3,7 @@
  */
 @import url("../components_v3.css");
 @import url("../brand.css");
+@import url("./portal.css");
 
 /* --------------------------------------------------------------------------
    Base layout normalization
@@ -39,7 +40,7 @@ p {
 }
 
 a {
-  color: var(--sec-blue, #1a5fdf);
+  color: var(--sec-blue, #2a6b5f);
 }
 
 img {
@@ -61,17 +62,19 @@ table.data-table td,
 .data-table th,
 .data-table td {
   padding: 12px 16px;
-  text-align: left;
-  border-bottom: 1px solid var(--gray-line-2, #eee);
+  text-align: center;
+  border-bottom: 1px solid var(--gray-line-2, #e8ece9);
   font: var(--font-body-small, 14px/1.45 inherit);
   vertical-align: middle;
 }
 
 table.data-table th,
 .data-table th {
-  background: var(--gray-line-1, #f7f7f3);
+  background: var(--gray-line-1, #f4f6f4);
   font-weight: var(--font-weight-semibold, 600);
-  color: var(--font-secondary, #666);
+  color: var(--font-secondary, #5a675f);
+  text-align: center;
+  vertical-align: middle;
 }
 
 /* --------------------------------------------------------------------------

@@ -20,6 +20,11 @@ from app.data.accreditation_bodies_seed import (
     ENTERPRISE_ISO_STANDARDS,
     ensure_accreditation_bodies,
 )
+from app.data.standards_catalog import (
+    FAMILY_DISPLAY_ORDER,
+    held_standards_as_initials,
+    to_family_initial,
+)
 from app.data.scope_taxonomies import (
     TAXONOMY_LABELS,
     codes_for_taxonomy,
@@ -241,12 +246,34 @@ class AuditorMemberItem(BaseModel):
     is_primary: bool = False
 
 
+class HeldStandardScopeRow(BaseModel):
+    """목록/팝업용 — DB(cb_standard_accreditations + cb_scope_matrix) 매핑 결과."""
+
+    family_initial: str
+    standard_code: str
+    standard_name: Optional[str] = None
+    ab_code: Optional[str] = None
+    registration_no: Optional[str] = None
+    iaf_codes: List[str] = Field(default_factory=list)
+
+
 class CbFullDetailResponse(CbDetailResponse):
     """기업 DB 스타일 통합 상세 — 기본정보 + Scope + 과금 + 소속 심사원."""
 
     contract: Optional[ContractInfo] = None
     auditor_count: int = 0
     auditors: List[AuditorMemberItem] = Field(default_factory=list)
+    # 목록에 없는 연락/계좌 등 (관리→상세)
+    fax: Optional[str] = None
+    bank_name: Optional[str] = None
+    account_no: Optional[str] = None
+    account_holder: Optional[str] = None
+    corp_no: Optional[str] = None
+    intro: Optional[str] = None
+    tax_email: Optional[str] = None
+    expire_date: Optional[str] = None
+    # 보유 표준 이니셜 + IAF (관계 테이블 매핑)
+    held_scope_rows: List[HeldStandardScopeRow] = Field(default_factory=list)
 
 
 class ScopeMatrixUpdate(BaseModel):
@@ -684,7 +711,7 @@ def _held_standards_summary(db: Session, cb_ids: List[int]) -> Dict[int, Tuple[i
             abs_.setdefault(cb_id, set()).add(ab)
     out: Dict[int, Tuple[int, List[str], str]] = {}
     for cid in cb_ids:
-        held = stds.get(cid, [])
+        held = held_standards_as_initials(stds.get(cid, []))
         out[cid] = (len(held), held, ", ".join(sorted(abs_.get(cid, set()))))
     return out
 
@@ -842,6 +869,63 @@ def _list_auditors(db: Session, cb_id: int) -> List[AuditorMemberItem]:
     return items
 
 
+def _build_held_scope_rows(db: Session, cb_id: int) -> List[HeldStandardScopeRow]:
+    """cb_standard_accreditations + cb_scope_matrix → 이니셜별 IAF 코드 (junk 제외)."""
+    acc_rows = _list_standard_accreditations(db, cb_id)
+    iaf_map = _iaf_by_standard(db, cb_id)
+    by_fam: Dict[str, HeldStandardScopeRow] = {}
+    order = {f: i for i, f in enumerate(FAMILY_DISPLAY_ORDER)}
+
+    def _merge(std: str, *, ab: Optional[str] = None, reg: Optional[str] = None, name: Optional[str] = None) -> None:
+        fam = to_family_initial(std)
+        if not fam:
+            return
+        codes = list(iaf_map.get(std, []) or [])
+        # also try display-code keys already in iaf_map via family match
+        if not codes:
+            for k, v in iaf_map.items():
+                if to_family_initial(k) == fam:
+                    for c in v:
+                        if c not in codes:
+                            codes.append(c)
+        row = by_fam.get(fam)
+        if not row:
+            by_fam[fam] = HeldStandardScopeRow(
+                family_initial=fam,
+                standard_code=std,
+                standard_name=name,
+                ab_code=ab,
+                registration_no=reg,
+                iaf_codes=sorted(codes, key=lambda x: (len(x), x)),
+            )
+            return
+        if ab and not row.ab_code:
+            row.ab_code = ab
+        if reg and not row.registration_no:
+            row.registration_no = reg
+        if name and not row.standard_name:
+            row.standard_name = name
+        for c in codes:
+            if c not in row.iaf_codes:
+                row.iaf_codes.append(c)
+        row.iaf_codes = sorted(row.iaf_codes, key=lambda x: (len(x), x))
+
+    for acc in acc_rows:
+        if not (acc.is_active or acc.ab_code or acc.registration_no or acc.scope_codes or acc.iaf_codes):
+            continue
+        _merge(acc.standard_code, ab=acc.ab_code, reg=acc.registration_no, name=acc.standard_name)
+
+    # scope matrix only (no accreditation row) still counts as held
+    for std, codes in iaf_map.items():
+        fam = to_family_initial(std)
+        if not fam or fam in by_fam:
+            continue
+        if codes:
+            _merge(std)
+
+    return sorted(by_fam.values(), key=lambda r: order.get(r.family_initial, 99))
+
+
 def _full_detail(db: Session, cb: CertificationBodies, *, year: Optional[int] = None) -> CbFullDetailResponse:
     base = _detail(db, cb)
     contract = _get_or_create_contract(db, cb, year=year)
@@ -851,6 +935,15 @@ def _full_detail(db: Session, cb: CertificationBodies, *, year: Optional[int] = 
         contract=_contract_info(contract, year=year),
         auditor_count=len(auditors),
         auditors=auditors,
+        fax=getattr(cb, "fax", None),
+        bank_name=getattr(cb, "bank_name", None),
+        account_no=getattr(cb, "account_no", None),
+        account_holder=getattr(cb, "account_holder", None),
+        corp_no=getattr(cb, "corp_no", None),
+        intro=getattr(cb, "intro", None),
+        tax_email=getattr(cb, "tax_email", None),
+        expire_date=getattr(cb, "expire_date", None),
+        held_scope_rows=_build_held_scope_rows(db, cb.id),
     )
 
 
@@ -1020,9 +1113,12 @@ def list_certification_bodies(
     for r in rows:
         std_cnt, sc_cnt, std_sum, iaf_sum = counts.get(r.id, (0, 0, "", ""))
         held_cnt, held_stds, ab_sum = held.get(r.id, (0, [], ""))
-        # 목록 "보유 표준"은 표준별 인정(AB/인정번호) 건수 우선; 없으면 행렬 표준 수
-        display_std_cnt = held_cnt or std_cnt
-        display_std_sum = ", ".join(held_stds) if held_stds else std_sum
+        # 목록 "보유 표준"은 지정 이니셜만 (행렬 fallback도 동일 정규화)
+        display_stds = held_stds or held_standards_as_initials(
+            [x.strip() for x in (std_sum or "").split(",") if x.strip()]
+        )
+        display_std_cnt = len(display_stds) or held_cnt or 0
+        display_std_sum = ", ".join(display_stds)
         spec = cb_to_spec_dict(r)
         contract = contracts.get(r.id)
         data.append(
@@ -1039,8 +1135,8 @@ def list_certification_bodies(
                 email=spec["email"],
                 status=spec["status"],
                 standard_count=display_std_cnt,
-                held_standard_count=held_cnt,
-                held_standards=held_stds,
+                held_standard_count=display_std_cnt,
+                held_standards=display_stds,
                 ab_summary=ab_sum,
                 scope_count=sc_cnt,
                 standards_summary=display_std_sum,
@@ -1539,36 +1635,23 @@ async def upload_certification_bodies_excel(
 
 @router.post("/reset-and-upload", response_model=ExcelUploadResponse)
 async def reset_and_upload_certification_bodies(
-    file: UploadFile = File(..., description="institutionData.ods / .xlsx — 기존 CB 삭제 후 재시딩"),
+    file: Optional[UploadFile] = File(None, description="DISABLED — 마스터 CB 보존"),
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(get_current_admin_user),
 ):
-    """기존 mock/중복 CB를 비운 뒤 엑셀 70여 개만 고유 INSERT (ID 1부터)."""
-    filename = (file.filename or "").lower()
-    if not filename.endswith((".ods", ".xlsx", ".xls")):
-        raise HTTPException(
-            status_code=400,
-            detail="ODS 또는 Excel 파일(.xlsx, .xls, .ods)만 업로드 가능합니다.",
-        )
-    content = await file.read()
-    if not content:
-        raise HTTPException(status_code=400, detail="빈 파일입니다.")
+    """마스터 CB 보호: 일괄 삭제/재시딩은 비활성화.
 
-    # 파싱을 먼저 수행해 실패 시 DB를 비우지 않음
-    df = _read_excel_dataframe(content, filename)
-
-    try:
-        _reset_certification_body_tables(db)
-        result = _import_cb_dataframe(db, df, fresh_insert=True)
-        result.message = (
-            f"기존 CB 데이터를 초기화한 뒤 {result.imported_count}개 기관을 재등록했습니다."
-        )
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"초기화 후 재시딩 실패: {e}") from e
+    certification_bodies(70) 및 관련 테이블을 DELETE 하지 않습니다.
+    증분 반영은 POST /upload-excel 또는 /bulk-import 를 사용하세요.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "마스터 DB 보호: CB/기업 마스터 초기화·재시딩은 비활성화되어 있습니다. "
+            "기존 certification_bodies(70) 및 companies(1134) 데이터를 삭제하지 마세요. "
+            "증분 반영은 upload-excel 또는 bulk-import를 사용하세요."
+        ),
+    )
 
 
 @router.post("/bulk-import", response_model=BulkImportResult)

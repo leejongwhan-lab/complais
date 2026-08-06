@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>인증기관(CB) 관리 - complAIs</title>
   <link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/portal.css" />
   <style>
     body { margin:0; background:#f5f7fb; font-family:system-ui,-apple-system,sans-serif; color:#0f172a; }
     .page { width:min(1280px,100%); margin:0 auto; padding:20px 16px 48px; }
@@ -21,11 +23,16 @@
     table { width:100%; border-collapse:collapse; font-size:.86rem; }
     th, td { padding:10px 11px; border-bottom:1px solid #eef2f7; text-align:left; vertical-align:top; }
     th { background:#f8fafc; color:#334155; position:sticky; top:0; z-index:1; }
-    .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:.72rem; font-weight:700; }
-    .badge.ok { background:#ecfdf5; color:#047857; }
-    .badge.warn { background:#fff7ed; color:#c2410c; }
-    .badge.no { background:#fef2f2; color:#b91c1c; }
-    .badge.tier { background:#eff6ff; color:#1d4ed8; }
+    /* No badges — plain text only */
+    .badge, .badge.ok, .badge.warn, .badge.no, .badge.tier {
+      display:inline; padding:0; margin:0; border:0; border-radius:0;
+      background:transparent; color:#1e2a24; font-size:inherit; font-weight:600;
+    }
+    .held-std-link, .held-std-text {
+      background:none !important; border:0 !important; padding:0 !important;
+      color:#1e2a24 !important; font-weight:700; cursor:pointer;
+    }
+    .held-std-link:hover, .held-std-text:hover { color:#2f6b4f !important; text-decoration:underline; }
     .muted { color:#64748b; font-size:.78rem; }
     .error { color:#dc2626; margin-top:8px; }
     .success { color:#047857; margin-top:8px; white-space:pre-wrap; }
@@ -56,22 +63,28 @@
     .std-acc-table th, .std-acc-table td { padding:8px; border-bottom:1px solid #eef2f7; text-align:left; vertical-align:middle; }
     .std-acc-table th { background:#f8fafc; }
     .std-acc-table select, .std-acc-table input { width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #d0d7e2; border-radius:8px; }
+
+    .cb-contracts-table td.col-cb-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px; }
+    .cb-contracts-table td.col-held-std { white-space:normal; word-break:break-word; }
   </style>
   <script src="/static/js/validation.js"></script>
 </head>
-<body>
+<body class="portal-page">
   <div class="page">
     <div class="card">
       <div class="head">
         <div>
+          <a href="/admin" style="display:inline-block;margin-bottom:10px;">
+            <img src="/static/brand/complais-logo.png" alt="complAIs" class="brand-logo brand-logo-md" />
+          </a>
           <h1>인증기관(CB) 관리</h1>
-          <p class="lead">고유 70여 개 CB 마스터 · 표준별 Scope · 상세 관리</p>
+          <p class="lead">CB 마스터 · 표준별 Scope · 상세 관리</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <a class="btn ghost" href="/platform_admin_dashboard.html#cb-contracts" style="text-decoration:none;">통합 관리 탭</a>
+          <a class="btn ghost" href="/admin#cb-contracts" style="text-decoration:none;">통합 관리 탭</a>
           <a class="btn ghost" href="/admin/dashboard" style="text-decoration:none;">어드민 홈</a>
-          <button type="button" id="upload-open-btn">엑셀/ODS 업로드</button>
-          <button type="button" class="danger" id="reset-upload-open-btn">초기화 후 재시딩</button>
+          <button type="button" id="upload-open-btn">엑셀/ODS 증분 업로드</button>
+          <button type="button" class="danger" id="reset-upload-open-btn" disabled title="마스터 DB 보호로 비활성화">초기화 후 재시딩 (비활성)</button>
         </div>
       </div>
 
@@ -86,26 +99,25 @@
         <button type="button" id="search-btn">검색</button>
         <button type="button" class="ghost" id="reload-btn">새로고침</button>
         <button type="button" class="ghost" id="create-btn">신규 등록</button>
-        <a class="btn ghost" href="/platform_admin_dashboard.html" style="text-decoration:none;">대시보드</a>
+        <a class="btn ghost" href="/admin" style="text-decoration:none;">대시보드</a>
       </div>
       <div class="error" id="list-error"></div>
       <div class="success" id="list-success"></div>
 
       <div style="overflow:auto; max-height:68vh;">
-        <table>
+        <table class="cb-contracts-table" style="width:100%;table-layout:fixed;">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>코드</th>
-              <th>인증기관명</th>
-              <th>상태</th>
-              <th>보유 표준 / 인정기관</th>
-              <th>계약연도</th>
-              <th>티어</th>
-              <th>관리</th>
+              <th style="width:6%;">ID</th>
+              <th style="width:10%;">코드</th>
+              <th class="col-cb-name" style="width:14%;max-width:140px;">인증기관명</th>
+              <th style="width:8%;">상태</th>
+              <th class="col-held-std" style="width:36%;min-width:220px;">보유 표준</th>
+              <th style="width:12%;">인정기관</th>
+              <th style="width:10%;">관리</th>
             </tr>
           </thead>
-          <tbody id="tbody"><tr><td colspan="8">불러오는 중…</td></tr></tbody>
+          <tbody id="tbody"><tr><td colspan="7">불러오는 중…</td></tr></tbody>
         </table>
       </div>
       <div class="pager">
@@ -251,9 +263,8 @@
       return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
     }
     function statusBadge(st) {
-      if (st === "active") return '<span class="badge ok">active</span>';
-      if (st === "suspended") return '<span class="badge warn">suspended</span>';
-      return `<span class="badge no">${esc(st || "-")}</span>`;
+      /* plain text — no badge pills */
+      return esc(st || "-");
     }
 
     async function loadList() {
@@ -273,29 +284,26 @@
         state.total = data.total || 0;
         const tbody = document.getElementById("tbody");
         if (!data.data?.length) {
-          tbody.innerHTML = '<tr><td colspan="8">등록된 인증기관이 없습니다. 초기화 후 재시딩으로 institutionData.ods를 업로드하세요.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7">등록된 인증기관이 없습니다. 초기화 후 재시딩으로 institutionData.ods를 업로드하세요.</td></tr>';
         } else {
           tbody.innerHTML = data.data.map((r) => {
-            const heldCnt = r.held_standard_count ?? r.standard_count ?? 0;
-            const heldLabel = heldCnt
-              ? `${heldCnt}개 표준`
-              : `${r.scope_count ?? 0}개 Scope`;
-            const abLine = r.ab_summary
-              ? `<div class="muted">AB: ${esc(r.ab_summary)}</div>`
-              : (r.held_standards?.length
-                ? `<div class="muted">${esc((r.held_standards || []).slice(0, 3).join(", "))}${(r.held_standards || []).length > 3 ? "…" : ""}</div>`
-                : "");
+            const stds = (r.held_standards && r.held_standards.length) ? r.held_standards : [];
+            const heldCell = stds.length
+              ? `<div class="held-std-cell">${stds.map((ini) =>
+                  `<button type="button" class="held-std-link" style="background:none;border:0;padding:0;cursor:pointer;font-weight:700;color:inherit;text-decoration:none;" onclick="openDetail(${r.id})" title="${esc(ini)}">${esc(ini)}</button>`
+                ).join("")}</div>`
+              : "—";
+            const abDisplay = r.ab_summary || r.accreditation_body || "-";
             return `
             <tr>
               <td>${r.id}</td>
               <td>${esc(r.cb_code)}</td>
-              <td><strong>${esc(r.cb_name)}</strong>
-                ${r.cb_name_en ? `<div class="muted">${esc(r.cb_name_en)}</div>` : ""}</td>
+              <td class="col-cb-name" title="${esc(r.cb_name)}"><strong>${esc(r.cb_name)}</strong>
+                ${r.cb_name_en ? `<div class="muted" style="overflow:hidden;text-overflow:ellipsis;">${esc(r.cb_name_en)}</div>` : ""}</td>
               <td>${statusBadge(r.status)}</td>
-              <td><button type="button" class="badge tier" style="cursor:pointer;border:0;" onclick="openDetail(${r.id})">${esc(heldLabel)}</button>${abLine}</td>
-              <td>${esc(r.contract_year ?? "-")}</td>
-              <td><span class="badge tier">${esc(r.billing_tier || "MEDIUM")}</span></td>
-              <td><button type="button" class="ghost" onclick="openDetail(${r.id})">상세 및 Scope 관리</button></td>
+              <td class="col-held-std">${heldCell}</td>
+              <td>${esc(abDisplay)}</td>
+              <td><button type="button" class="ghost" onclick="openDetail(${r.id})">상세정보</button></td>
             </tr>`;
           }).join("");
         }
@@ -645,8 +653,7 @@
 
     document.getElementById("upload-open-btn").addEventListener("click", () => openUploadModal("upload-excel"));
     document.getElementById("reset-upload-open-btn").addEventListener("click", () => {
-      if (!confirm("기존 인증기관 데이터를 모두 삭제하고 엑셀로 재등록합니다. 계속할까요?")) return;
-      openUploadModal("reset-and-upload");
+      alert("마스터 DB 보호: CB 70건 초기화·재시딩은 비활성화되어 있습니다.");
     });
     document.getElementById("upload-close").addEventListener("click", closeUploadModal);
     document.getElementById("upload-cancel").addEventListener("click", closeUploadModal);

@@ -1,25 +1,16 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 <meta charset="UTF-8"/>
 <title>CB 제안검토 — MD 가감/입회</title>
-<style>
-body{font-family:Pretendard,sans-serif;margin:24px;background:#f5f6f8;color:#111}
-.card{background:#fff;padding:20px;max-width:960px;border:1px solid #e5e7eb}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{border-bottom:1px solid #eee;padding:8px;text-align:left}
-input,select,textarea{padding:6px;margin:4px 0}
-button{padding:8px 12px;background:#185fa5;color:#fff;border:0;cursor:pointer;margin-right:6px}
-button.ghost{background:#fff;color:#185fa5;border:1px solid #185fa5}
-.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:8px 0}
-.field label{display:block;font-size:12px;color:#555;margin-bottom:2px}
-.final{font-size:20px;font-weight:700}
-.muted{color:#666;font-size:12px}
-hr{border:none;border-top:1px solid #eee;margin:16px 0}
-</style>
+<link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/components/sidebar.css" />
+  <link rel="stylesheet" href="/static/css/pages/enterprise.css" />
+  <link rel="stylesheet" href="/static/css/portal.css" />
 </head>
-<body>
-<div class="card">
+<body class="portal-page">
+<div class="portal-shell-sm"><div class="card">
   <h2>CB 제안검토</h2>
   <button type="button" onclick="loadList()">목록 새로고침</button>
   <table>
@@ -83,7 +74,7 @@ hr{border:none;border-top:1px solid #eee;margin:16px 0}
     <pre id="out"></pre>
   </div>
 </div>
-
+</div>
 <script src="/static/js/cb_admin_api.js"></script>
 <script src="/static/js/cb_md_review.js"></script>
 <script>

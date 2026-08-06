@@ -28,6 +28,7 @@ from app.models.cb import CertificationBodies, CbAccreditationScopes
 from app.models.company import Companies
 from app.models.certification_body import CbAccreditationScope, CbStandardAccreditation
 from app.models.standard import StandardMaster
+from app.data.standards_catalog import held_standards_as_initials
 from app.schemas.admin import (
     AccreditationActionResponse,
     AccreditationRejectRequest,
@@ -77,7 +78,7 @@ def _assert_standard_master_exists(db: Session, standard_master_id: int) -> None
 
 
 def _scope_count_for_cb(db: Session, cb_id: int) -> int:
-    """활성 Scope 수 — cb_scope_matrix 우선, 없으면 레거시 cb_accreditation_scopes."""
+    """활성 Scope 수 — cb_scope_matrix 행 수 우선, 없으면 레거시 iaf_codes 토큰 합."""
     matrix_count = (
         db.query(func.count(CbAccreditationScope.id))
         .filter(
@@ -100,12 +101,19 @@ def _scope_count_for_cb(db: Session, cb_id: int) -> int:
     )
     total = 0
     for (iaf_codes,) in legacy_rows:
-        total += len([x for x in (iaf_codes or "").split(",") if x.strip()])
+        tokens = [x for x in (iaf_codes or "").split(",") if x.strip()]
+        total += len(tokens) if tokens else 1
     return total
 
 
 def _held_summary_for_cb(db: Session, cb_id: int) -> tuple[int, list[str], str]:
-    """표준별 인정(AB/인정번호) 보유 요약 — cb_standard_accreditations."""
+    """표준별 인정 보유 요약.
+
+    우선순위:
+      1) cb_standard_accreditations
+      2) cb_scope_matrix DISTINCT standard_code
+      3) cb_accreditation_scopes DISTINCT standard_code
+    """
     rows = (
         db.query(CbStandardAccreditation.standard_code, CbStandardAccreditation.ab_code)
         .filter(
@@ -121,7 +129,128 @@ def _held_summary_for_cb(db: Session, cb_id: int) -> tuple[int, list[str], str]:
             standards.append(std)
         if ab:
             abs_.add(ab)
-    return len(standards), standards, ", ".join(sorted(abs_))
+    if standards:
+        return len(standards), standards, ", ".join(sorted(abs_))
+
+    matrix_stds = (
+        db.query(CbAccreditationScope.standard_code)
+        .filter(
+            CbAccreditationScope.cb_id == cb_id,
+            CbAccreditationScope.is_active.is_(True),
+        )
+        .distinct()
+        .all()
+    )
+    standards = [s for (s,) in matrix_stds if s]
+    if standards:
+        return len(standards), standards, ""
+
+    legacy_stds = (
+        db.query(CbAccreditationScopes.standard_code)
+        .filter(
+            CbAccreditationScopes.cb_id == cb_id,
+            CbAccreditationScopes.is_active.is_(True),
+        )
+        .distinct()
+        .all()
+    )
+    standards = [s for (s,) in legacy_stds if s]
+    return len(standards), standards, ""
+
+
+def _batch_scope_and_held(
+    db: Session, cb_ids: List[int]
+) -> dict[int, tuple[int, int, list[str], str]]:
+    """cb_id → (scope_count, held_standard_count, held_standards, ab_summary)."""
+    out: dict[int, tuple[int, int, list[str], str]] = {
+        cid: (0, 0, [], "") for cid in cb_ids
+    }
+    if not cb_ids:
+        return out
+
+    matrix_rows = (
+        db.query(
+            CbAccreditationScope.cb_id,
+            func.count(CbAccreditationScope.id),
+            func.count(func.distinct(CbAccreditationScope.standard_code)),
+        )
+        .filter(
+            CbAccreditationScope.cb_id.in_(cb_ids),
+            CbAccreditationScope.is_active.is_(True),
+        )
+        .group_by(CbAccreditationScope.cb_id)
+        .all()
+    )
+    matrix_scope = {cid: int(cnt) for cid, cnt, _ in matrix_rows}
+    matrix_std_cnt = {cid: int(std_cnt) for cid, _, std_cnt in matrix_rows}
+
+    matrix_std_names: dict[int, list[str]] = {cid: [] for cid in cb_ids}
+    for cid, std in (
+        db.query(CbAccreditationScope.cb_id, CbAccreditationScope.standard_code)
+        .filter(
+            CbAccreditationScope.cb_id.in_(cb_ids),
+            CbAccreditationScope.is_active.is_(True),
+        )
+        .distinct()
+        .all()
+    ):
+        if std and std not in matrix_std_names[cid]:
+            matrix_std_names[cid].append(std)
+
+    held_rows = (
+        db.query(
+            CbStandardAccreditation.cb_id,
+            CbStandardAccreditation.standard_code,
+            CbStandardAccreditation.ab_code,
+        )
+        .filter(
+            CbStandardAccreditation.cb_id.in_(cb_ids),
+            CbStandardAccreditation.is_active.is_(True),
+        )
+        .all()
+    )
+    held_map: dict[int, list[str]] = {cid: [] for cid in cb_ids}
+    ab_map: dict[int, set[str]] = {cid: set() for cid in cb_ids}
+    for cid, std, ab in held_rows:
+        if std and std not in held_map[cid]:
+            held_map[cid].append(std)
+        if ab:
+            ab_map[cid].add(ab)
+
+    # legacy fallback for CBs without matrix
+    need_legacy = [cid for cid in cb_ids if matrix_scope.get(cid, 0) == 0]
+    legacy_scope: dict[int, int] = {}
+    legacy_stds: dict[int, list[str]] = {cid: [] for cid in need_legacy}
+    if need_legacy:
+        for cid, std, iaf in (
+            db.query(
+                CbAccreditationScopes.cb_id,
+                CbAccreditationScopes.standard_code,
+                CbAccreditationScopes.iaf_codes,
+            )
+            .filter(
+                CbAccreditationScopes.cb_id.in_(need_legacy),
+                CbAccreditationScopes.is_active.is_(True),
+            )
+            .all()
+        ):
+            tokens = [x for x in (iaf or "").split(",") if x.strip()]
+            legacy_scope[cid] = legacy_scope.get(cid, 0) + (len(tokens) if tokens else 1)
+            if std and std not in legacy_stds[cid]:
+                legacy_stds[cid].append(std)
+
+    for cid in cb_ids:
+        scope_cnt = matrix_scope.get(cid, 0) or legacy_scope.get(cid, 0)
+        held_raw = held_map[cid] or matrix_std_names[cid] or legacy_stds.get(cid, [])
+        # 보유 표준: 지정 KAB 이니셜만 (QMS/EMS/…); 한글 junk·장문 표기 제외
+        held = held_standards_as_initials(held_raw)
+        # 인정기관: AB 코드만 (한글/잡문자 제외) — 표준 이니셜과 섞지 않음
+        abs_clean = sorted(
+            a for a in ab_map[cid] if a and not any("\uac00" <= ch <= "\ud7a3" or "\u3131" <= ch <= "\u318e" for ch in a)
+        )
+        ab_sum = ", ".join(abs_clean) if abs_clean else ""
+        out[cid] = (scope_cnt, len(held), held, ab_sum)
+    return out
 
 
 # 0. 대시보드 통계
@@ -203,7 +332,8 @@ def list_cb_contracts(
     cb_query = db.query(CertificationBodies)
     if cb_id is not None:
         cb_query = cb_query.filter(CertificationBodies.id == cb_id)
-    cbs = cb_query.order_by(CertificationBodies.id.desc()).offset(skip).limit(limit).all()
+    # 마스터 순서: institutionData.idx(=id) 오름차순 — 더미 고ID가 상단에 오지 않도록
+    cbs = cb_query.order_by(CertificationBodies.id.asc()).offset(skip).limit(limit).all()
 
     created = False
     if ensure_missing:
@@ -220,6 +350,7 @@ def list_cb_contracts(
             db.commit()
 
     results: List[CBContractListResponse] = []
+    metrics = _batch_scope_and_held(db, [cb.id for cb in cbs])
     for cb in cbs:
         contract = (
             db.query(CBContract)
@@ -238,7 +369,7 @@ def list_cb_contracts(
         if contract is None:
             continue
 
-        held_cnt, held_stds, ab_sum = _held_summary_for_cb(db, cb.id)
+        scope_cnt, held_cnt, held_stds, ab_sum = metrics.get(cb.id, (0, 0, [], ""))
         results.append(
             CBContractListResponse(
                 id=contract.id,
@@ -246,7 +377,7 @@ def list_cb_contracts(
                 cb_name=cb.name,
                 cb_code=cb.code,
                 cb_status=cb.status or ("정상" if cb.is_active else "정지"),
-                scope_count=_scope_count_for_cb(db, cb.id),
+                scope_count=scope_cnt,
                 held_standard_count=held_cnt,
                 held_standards=held_stds,
                 ab_summary=ab_sum,

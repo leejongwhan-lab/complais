@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>인증기관 회원가입 - complAIs</title>
   <link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/portal.css" />
   <style>
     body {
       min-height: 100vh;
@@ -142,10 +144,10 @@
   </style>
   <script src="/static/js/validation.js"></script>
 </head>
-<body>
+<body class="portal-page">
   <div class="register-card">
     <div class="brand-wrap">
-      <img src="/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
+      <img src="/static/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
     </div>
     <h1 id="page-title">인증기관 회원가입</h1>
     <p id="page-desc">가입 유형에 맞게 정보를 입력하세요.</p>

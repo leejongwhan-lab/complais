@@ -1,60 +1,13 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>플랫폼 어드민 - complAIs</title>
-  <link rel="stylesheet" href="/static/css/main.css" />
-  <style>
-    body { margin:0; background:#f5f7fb; font-family:system-ui,-apple-system,sans-serif; color:#0f172a; }
-    .wrap { width:min(960px,100%); margin:0 auto; padding:28px 16px 48px; }
-    .head { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start; margin-bottom:18px; }
-    h1 { margin:0 0 6px; font-size:1.4rem; }
-    .lead { margin:0; color:#64748b; }
-    .card { background:#fff; border-radius:12px; padding:18px 20px; box-shadow:0 8px 28px rgba(15,23,42,.08); margin-bottom:14px; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
-    a.tile {
-      display:block; padding:16px; border:1px solid #e2e8f0; border-radius:12px; text-decoration:none; color:inherit; background:#f8fafc;
-    }
-    a.tile:hover { border-color:#2563eb; background:#eff6ff; }
-    a.tile strong { display:block; margin-bottom:6px; }
-    .muted { color:#64748b; font-size:.85rem; }
-    button, .btn { padding:9px 14px; border:0; border-radius:8px; background:#2563eb; color:#fff; font-weight:700; cursor:pointer; text-decoration:none; display:inline-block; }
-    button.ghost, .btn.ghost { background:#fff; color:#2563eb; border:1px solid #bfdbfe; }
-  </style>
+  <meta http-equiv="refresh" content="0; url=/admin" />
+  <title>플랫폼 어드민</title>
+  <script>location.replace("/admin");</script>
 </head>
 <body>
-  <div class="wrap">
-    <div class="head">
-      <div>
-        <h1>플랫폼 어드민</h1>
-        <p class="lead">관리 콘솔 진입점</p>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <a class="btn ghost" href="/login.html">로그인</a>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2 style="margin:0 0 12px;font-size:1.05rem;">바로가기</h2>
-      <div class="grid">
-        <a class="tile" href="/platform_admin_dashboard.html">
-          <strong>운영 대시보드</strong>
-          <span class="muted">통계 · CB 과금 · 멤버십</span>
-        </a>
-        <a class="tile" href="/platform_admin_dashboard.html#cb-contracts">
-          <strong>인증기관(CB) 통합 관리</strong>
-          <span class="muted">현황 · Scope · 과금 · 상세</span>
-        </a>
-      </div>
-    </div>
-  </div>
-  <script>
-    const role = localStorage.getItem("role") || "";
-    const token = localStorage.getItem("access_token");
-    if (!token || role !== "platform_admin") {
-      // 비관리자도 허브는 볼 수 있으나 민감 메뉴 이동 시 각 페이지에서 가드
-    }
-  </script>
+  <p><a href="/admin">플랫폼 전체 어드민으로 이동</a></p>
 </body>
 </html>

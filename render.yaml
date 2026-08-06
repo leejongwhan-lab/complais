@@ -1,0 +1,45 @@
+# ComplAIs Backend — Render Blueprint
+# Connect GitHub repo: leejongwhan-lab/complais (complais-backend)
+# Auto Deploy: ON for branch `main`
+#
+# DATABASE_URL is injected from the linked Postgres database below.
+# For DBeaver / local alembic, copy the *External* Database URL into local .env
+# (Internal URL only works inside Render's private network).
+
+databases:
+  - name: complais-db
+    plan: free
+    databaseName: complais
+    user: complais
+
+services:
+  - type: web
+    name: complais-api
+    runtime: python
+    plan: free
+    branch: main
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: complais-db
+          property: connectionString
+      # App uses SECRET_KEY (not JWT_SECRET). Set a long random value in Dashboard.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PROJECT_NAME
+        value: ComplAIs API
+      - key: API_V1_STR
+        value: /api/v1
+      - key: DEBUG
+        value: "false"
+      # Optional alias some dashboards expect — app reads SECRET_KEY.
+      - key: JWT_SECRET
+        sync: false
+      - key: PORT
+        value: "8000"

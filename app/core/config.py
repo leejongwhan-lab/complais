@@ -2,6 +2,13 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _normalize_database_url(url: str) -> str:
+    """Render often injects postgres://; SQLAlchemy expects postgresql://."""
+    if url.startswith("postgres://"):
+        return "postgresql://" + url[len("postgres://") :]
+    return url
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -14,7 +21,7 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        return self.DATABASE_URL
+        return _normalize_database_url(self.DATABASE_URL)
 
 
 settings = Settings()

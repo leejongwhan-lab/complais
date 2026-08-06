@@ -1,19 +1,16 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 <meta charset="UTF-8"/>
 <title>기업 인증신청 MD 산출</title>
 <link rel="stylesheet" href="/static/design_tokens_v3.css"/>
-<style>
-body{font-family:Pretendard,sans-serif;margin:24px;background:#f5f6f8;color:#1a1a1a}
-.card{background:#fff;padding:20px;max-width:720px;border:1px solid #e5e7eb}
-label{display:block;font-size:12px;margin:10px 0 4px;color:#555}
-input,select{width:100%;padding:8px;border:1px solid #d1d5db}
-button{margin-top:14px;padding:10px 16px;background:#185fa5;color:#fff;border:0;cursor:pointer}
-pre{background:#f7f8fa;padding:12px;font-size:12px;overflow:auto}
-</style>
+<link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/components/sidebar.css" />
+  <link rel="stylesheet" href="/static/css/pages/enterprise.css" />
+  <link rel="stylesheet" href="/static/css/portal.css" />
 </head>
-<body>
+<body class="portal-page">
 <div class="card">
   <h2>기업 인증신청 — MD 산출</h2>
   <label>CB ID</label><input id="cb_id" type="number" value="1"/>
