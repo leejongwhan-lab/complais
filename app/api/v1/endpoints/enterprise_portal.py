@@ -80,6 +80,7 @@ class CompanyProfileUpdate(BaseModel):
     address: Optional[str] = None
     detail_address: Optional[str] = None
     address_en: Optional[str] = None
+    zip_code: Optional[str] = None
     tel: Optional[str] = None
     email: Optional[str] = None
     website: Optional[str] = None
@@ -115,6 +116,7 @@ class SiteIn(BaseModel):
     address: Optional[str] = None
     detail_address: Optional[str] = None
     address_en: Optional[str] = None
+    zip_code: Optional[str] = None
     biz_no: Optional[str] = None
     employee_count: int = 0
     is_main: bool = False
@@ -172,9 +174,32 @@ def create_site(
         created_at=now,
         updated_at=now,
     )
+    if hasattr(row, "zip_code"):
+        row.zip_code = payload.zip_code
     db.add(row)
-    db.commit()
-    db.refresh(row)
+    try:
+        db.commit()
+        db.refresh(row)
+    except Exception:
+        db.rollback()
+        if payload.zip_code is None:
+            raise
+        row = CompanySites(
+            company_id=cid,
+            site_name=payload.site_name.strip(),
+            address=payload.address,
+            detail_address=payload.detail_address,
+            address_en=payload.address_en,
+            biz_no=payload.biz_no,
+            employee_count=payload.employee_count or 0,
+            is_main=False,
+            work_type=payload.work_type,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
     return _site_out(row)
 
 
@@ -194,10 +219,26 @@ def update_site(
     for k, v in payload.model_dump().items():
         if k == "is_main":
             continue
-        setattr(row, k, v)
+        if k == "zip_code" and not hasattr(row, "zip_code"):
+            continue
+        if hasattr(row, k):
+            setattr(row, k, v)
     row.updated_at = datetime.now()
-    db.commit()
-    db.refresh(row)
+    try:
+        db.commit()
+        db.refresh(row)
+    except Exception:
+        db.rollback()
+        data = payload.model_dump()
+        data.pop("zip_code", None)
+        for k, v in data.items():
+            if k == "is_main":
+                continue
+            if hasattr(row, k):
+                setattr(row, k, v)
+        row.updated_at = datetime.now()
+        db.commit()
+        db.refresh(row)
     return _site_out(row)
 
 

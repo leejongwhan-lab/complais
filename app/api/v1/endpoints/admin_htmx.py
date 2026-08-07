@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import logging
 from datetime import datetime
 from math import ceil
 from typing import Optional
@@ -19,6 +20,7 @@ from app.services.cb_billing import ensure_default_cb_contract
 from app.api.v1.endpoints.admin import _batch_scope_and_held
 
 router = APIRouter(tags=["Admin HTMX"])
+logger = logging.getLogger(__name__)
 
 # Sliding window of page number buttons (never dump all pages)
 PAGINATION_WINDOW = 5
@@ -134,35 +136,36 @@ def htmx_companies(
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(get_current_admin_user),
 ):
-    q = db.query(Companies)
-    if keyword and keyword.strip():
-        like = f"%{keyword.strip()}%"
-        q = q.filter(
-            (Companies.name.ilike(like))
-            | (Companies.biz_no.ilike(like))
-            | (Companies.name_en.ilike(like))
-        )
-    total = q.count()
-    offset = (page - 1) * limit
-    rows = q.order_by(Companies.id.desc()).offset(offset).limit(limit).all()
+    try:
+        q = db.query(Companies)
+        if keyword and keyword.strip():
+            like = f"%{keyword.strip()}%"
+            q = q.filter(
+                (Companies.name.ilike(like))
+                | (Companies.biz_no.ilike(like))
+                | (Companies.name_en.ilike(like))
+            )
+        total = q.count()
+        offset = (page - 1) * limit
+        rows = q.order_by(Companies.id.desc()).offset(offset).limit(limit).all()
 
-    body_rows = []
-    for i, c in enumerate(rows):
-        cid = c.id
-        seq = offset + i + 1  # 1-based continuous across pages
-        name = c.name or ""
-        corp = _corp_type(c)
-        website = (c.website or "").strip()
-        if website and not website.startswith("http"):
-            website = f"http://{website}"
-        web_cell = (
-            f'<a href="{_esc(website)}" target="_blank" rel="noopener" class="text-decoration-none">방문</a>'
-            if website
-            else "-"
-        )
-        addr = getattr(c, "address", None) or ""
-        body_rows.append(
-            f"""<tr>
+        body_rows = []
+        for i, c in enumerate(rows):
+            cid = c.id
+            seq = offset + i + 1  # 1-based continuous across pages
+            name = c.name or ""
+            corp = _corp_type(c)
+            website = (c.website or "").strip()
+            if website and not website.startswith("http"):
+                website = f"http://{website}"
+            web_cell = (
+                f'<a href="{_esc(website)}" target="_blank" rel="noopener" class="text-decoration-none">방문</a>'
+                if website
+                else "-"
+            )
+            addr = getattr(c, "address", None) or ""
+            body_rows.append(
+                f"""<tr>
           <td>{seq}</td>
           <td class="col-company-name fw-bold" title="{_esc(name)}">{_esc(name)}</td>
           <td>{_esc(c.biz_no or "-")}</td>
@@ -172,26 +175,26 @@ def htmx_companies(
           <td>{web_cell}</td>
           <td><button type="button" class="btn-detail" onclick="openDetailModal({cid})">상세정보</button></td>
         </tr>"""
+            )
+        if not body_rows:
+            body_rows = [
+                '<tr><td colspan="8" style="text-align:center;color:var(--font-tertiary);">검색 결과가 없습니다.</td></tr>'
+            ]
+
+        pages = max(1, ceil(total / limit))
+        pagination = _render_pagination_html(
+            page=page,
+            total_pages=pages,
+            base_url="/admin/partials/companies",
+            hx_target="#company-htmx-panel",
+            container_id="pagination",
+            limit=limit,
+            keyword=keyword or "",
         )
-    if not body_rows:
-        body_rows = [
-            '<tr><td colspan="8" style="text-align:center;color:var(--font-tertiary);">검색 결과가 없습니다.</td></tr>'
-        ]
 
-    pages = max(1, ceil(total / limit))
-    pagination = _render_pagination_html(
-        page=page,
-        total_pages=pages,
-        base_url="/admin/partials/companies",
-        hx_target="#company-htmx-panel",
-        container_id="pagination",
-        limit=limit,
-        keyword=keyword or "",
-    )
-
-    oob_count = f'<span id="total-count" hx-swap-oob="true">{total}</span>'
-    return HTMLResponse(
-        f"""{oob_count}
+        oob_count = f'<span id="total-count" hx-swap-oob="true">{total}</span>'
+        return HTMLResponse(
+            f"""{oob_count}
 <div class="table-responsive">
   <table class="data-table admin-data-table text-nowrap companies-table">
     <thead>
@@ -211,7 +214,18 @@ def htmx_companies(
 </div>
 {pagination}
 """
-    )
+        )
+    except Exception:
+        logger.exception("htmx companies partial failed")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return HTMLResponse(
+            '<div class="table-responsive"><table class="data-table"><tbody>'
+            '<tr><td style="text-align:center;color:var(--sec-red);">'
+            "기업 목록을 불러오지 못했습니다.</td></tr></tbody></table></div>"
+        )
 
 
 @router.get("/cb-contracts", response_class=HTMLResponse)
@@ -223,57 +237,56 @@ def htmx_cb_contracts(
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(get_current_admin_user),
 ):
-    year = datetime.utcnow().year
-    q = db.query(CertificationBodies)
-    if keyword and keyword.strip():
-        like = f"%{keyword.strip()}%"
-        q = q.filter(
-            (CertificationBodies.name.ilike(like))
-            | (CertificationBodies.code.ilike(like))
-            | (CertificationBodies.name_en.ilike(like))
-        )
-    total = q.count()
-    # legacy skip= support
-    if skip is not None:
-        offset = skip
-        page = (skip // limit) + 1 if limit else 1
-    else:
-        offset = (page - 1) * limit
+    try:
+        year = datetime.utcnow().year
+        q = db.query(CertificationBodies)
+        if keyword and keyword.strip():
+            like = f"%{keyword.strip()}%"
+            q = q.filter(
+                (CertificationBodies.name.ilike(like))
+                | (CertificationBodies.code.ilike(like))
+                | (CertificationBodies.name_en.ilike(like))
+            )
+        total = q.count()
+        # legacy skip= support
+        if skip is not None:
+            offset = skip
+            page = (skip // limit) + 1 if limit else 1
+        else:
+            offset = (page - 1) * limit
 
-    cbs = q.order_by(CertificationBodies.id.asc()).offset(offset).limit(limit).all()
-    for cb in cbs:
-        ensure_default_cb_contract(db, cb, year=year)
-    db.commit()
+        cbs = q.order_by(CertificationBodies.id.asc()).offset(offset).limit(limit).all()
+        for cb in cbs:
+            ensure_default_cb_contract(db, cb, year=year)
+        db.commit()
 
-    metrics = _batch_scope_and_held(db, [cb.id for cb in cbs])
-    rows_html = []
-    for i, cb in enumerate(cbs):
-        contract = (
-            db.query(CBContract)
-            .filter(CBContract.cb_id == cb.id, CBContract.contract_year == year)
-            .order_by(CBContract.id.desc())
-            .first()
-        )
-        if contract is None:
+        metrics = _batch_scope_and_held(db, [cb.id for cb in cbs])
+        rows_html = []
+        for i, cb in enumerate(cbs):
             contract = (
                 db.query(CBContract)
-                .filter(CBContract.cb_id == cb.id)
-                .order_by(CBContract.contract_year.desc(), CBContract.id.desc())
+                .filter(CBContract.cb_id == cb.id, CBContract.contract_year == year)
+                .order_by(CBContract.id.desc())
                 .first()
             )
-        if contract is None:
-            continue
-        seq = offset + i + 1  # 1-based continuous: (page-1)*limit + index
-        _scope_cnt, _held_cnt, held_stds, ab_sum = metrics.get(cb.id, (0, 0, [], ""))
-        ab_display = ab_sum or (cb.accreditation_body or "") or "-"
-        fee = contract.annual_base_fee
-        md = contract.price_per_md
-        fee_s = f"{int(fee):,}" if fee is not None else "-"
-        md_s = f"{int(md):,}" if md is not None else "-"
-        status = cb.status or ("정상" if cb.is_active else "정지")
-        held_cell = _held_std_buttons(cb.id, held_stds)
-        rows_html.append(
-            f"""<tr>
+            if contract is None:
+                contract = (
+                    db.query(CBContract)
+                    .filter(CBContract.cb_id == cb.id)
+                    .order_by(CBContract.contract_year.desc(), CBContract.id.desc())
+                    .first()
+                )
+            if contract is None:
+                continue
+            seq = offset + i + 1  # 1-based continuous: (page-1)*limit + index
+            _scope_cnt, _held_cnt, held_stds, ab_sum = metrics.get(cb.id, (0, 0, [], ""))
+            ab_display = ab_sum or (cb.accreditation_body or "") or "-"
+            fee = contract.annual_base_fee
+            fee_s = f"{int(fee):,}" if fee is not None else "-"
+            status = cb.status or ("정상" if cb.is_active else "정지")
+            held_cell = _held_std_buttons(cb.id, held_stds)
+            rows_html.append(
+                f"""<tr>
           <td>{seq}</td>
           <td>{_esc(cb.code or "-")}</td>
           <td class="col-cb-name fw-bold" title="{_esc(cb.name)}">{_esc(cb.name)}</td>
@@ -281,29 +294,28 @@ def htmx_cb_contracts(
           <td class="col-held-std">{held_cell}</td>
           <td>{_esc(ab_display)}</td>
           <td>{_esc(fee_s)}</td>
-          <td>{_esc(md_s)}</td>
           <td><button type="button" class="btn-detail" data-cb-detail="{cb.id}">상세정보</button></td>
         </tr>"""
+            )
+        if not rows_html:
+            rows_html = [
+                '<tr><td colspan="8" style="text-align:center;color:var(--font-tertiary);">등록된 인증기관이 없습니다.</td></tr>'
+            ]
+
+        pages = max(1, ceil(total / limit)) if limit else 1
+        pagination = _render_pagination_html(
+            page=page,
+            total_pages=pages,
+            base_url="/admin/partials/cb-contracts",
+            hx_target="#cb-htmx-panel",
+            container_id="cb-pagination",
+            limit=limit,
+            keyword=keyword or "",
         )
-    if not rows_html:
-        rows_html = [
-            '<tr><td colspan="9" style="text-align:center;color:var(--font-tertiary);">등록된 인증기관이 없습니다.</td></tr>'
-        ]
 
-    pages = max(1, ceil(total / limit)) if limit else 1
-    pagination = _render_pagination_html(
-        page=page,
-        total_pages=pages,
-        base_url="/admin/partials/cb-contracts",
-        hx_target="#cb-htmx-panel",
-        container_id="cb-pagination",
-        limit=limit,
-        keyword=keyword or "",
-    )
-
-    oob_count = f'<span id="cb-total-count" hx-swap-oob="true">{total}</span>'
-    return HTMLResponse(
-        f"""{oob_count}
+        oob_count = f'<span id="cb-total-count" hx-swap-oob="true">{total}</span>'
+        return HTMLResponse(
+            f"""{oob_count}
 <div class="table-responsive">
   <table class="data-table admin-data-table text-nowrap cb-contracts-table">
     <thead>
@@ -315,7 +327,6 @@ def htmx_cb_contracts(
         <th class="col-held-std">보유 표준</th>
         <th style="width:9%;">인정기관</th>
         <th style="width:8%;">기본료</th>
-        <th style="width:8%;">MD단가</th>
         <th style="width:8%;">관리</th>
       </tr>
     </thead>
@@ -324,4 +335,15 @@ def htmx_cb_contracts(
 </div>
 {pagination}
 """
-    )
+        )
+    except Exception:
+        logger.exception("htmx cb-contracts partial failed")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return HTMLResponse(
+            '<div class="table-responsive"><table class="data-table"><tbody>'
+            '<tr><td style="text-align:center;color:var(--sec-red);">'
+            "인증기관 목록을 불러오지 못했습니다.</td></tr></tbody></table></div>"
+        )

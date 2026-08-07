@@ -15,9 +15,7 @@ from app.api.v1.endpoints.user_common import require_enterprise_user, resolve_co
 from app.core.security import CurrentUser, get_current_user
 from app.core.validators import format_biz_no
 from app.models.cb import CertificationBodies, CbAccreditationScopes
-from app.models.certification import Certificates
 from app.models.certification_body import CbAccreditationScope
-from app.models.client import AuditRequest
 from app.models.company import Companies, CompanyHeadcountYearly
 from app.models.standard import StandardMaster
 
@@ -74,6 +72,7 @@ class CompanyProfileOut(BaseModel):
     address: Optional[str] = None
     detail_address: Optional[str] = None
     address_en: Optional[str] = None
+    zip_code: Optional[str] = None
     tel: Optional[str] = None
     email: Optional[str] = None
     website: Optional[str] = None
@@ -144,11 +143,22 @@ def _classify_cert_token(token: str) -> Optional[Tuple[str, str]]:
 
 
 def _collect_company_cert_badges(db: Session, company: Companies) -> Tuple[List[str], List[str]]:
-    held: List[str] = []
-    other: List[str] = []
-    seen: Set[str] = set()
+    """Enterprise: full held standards (all CBs) + survey/other certifications.
 
-    def add(token: str) -> None:
+    Held labels come from ``list_company_held_standards`` (company_certificates,
+    certificates/contracts, applications). Soft-fails to [].
+    """
+    from app.services.company_held_certs import company_held_standard_labels
+
+    try:
+        held = company_held_standard_labels(db, int(company.id), cb_id=None)
+    except Exception:
+        held = []
+
+    other: List[str] = []
+    seen: Set[str] = {h.casefold() for h in held}
+
+    def add_other(token: str) -> None:
         classified = _classify_cert_token(token)
         if not classified:
             return
@@ -157,43 +167,30 @@ def _collect_company_cert_badges(db: Session, company: Companies) -> Tuple[List[
         if key in seen:
             return
         seen.add(key)
-        if bucket == "held":
-            held.append(label)
-        else:
+        if bucket == "other":
             other.append(label)
 
-    # 1) 유효 인증서
-    cert_rows = (
-        db.query(Certificates)
-        .filter(Certificates.company_id == company.id)
-        .filter(Certificates.status.in_(("active", "valid", "issued", "ACTIVE", "VALID")))
-        .all()
-    )
-    for row in cert_rows:
-        for tok in _iter_token_list(row.standards):
-            add(tok)
-
-    # 2) 설문 스냅샷
+    # 설문 스냅샷 · 기타 인증 (보유 표준은 helper가 담당)
     snap = company.latest_survey_snapshot or {}
     if isinstance(snap, dict):
-        for key in ("iso_standards", "held_standards", "standards"):
-            for tok in _iter_token_list(snap.get(key)):
-                add(tok)
         for key in ("other_certs", "other_certifications", "extra_certs", "certifications"):
             for tok in _iter_token_list(snap.get(key)):
-                add(tok)
-
-    # 3) 최근 심사신청 ISO
-    reqs = (
-        db.query(AuditRequest)
-        .filter(AuditRequest.company_id == company.id)
-        .order_by(AuditRequest.id.desc())
-        .limit(5)
-        .all()
-    )
-    for req in reqs:
-        for tok in _iter_token_list(req.iso_standards):
-            add(tok)
+                add_other(tok)
+        # 스냅샷 held 중 helper에 없는 ISO는 기타로 흡수하지 않고 held 보강
+        for key in ("iso_standards", "held_standards", "standards"):
+            for tok in _iter_token_list(snap.get(key)):
+                classified = _classify_cert_token(tok)
+                if not classified:
+                    continue
+                bucket, label = classified
+                if bucket != "held":
+                    add_other(tok)
+                    continue
+                if label.casefold() not in seen and label not in held:
+                    # Prefer catalog label if helper returned empty for this company
+                    if not held:
+                        held.append(label)
+                        seen.add(label.casefold())
 
     return held, other
 
@@ -318,6 +315,7 @@ def get_my_company_profile(
         address=company.address,
         detail_address=company.detail_address,
         address_en=company.address_en,
+        zip_code=getattr(company, "zip_code", None),
         tel=company.tel,
         email=company.email,
         website=company.website,

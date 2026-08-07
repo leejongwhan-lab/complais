@@ -73,6 +73,8 @@ class CbAdminRegisterRequest(BaseModel):
     reg_no: Optional[str] = None
     ceo_name: Optional[str] = None
     address: Optional[str] = None
+    zip_code: Optional[str] = None
+    detail_address: Optional[str] = None
     tel: Optional[str] = None
     intro: Optional[str] = None
 
@@ -108,6 +110,9 @@ class CbSignupRequest(BaseModel):
     reg_no: Optional[str] = None
     ceo_name: Optional[str] = None
     address: Optional[str] = None
+    # 우편번호/상세 — DB 컬럼 없으면 address 로 합쳐 저장 (additive, optional)
+    zip_code: Optional[str] = None
+    detail_address: Optional[str] = None
 
     # staff: 기존 CB 소속 신청
     selected_cb_id: Optional[int] = None
@@ -149,6 +154,7 @@ class AuditorRegisterRequest(BaseModel):
     gender: Optional[str] = None
     address: str = "미입력"
     detail_address: str = "미입력"
+    zip_code: Optional[str] = None  # 우편번호 — address 앞에 합쳐 저장 (별도 컬럼 없음)
 
     # Step 2: 고용 형태 (CB 소속과 무관)
     employment_type: str = "fulltime"  # fulltime, parttime
@@ -510,6 +516,27 @@ def _register_cb_member_pending_tx(
     }
 
 
+def _compose_register_address(
+    address: Optional[str] = None,
+    zip_code: Optional[str] = None,
+    detail_address: Optional[str] = None,
+) -> Optional[str]:
+    """우편번호·기본주소·상세를 단일 address 문자열로 합친다 (기존 컬럼 호환)."""
+    parts = [
+        (zip_code or "").strip(),
+        (address or "").strip(),
+        (detail_address or "").strip(),
+    ]
+    # address 가 이미 합쳐진 값이면 zip/detail 중복 합치기 방지
+    base = parts[1]
+    if base and parts[0] and parts[0] in base and not parts[2]:
+        return base
+    if base and parts[0] and parts[0] in base and parts[2] and parts[2] in base:
+        return base
+    merged = " ".join(p for p in parts if p)
+    return merged or None
+
+
 @router.post("/register/cb", status_code=status.HTTP_201_CREATED)
 def register_cb(
     payload: CbSignupRequest,
@@ -525,6 +552,11 @@ def register_cb(
 
     try:
         if signup_type == "admin":
+            composed_address = _compose_register_address(
+                address=payload.address,
+                zip_code=payload.zip_code,
+                detail_address=payload.detail_address,
+            )
             result = _register_cb_admin_tx(
                 db,
                 email=str(payload.email),
@@ -538,7 +570,7 @@ def register_cb(
                 biz_no=payload.biz_no,
                 reg_no=payload.reg_no,
                 ceo_name=payload.ceo_name,
-                address=payload.address,
+                address=composed_address,
             )
         else:
             if not payload.selected_cb_id:
@@ -588,7 +620,11 @@ def register_cb_admin(
             biz_no=payload.biz_no,
             reg_no=payload.reg_no,
             ceo_name=payload.ceo_name,
-            address=payload.address,
+            address=_compose_register_address(
+                address=payload.address,
+                zip_code=payload.zip_code,
+                detail_address=payload.detail_address,
+            ),
             intro=payload.intro,
         )
         db.commit()
@@ -642,6 +678,10 @@ def register_auditor(
         db.add(new_user)
         db.flush()
 
+        addr_base = (payload.address or "").strip() or "미입력"
+        zip_c = (payload.zip_code or "").strip()
+        if zip_c and addr_base != "미입력" and zip_c not in addr_base:
+            addr_base = f"{zip_c} {addr_base}"
         new_auditor = Auditor(
             user_id=new_user.id,
             name=payload.name,
@@ -649,8 +689,8 @@ def register_auditor(
             phone=payload.phone,
             birth_date=birth_date,
             gender=payload.gender,
-            address=payload.address or "미입력",
-            detail_address=payload.detail_address or "미입력",
+            address=addr_base,
+            detail_address=(payload.detail_address or "").strip() or "미입력",
             employment_type=payload.employment_type,
             is_freelance=payload.is_freelance,
             grade=payload.apply_grade,

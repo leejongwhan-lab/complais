@@ -5,63 +5,67 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>기업 포털 - complAIs</title>
-  <link rel="stylesheet" href="/static/css/main.css">
-  <link rel="stylesheet" href="/static/css/components/sidebar.css">
-  <link rel="stylesheet" href="/static/css/pages/enterprise.css">
-  <link rel="stylesheet" href="/static/css/portal.css" />
+  <link rel="stylesheet" href="/static/css/main.css?v=20260807hs">
+  <link rel="stylesheet" href="/static/css/portal.css?v=20260807hs">
+  <link rel="stylesheet" href="/static/css/pages/enterprise.css?v=20260807hs">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260807hs">
+  <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  <script src="/static/js/daum_postcode.js?v=20260807hs"></script>
 </head>
-<body class="portal-page">
-  <div class="layout">
-    <aside class="sidebar">
-      <div class="sidebar-brand">
+<body class="portal-page admin-page enterprise-portal-page">
+  <aside class="admin-sidebar">
+    <div class="brand-lockup" style="margin-bottom:14px;padding:6px 4px;">
+      <a href="/enterprise">
         <img src="/static/brand/complais-logo.png" alt="complAIs" class="brand-logo brand-logo-md" />
+      </a>
+    </div>
+    <div class="sidebar-profile" id="sidebar-profile" aria-live="polite" style="padding:0 4px 12px;">
+      <p class="sidebar-profile-name" id="sidebar-company-name" style="margin:0;font-weight:700;">기업 정보 로딩…</p>
+      <p class="sidebar-profile-code muted" id="sidebar-company-code" style="margin:2px 0 8px;font-size:12px;"></p>
+      <p class="muted" style="margin:0 0 4px;font-size:11px;">보유 표준</p>
+      <div class="sidebar-badges" id="sidebar-held-badges">
+        <span class="sidebar-badge empty">조회 중</span>
       </div>
-      <span class="sidebar-badge-role">ENTERPRISE</span>
-      <div class="sidebar-profile" id="sidebar-profile" aria-live="polite">
-        <p class="sidebar-profile-name" id="sidebar-company-name">기업 정보 로딩…</p>
-        <p class="sidebar-profile-code" id="sidebar-company-code"></p>
-        <p class="sidebar-profile-label">보유 표준</p>
-        <div class="sidebar-badges" id="sidebar-held-badges">
-          <span class="sidebar-badge empty">조회 중</span>
-        </div>
-        <p class="sidebar-profile-label">기타 인증</p>
-        <div class="sidebar-badges" id="sidebar-other-badges">
-          <span class="sidebar-badge empty">조회 중</span>
-        </div>
+      <p class="muted" style="margin:8px 0 4px;font-size:11px;">기타 인증</p>
+      <div class="sidebar-badges" id="sidebar-other-badges">
+        <span class="sidebar-badge empty">조회 중</span>
       </div>
-      <div class="side-group">
-        <span class="side-group-label">개요</span>
-        <button type="button" class="side-link nested" data-panel="dashboard">대시보드</button>
-        <button type="button" class="side-link nested active" data-panel="company">기업정보</button>
-      </div>
-      <div class="side-group">
-        <span class="side-group-label">인증 관리</span>
-        <button type="button" class="side-link nested" data-panel="cert">인증현황</button>
-        <button type="button" class="side-link nested" data-panel="archive">결과보관함</button>
-        <button type="button" class="side-link nested" data-panel="ncr">시정조치 (NCR)</button>
-      </div>
-      <div class="side-group">
-        <span class="side-group-label">ESG 관리</span>
-        <button type="button" class="side-link nested" data-panel="esg">ESG관리</button>
-      </div>
-      <div class="side-foot">
-        <a class="side-link" href="/client_portal.html">설문 신청 포털</a>
-        <button type="button" class="side-link" id="logout-btn">로그아웃</button>
-      </div>
-    </aside>
+    </div>
+    <nav>
+      <div class="sidebar-group-label">개요</div>
+      <ul class="sidebar-menu">
+        <li><a href="#" class="sidebar-menu-item side-link" data-panel="dashboard">대시보드</a></li>
+        <li><a href="#" class="sidebar-menu-item side-link active" data-panel="company">기업정보</a></li>
+      </ul>
+      <div class="sidebar-group-label">인증 관리</div>
+      <ul class="sidebar-menu">
+        <li><a href="#" class="sidebar-menu-item side-link" data-panel="cert">인증현황</a></li>
+        <li><a href="/enterprise/cert-application" class="sidebar-menu-item">인증신청</a></li>
+        <li><a href="#" class="sidebar-menu-item side-link" data-panel="archive">결과보관함</a></li>
+        <li><a href="#" class="sidebar-menu-item side-link" data-panel="ncr">시정조치 (NCR)</a></li>
+      </ul>
+      <div class="sidebar-group-label">ESG 관리</div>
+      <ul class="sidebar-menu">
+        <li><a href="#" class="sidebar-menu-item side-link" data-panel="esg">ESG관리</a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">
+      <a class="sidebar-menu-item" href="/client_portal.html">설문 신청 포털</a>
+      <a href="#" class="sidebar-menu-item" id="logout-btn">로그아웃</a>
+    </div>
+  </aside>
 
-    <div class="main">
-      <header class="topbar">
+  <main class="admin-main">
+      <header class="cb-page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
         <div>
-          <h1 id="page-title">기업정보</h1>
-          <div class="muted" id="page-sub">기업 마스터 · 사업장 · 담당자</div>
+          <h1 id="page-title" style="font: var(--font-h1); margin: 0;">기업정보</h1>
+          <p class="muted" id="page-sub" style="margin: 6px 0 0;">기업 마스터 · 사업장 · 담당자</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <a class="btn ghost" id="admin-switch" href="/admin/dashboard">플랫폼 어드민 전환</a>
+          <a class="btn-secondary" id="admin-switch" href="/admin/dashboard">플랫폼 어드민 전환</a>
         </div>
       </header>
 
-      <div class="content">
         <div class="error" id="global-error"></div>
         <div class="success" id="global-success"></div>
 
@@ -72,8 +76,8 @@
           <dl class="kv" id="dashboard-kv"><dt>불러오는 중…</dt><dd></dd></dl>
         </section>
 
-        <section class="card" id="panel-company">
-          <form id="company-form" autocomplete="off">
+        <section class="card portal-form" id="panel-company">
+          <form id="company-form" class="portal-form" autocomplete="off">
             <div class="ep-section">
               <div class="ep-section-head">
                 <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>기본 정보</h2>
@@ -138,17 +142,21 @@
               <div class="ep-section-head">
                 <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>주소</h2>
               </div>
-              <div class="ep-field" style="margin-bottom:12px;">
-                <label for="f-address">주소</label>
-                <input id="f-address" name="address" />
-              </div>
-              <div class="ep-field" style="margin-bottom:12px;">
-                <label for="f-detail_address">상세주소</label>
-                <input id="f-detail_address" name="detail_address" placeholder="상세주소를 입력하세요" />
-              </div>
-              <div class="ep-field">
-                <label for="f-address_en">영문 주소</label>
-                <input id="f-address_en" name="address_en" placeholder="우편번호 검색 시 영문 주소가 자동 매핑됩니다." />
+              <div class="ep-field ep-full" style="margin-bottom:12px;">
+                <label for="f-zip_code">우편번호 / 주소</label>
+                <div class="addr-stack">
+                  <div class="addr-row ep-addr-row">
+                    <input id="f-zip_code" name="zip_code" class="addr-zip" readonly placeholder="우편번호" />
+                    <button type="button" class="btn-postcode"
+                      data-postcode-zip="f-zip_code"
+                      data-postcode-addr="f-address"
+                      data-postcode-detail="f-detail_address"
+                      data-postcode-en="f-address_en">주소 검색</button>
+                  </div>
+                  <input id="f-address" name="address" class="addr-main" readonly placeholder="도로명/지번 주소" />
+                  <input id="f-detail_address" name="detail_address" placeholder="상세주소를 입력하세요" />
+                  <input id="f-address_en" name="address_en" placeholder="우편번호 검색 시 영문 주소가 자동 매핑됩니다." />
+                </div>
               </div>
             </div>
 
@@ -419,9 +427,7 @@
             </table>
           </div>
         </section>
-      </div>
-    </div>
-  </div>
+  </main>
 
   <div class="drawer-backdrop" id="ncr-backdrop"></div>
   <aside class="drawer" id="ncr-drawer">
@@ -513,7 +519,7 @@
         const el = document.getElementById(`panel-${p}`);
         if (el) el.style.display = p === name ? "block" : "none";
       });
-      document.querySelector(".content")?.classList.toggle("content-wide", name === "esg");
+      document.querySelector(".admin-main")?.classList.toggle("content-wide", name === "esg");
       const [t, s] = titles[name] || ["기업 포털", ""];
       document.getElementById("page-title").textContent = t;
       document.getElementById("page-sub").textContent = s;
@@ -528,12 +534,16 @@
       }
     }
     document.querySelectorAll(".side-link[data-panel]").forEach((b) => {
-      b.addEventListener("click", () => switchPanel(b.dataset.panel));
+      b.addEventListener("click", (e) => {
+        e.preventDefault();
+        switchPanel(b.dataset.panel);
+      });
     });
 
-    document.getElementById("logout-btn").addEventListener("click", () => {
+    document.getElementById("logout-btn").addEventListener("click", (e) => {
+      e.preventDefault();
       ["access_token","role","user_id","company_id","cb_id"].forEach((k) => localStorage.removeItem(k));
-      window.location.href = "/login.html";
+      window.location.href = "/login";
     });
 
     function renderApplyStandards(standards) {
@@ -554,14 +564,35 @@
       }).join("");
     }
 
+    function heldDisplayLabel(item) {
+      if (item == null) return "";
+      if (typeof item === "string") return item;
+      return (
+        item.label ||
+        [item.initial, item.iso_code, item.name_kr].filter(Boolean).join(" · ") ||
+        item.initial ||
+        item.standard_code ||
+        ""
+      );
+    }
+
+    function heldBadgeText(item) {
+      if (item == null) return "";
+      if (typeof item === "string") {
+        const head = item.split(" · ")[0];
+        return head || item;
+      }
+      return item.initial || heldDisplayLabel(item);
+    }
+
     function renderSidebarBadges(held, other) {
       const heldBox = document.getElementById("sidebar-held-badges");
       const otherBox = document.getElementById("sidebar-other-badges");
       heldBox.innerHTML = (held || []).length
-        ? held.map((b) => `<span class="sidebar-badge">${esc(b)}</span>`).join("")
+        ? held.map((b) => `<span class="sidebar-badge" title="${esc(heldDisplayLabel(b))}">${esc(heldBadgeText(b))}</span>`).join("")
         : `<span class="sidebar-badge empty">등록된 표준 없음</span>`;
       otherBox.innerHTML = (other || []).length
-        ? other.map((b) => `<span class="sidebar-badge other">${esc(b)}</span>`).join("")
+        ? other.map((b) => `<span class="sidebar-badge other">${esc(typeof b === "string" ? b : heldDisplayLabel(b))}</span>`).join("")
         : `<span class="sidebar-badge empty">기타 인증 없음</span>`;
     }
 
@@ -797,6 +828,7 @@
         address: c.address || "",
         detail_address: c.detail_address || "",
         address_en: c.address_en || "",
+        zip_code: c.zip_code || "",
         tel: c.tel || "",
         email: c.email || "",
         website: c.website || "",
@@ -818,7 +850,7 @@
         <dt>사업자번호</dt><dd>${esc(c.biz_no || "-")}</dd>
         <dt>대표자</dt><dd>${esc(c.ceo_name || "-")}</dd>
         <dt>KSIC / IAF</dt><dd>${esc(c.ksic_code || "-")} / ${esc((c.iaf_codes||[]).join(", ") || c.iaf_code || "-")}</dd>
-        <dt>보유 표준</dt><dd>${esc((c.held_standards||[]).join(", ") || "-")}</dd>
+        <dt>보유 표준</dt><dd>${esc((c.held_standards||[]).map(heldDisplayLabel).filter(Boolean).join(", ") || "-")}</dd>
         <dt>인원(${esc(c.headcount_year || new Date().getFullYear())})</dt><dd>${esc(c.employee_count ?? "-")}</dd>`;
     }
 
@@ -862,7 +894,7 @@
       setMsg("", "");
       const fields = [
         "name","biz_no","entity_type","corp_no","name_en","ceo_name","biz_type","biz_class",
-        "scope_kr","scope_en","address","detail_address","address_en","tel","email","website",
+        "scope_kr","scope_en","zip_code","address","detail_address","address_en","tel","email","website",
         "employee_count","headcount_outsourced","headcount_regular","headcount_non_regular",
         "ksic_code","iaf_code"
       ];
@@ -911,21 +943,30 @@
         return;
       }
       box.innerHTML = orgState.sites.map((s, idx) => `
-        <div class="site-row" data-idx="${idx}">
+        <div class="site-row site-row-addr" data-idx="${idx}">
           <input data-k="site_name" value="${esc(s.site_name || "")}" placeholder="사업장명 *" />
-          <input data-k="address" value="${esc(s.address || "")}" placeholder="주소" />
-          <input data-k="detail_address" value="${esc(s.detail_address || "")}" placeholder="상세주소" />
-          <input data-k="address_en" value="${esc(s.address_en || "")}" placeholder="영문 주소" />
+          <input id="site-zip-${idx}" data-k="zip_code" value="${esc(s.zip_code || "")}" placeholder="우편번호" readonly />
+          <input id="site-addr-${idx}" data-k="address" value="${esc(s.address || "")}" placeholder="주소" readonly />
+          <button type="button" class="btn-postcode"
+            data-postcode-zip="site-zip-${idx}"
+            data-postcode-addr="site-addr-${idx}"
+            data-postcode-detail="site-detail-${idx}"
+            data-postcode-en="site-en-${idx}">주소 검색</button>
+          <input id="site-detail-${idx}" data-k="detail_address" value="${esc(s.detail_address || "")}" placeholder="상세주소" />
+          <input id="site-en-${idx}" data-k="address_en" value="${esc(s.address_en || "")}" placeholder="영문 주소" />
           <input data-k="employee_count" type="number" min="0" value="${esc(s.employee_count ?? 0)}" placeholder="인원" />
           <button type="button" class="ghost site-del" data-idx="${idx}">삭제</button>
         </div>`).join("");
       box.querySelectorAll(".site-row input").forEach((inp) => {
-        inp.addEventListener("change", () => {
+        const sync = () => {
           const idx = Number(inp.closest(".site-row").dataset.idx);
           const k = inp.dataset.k;
           orgState.sites[idx][k] = k === "employee_count" ? Number(inp.value || 0) : inp.value;
-        });
+        };
+        inp.addEventListener("change", sync);
+        inp.addEventListener("input", sync);
       });
+      if (typeof wireDaumPostcodeButtons === "function") wireDaumPostcodeButtons(box);
       box.querySelectorAll(".site-del").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const idx = Number(btn.dataset.idx);
@@ -960,7 +1001,7 @@
 
     document.getElementById("site-add-btn")?.addEventListener("click", () => {
       orgState.sites.push({
-        site_name: "", address: "", detail_address: "", address_en: "",
+        site_name: "", zip_code: "", address: "", detail_address: "", address_en: "",
         employee_count: 0, is_main: false,
       });
       renderSites();
@@ -973,6 +1014,7 @@
           if (!(s.site_name || "").trim()) throw new Error("사업장명을 입력하세요.");
           const body = {
             site_name: s.site_name.trim(),
+            zip_code: s.zip_code || null,
             address: s.address || null,
             detail_address: s.detail_address || null,
             address_en: s.address_en || null,
@@ -1375,7 +1417,7 @@
           : Array.from({ length: 5 }, (_, i) => state.esgCurrentYear - 4 + i);
         updateEsgThead(years);
 
-        const held = (data.held_standards || state.heldStandards || []).join(", ") || "없음";
+        const held = (data.held_standards || state.heldStandards || []).map(heldDisplayLabel).filter(Boolean).join(", ") || "없음";
         document.getElementById("esg-meta").textContent = data.matched_to_held
           ? `보유 표준(${held})에 매칭된 KPI · ${state.esgPage * state.esgLimit + 1}–${Math.min((state.esgPage + 1) * state.esgLimit, state.esgTotal)} / ${state.esgTotal}`
           : `전체 카탈로그 · ${state.esgTotal}건 중 ${state.esgPage * state.esgLimit + 1}–${Math.min((state.esgPage + 1) * state.esgLimit, state.esgTotal)} 표시`;

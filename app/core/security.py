@@ -193,7 +193,8 @@ _CB_REVIEW_ROLES = frozenset(
 def require_cb_review_access(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
     """기업 인증신청 MD 제안검토(PATCH): platform_admin 또는 CB 역할(+cb_id).
 
-    CB 포털이 아직 없으므로 지금은 platform_admin이 주 진입점이다.
+    플랫폼 어드민 대시보드의 MD 검토 API용. CB 포털 셸/대시보드는
+    ``require_cb_portal_user`` 를 사용한다 (platform_admin 혼용 금지).
     """
     role = (current_user.role or "").lower()
     if role == UsersRole.PLATFORM_ADMIN.value:
@@ -209,6 +210,27 @@ def require_cb_review_access(current_user: CurrentUser = Depends(get_current_use
         status_code=status.HTTP_403_FORBIDDEN,
         detail="MD 제안검토 권한이 없습니다. (platform_admin 또는 CB 역할 필요)",
     )
+
+
+def require_cb_portal_user(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """CB 포털 전용 — cb_* 역할 + cb_id. platform_admin은 403 (어드민/CB 세션 분리)."""
+    role = (current_user.role or "").lower()
+    if role == UsersRole.PLATFORM_ADMIN.value or role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="플랫폼 관리자 계정으로는 CB 포털에 접근할 수 없습니다. CB 계정으로 로그인해 주세요.",
+        )
+    if role not in _CB_REVIEW_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CB 포털 권한이 없습니다. (cb_admin / cb_manager / cb_staff / cb_reviewer)",
+        )
+    if current_user.cb_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="소속 인증원(CB) 정보가 없어 CB 포털에 접근할 수 없습니다.",
+        )
+    return current_user
 
 
 def require_platform_admin(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:

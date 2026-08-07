@@ -4,16 +4,20 @@ Enterprise 포털과 Platform Admin이 동일 테이블·동일 로직으로 읽
 """
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence
 
 from fastapi import HTTPException
+from sqlalchemy.exc import ProgrammingError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.validators import format_biz_no
 from app.models.backoffice import CompanyStaff
 from app.models.company import Companies, CompanyDepartments, CompanyHeadcountYearly, CompanySites
+
+logger = logging.getLogger(__name__)
 
 HEADCOUNT_FIELDS = (
     "employee_count",
@@ -36,6 +40,7 @@ COMPANY_PROFILE_FIELDS = (
     "address",
     "detail_address",
     "address_en",
+    "zip_code",
     "tel",
     "email",
     "website",
@@ -104,35 +109,50 @@ def resolve_headcount_snapshot(
     company: Companies,
     headcount_year: Optional[int] = None,
 ) -> Dict[str, Any]:
-    year_rows = (
-        db.query(CompanyHeadcountYearly.year)
-        .filter(CompanyHeadcountYearly.company_id == company.id)
-        .order_by(CompanyHeadcountYearly.year.desc())
-        .all()
-    )
-    years = [int(r[0]) for r in year_rows]
+    """연도별 인원 스냅샷. 테이블 미존재/스키마 드리프트 시 companies 캐시로 soft-fail."""
     current_year = datetime.now().year
-    if current_year not in years:
-        years = [current_year] + years
     selected_year = int(headcount_year or current_year)
-
     emp = company.employee_count
     hc_out = company.headcount_outsourced
     hc_reg = company.headcount_regular
     hc_non = company.headcount_non_regular
-    snap = (
-        db.query(CompanyHeadcountYearly)
-        .filter(
-            CompanyHeadcountYearly.company_id == company.id,
-            CompanyHeadcountYearly.year == selected_year,
+    years = [current_year]
+
+    try:
+        year_rows = (
+            db.query(CompanyHeadcountYearly.year)
+            .filter(CompanyHeadcountYearly.company_id == company.id)
+            .order_by(CompanyHeadcountYearly.year.desc())
+            .all()
         )
-        .first()
-    )
-    if snap:
-        emp = snap.employee_count if snap.employee_count is not None else emp
-        hc_out = snap.headcount_outsourced if snap.headcount_outsourced is not None else hc_out
-        hc_reg = snap.headcount_regular if snap.headcount_regular is not None else hc_reg
-        hc_non = snap.headcount_non_regular if snap.headcount_non_regular is not None else hc_non
+        years = [int(r[0]) for r in year_rows]
+        if current_year not in years:
+            years = [current_year] + years
+
+        snap = (
+            db.query(CompanyHeadcountYearly)
+            .filter(
+                CompanyHeadcountYearly.company_id == company.id,
+                CompanyHeadcountYearly.year == selected_year,
+            )
+            .first()
+        )
+        if snap:
+            emp = snap.employee_count if snap.employee_count is not None else emp
+            hc_out = snap.headcount_outsourced if snap.headcount_outsourced is not None else hc_out
+            hc_reg = snap.headcount_regular if snap.headcount_regular is not None else hc_reg
+            hc_non = snap.headcount_non_regular if snap.headcount_non_regular is not None else hc_non
+    except (ProgrammingError, OperationalError):
+        logger.warning(
+            "company_headcount_yearly unavailable; falling back to companies cache (company_id=%s)",
+            company.id,
+            exc_info=True,
+        )
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        years = [current_year]
 
     return {
         "headcount_year": selected_year,
@@ -152,6 +172,7 @@ def site_to_dict(row: CompanySites) -> Dict[str, Any]:
         "address": row.address,
         "detail_address": getattr(row, "detail_address", None),
         "address_en": getattr(row, "address_en", None),
+        "zip_code": getattr(row, "zip_code", None),
         "biz_no": row.biz_no,
         "employee_count": row.employee_count or 0,
         "is_main": bool(row.is_main),
@@ -184,31 +205,55 @@ def dept_to_dict(row: CompanyDepartments) -> Dict[str, Any]:
 
 
 def list_additional_sites(db: Session, company_id: int) -> List[CompanySites]:
-    return (
-        db.query(CompanySites)
-        .filter(CompanySites.company_id == company_id)
-        .filter((CompanySites.is_main.is_(False)) | (CompanySites.is_main.is_(None)))
-        .order_by(CompanySites.id.asc())
-        .all()
-    )
+    try:
+        return (
+            db.query(CompanySites)
+            .filter(CompanySites.company_id == company_id)
+            .filter((CompanySites.is_main.is_(False)) | (CompanySites.is_main.is_(None)))
+            .order_by(CompanySites.id.asc())
+            .all()
+        )
+    except (ProgrammingError, OperationalError):
+        logger.warning("company_sites list failed for company_id=%s", company_id, exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return []
 
 
 def list_active_departments(db: Session, company_id: int) -> List[CompanyDepartments]:
-    return (
-        db.query(CompanyDepartments)
-        .filter(CompanyDepartments.company_id == company_id, CompanyDepartments.is_active.is_(True))
-        .order_by(CompanyDepartments.sort_order.asc(), CompanyDepartments.id.asc())
-        .all()
-    )
+    try:
+        return (
+            db.query(CompanyDepartments)
+            .filter(CompanyDepartments.company_id == company_id, CompanyDepartments.is_active.is_(True))
+            .order_by(CompanyDepartments.sort_order.asc(), CompanyDepartments.id.asc())
+            .all()
+        )
+    except (ProgrammingError, OperationalError):
+        logger.warning("company_departments list failed for company_id=%s", company_id, exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return []
 
 
 def list_staff_members(db: Session, company_id: int) -> List[CompanyStaff]:
-    return (
-        db.query(CompanyStaff)
-        .filter(CompanyStaff.company_id == company_id)
-        .order_by(CompanyStaff.id.asc())
-        .all()
-    )
+    try:
+        return (
+            db.query(CompanyStaff)
+            .filter(CompanyStaff.company_id == company_id)
+            .order_by(CompanyStaff.id.asc())
+            .all()
+        )
+    except (ProgrammingError, OperationalError):
+        logger.warning("company_staff list failed for company_id=%s", company_id, exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return []
 
 
 def build_company_org_detail(
@@ -235,6 +280,7 @@ def build_company_org_detail(
         "address": company.address,
         "detail_address": company.detail_address,
         "address_en": company.address_en,
+        "zip_code": getattr(company, "zip_code", None),
         "tel": company.tel,
         "email": company.email,
         "website": company.website,
@@ -267,13 +313,28 @@ def update_company_profile(
     headcount_vals = {k: payload.pop(k) for k in list(payload.keys()) if k in HEADCOUNT_FIELDS}
     for field, value in payload.items():
         if field in COMPANY_PROFILE_FIELDS or field == "status":
+            if not hasattr(company, field):
+                continue
             setattr(company, field, value)
     if headcount_vals:
         upsert_headcount_yearly(db, company, int(headcount_year), headcount_vals)
     company.updated_at = datetime.now()
     if commit:
-        db.commit()
-        db.refresh(company)
+        try:
+            db.commit()
+            db.refresh(company)
+        except (ProgrammingError, OperationalError):
+            # zip_code 컬럼 미적용 환경에서도 기존 저장이 깨지지 않도록 soft-fail
+            logger.warning("company profile commit failed; retry without zip_code", exc_info=True)
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            if "zip_code" not in data:
+                raise
+            payload2 = {k: v for k, v in data.items() if k != "zip_code"}
+            company = get_company_or_404(db, company.id)
+            return update_company_profile(db, company, payload2, commit=commit)
     return {
         "ok": True,
         "id": company.id,
@@ -297,11 +358,24 @@ def create_site(db: Session, company_id: int, payload: Dict[str, Any]) -> Compan
         created_at=now,
         updated_at=now,
     )
+    if hasattr(row, "zip_code") and "zip_code" in payload:
+        row.zip_code = payload.get("zip_code")
     if not row.site_name:
         raise HTTPException(status_code=422, detail="사업장명을 입력하세요.")
     db.add(row)
-    db.commit()
-    db.refresh(row)
+    try:
+        db.commit()
+        db.refresh(row)
+    except (ProgrammingError, OperationalError):
+        logger.warning("create_site commit failed; retry without zip_code", exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        if "zip_code" not in payload:
+            raise
+        payload2 = {k: v for k, v in payload.items() if k != "zip_code"}
+        return create_site(db, company_id, payload2)
     return row
 
 
@@ -316,12 +390,26 @@ def update_site(db: Session, company_id: int, site_id: int, payload: Dict[str, A
     for k, v in payload.items():
         if k == "is_main":
             continue
+        if k == "zip_code" and not hasattr(row, "zip_code"):
+            continue
         if k == "site_name" and v is not None:
             v = str(v).strip()
-        setattr(row, k, v)
+        if hasattr(row, k):
+            setattr(row, k, v)
     row.updated_at = datetime.now()
-    db.commit()
-    db.refresh(row)
+    try:
+        db.commit()
+        db.refresh(row)
+    except (ProgrammingError, OperationalError):
+        logger.warning("update_site commit failed; retry without zip_code", exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        if "zip_code" not in payload:
+            raise
+        payload2 = {k: v for k, v in payload.items() if k != "zip_code"}
+        return update_site(db, company_id, site_id, payload2)
     return row
 
 

@@ -51,6 +51,9 @@ class Contracts(Base):
     report_issued_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     cert_issued_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     cert_expiry_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    cancelled_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, comment="인증/계약 취소 시각"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     contract_type: Mapped[str] = mapped_column(String(50), nullable=False)

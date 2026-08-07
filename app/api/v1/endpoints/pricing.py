@@ -28,6 +28,7 @@ from app.schemas.pricing import (
     TravelExpensePolicy,
 )
 from app.services.audit_pricing import calculate_audit_pricing
+from app.services.cb_md_rate import resolve_cb_md_rate
 
 
 router = APIRouter(prefix="/pricing", tags=["Pricing"])
@@ -276,7 +277,13 @@ def post_calculate_audit_pricing(
     payload: CostCalculationInput,
     db: Session = Depends(get_db),
 ):
-    """심사비·출장비·부가세 통합 산출."""
+    """심사비·출장비·부가세 통합 산출.
+
+    cbId가 있으면 MD 단가 fallback:
+      1) cb_standard_accreditations.md_rate
+      2) cb_contracts.price_per_md
+      3) standard_price_masters / catalog
+    """
     ensure_pricing_schema(db)
     if db.query(TravelExpensePolicyRow.region_code).first() is None:
         seed_from_catalog(db)
@@ -325,6 +332,14 @@ def post_calculate_audit_pricing(
                 "isActive": cat.is_active,
             }
         )
+
+    # Scope-level CB MD rate overrides catalog when cb_id present
+    if payload.cb_id:
+        scope_rate = resolve_cb_md_rate(db, int(payload.cb_id), payload.standard_code)
+        if scope_rate and scope_rate > 0:
+            price_master = price_master.model_copy(
+                update={"base_price_per_md": float(scope_rate)}
+            )
 
     travel_row = db.get(TravelExpensePolicyRow, payload.region_code)
     if travel_row and travel_row.is_active:

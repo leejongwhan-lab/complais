@@ -69,6 +69,8 @@ class CostCalculationInput(BaseModel):
     requires_accommodation: bool = Field(..., alias="requiresAccommodation")
     accommodation_nights: int = Field(0, alias="accommodationNights")
     discounts: List[DiscountPolicy] = Field(default_factory=list)
+    # CB 지정 시: scope md_rate → cb_contracts.price_per_md → catalog 순
+    cb_id: Optional[int] = Field(None, alias="cbId")
 
     class Config:
         populate_by_name = True

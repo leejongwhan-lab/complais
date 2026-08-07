@@ -18,14 +18,18 @@ from app.api.v1.endpoints import (
     cb_admin,
     cb_auditors,
     cb_entities,
+    cb_operations,
+    cb_portal,
     cb_profile,
     cb_qualifications,
+    cb_cert_applications,
     cert_contracts,
     certification_applications,
     client,
     companies,
     contracts,
     enterprise_audit_applications,
+    enterprise_cert_applications,
     enterprise_portal,
     esg_master_kpis,
     mappings,
@@ -43,6 +47,8 @@ api_router.include_router(admin_companies.router)
 api_router.include_router(admin_auditors.router)
 api_router.include_router(admin_cb.router)
 api_router.include_router(certification_applications.router)
+api_router.include_router(enterprise_cert_applications.router)
+api_router.include_router(cb_cert_applications.router)
 api_router.include_router(client.router)
 api_router.include_router(audit_request.router)
 api_router.include_router(enterprise_portal.router)
@@ -58,6 +64,8 @@ api_router.include_router(md_adjustments.router)
 api_router.include_router(pricing.router)
 api_router.include_router(proposals.router)
 api_router.include_router(cb_admin.router)
+api_router.include_router(cb_portal.router)
+api_router.include_router(cb_operations.router)
 api_router.include_router(contracts.router)
 api_router.include_router(assignments.router)
 api_router.include_router(auditors.router)

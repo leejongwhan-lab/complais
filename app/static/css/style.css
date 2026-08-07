@@ -196,16 +196,7 @@ img {
   box-shadow: var(--admin-shadow);
 }
 
-/* Admin list surfaces: open layout — no nested white boxes around tables/KPIs */
-body.admin-page .grid-cards .card,
-body.admin-page .stat-metric {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  border-radius: 0;
-  padding: 4px 0 12px;
-}
-
+/* List tabs: open layout — no nested white boxes around tables */
 body.admin-page .card.table-responsive,
 body.admin-page .tab-panel > .card:has(> .data-table),
 body.admin-page .tab-panel > .card:has(> table.data-table) {
@@ -214,6 +205,71 @@ body.admin-page .tab-panel > .card:has(> table.data-table) {
   box-shadow: none;
   border-radius: 0;
   padding: 0;
+}
+
+/* Dashboard only: soft metric boxes (lists stay unboxed) */
+body.admin-page #tab-dashboard .stat-metric {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  box-shadow: var(--admin-shadow);
+  border-radius: var(--admin-radius-lg);
+  padding: 20px;
+}
+
+body.admin-page #tab-dashboard .stat-metric.is-pending .card-value {
+  color: var(--admin-faint);
+}
+
+body.admin-page #tab-dashboard .stat-metric.is-clickable {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+body.admin-page #tab-dashboard .stat-metric.is-clickable:hover {
+  border-color: var(--admin-border-strong);
+  box-shadow: 0 0 0 3px var(--admin-primary-soft);
+  background: #f7fbf8;
+}
+
+body.admin-page #tab-dashboard .stat-metric.is-clickable:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+
+body.admin-page #tab-dashboard .monitoring-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  body.admin-page #tab-dashboard .monitoring-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+body.admin-page #tab-dashboard .revenue-total-row {
+  grid-template-columns: minmax(0, 1fr);
+  margin-bottom: 12px;
+}
+
+body.admin-page #tab-dashboard .revenue-total .card-value {
+  font: var(--font-h1);
+}
+
+body.admin-page #tab-dashboard .dashboard-section {
+  margin-top: 8px;
+}
+
+body.admin-page #tab-dashboard .card-hint {
+  margin-top: 6px;
+  font: var(--font-caption);
+  color: var(--admin-faint);
 }
 
 .card-title {
@@ -294,6 +350,18 @@ body.admin-page .tab-panel > .card:has(> table.data-table) {
 .cb-field select:focus {
   border-color: var(--input-border-focus);
   box-shadow: 0 0 0 3px var(--admin-primary-soft);
+}
+
+.org-field input[readonly],
+.org-field textarea[readonly],
+.org-field select:disabled,
+.cb-field input[readonly],
+.cb-field textarea[readonly],
+.cb-field select:disabled {
+  background: var(--admin-success-soft);
+  color: var(--admin-ink);
+  cursor: default;
+  box-shadow: none;
 }
 
 .search-bar button,
@@ -1035,6 +1103,65 @@ body.admin-page .data-table.admin-data-table th {
   gap: 12px 14px;
 }
 
+.cb-detail-box {
+  padding: 14px 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  background: var(--admin-success-soft);
+}
+
+.cb-detail-box .org-section-title {
+  color: var(--admin-primary);
+}
+
+.cb-readonly {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+  color: var(--admin-ink);
+  font: var(--font-body-small);
+  display: flex;
+  align-items: center;
+}
+
+.cb-field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+  color: var(--admin-ink);
+  font: inherit;
+  resize: vertical;
+  min-height: 72px;
+}
+
+.cb-field textarea:focus {
+  outline: none;
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 3px var(--admin-primary-soft);
+}
+
+.modal-dialog-wide {
+  max-width: 720px;
+  width: min(720px, 96vw);
+}
+
+/* 보유 표준 · 인정번호·만료일·MD단가·인증수행범위 — landscape wide (not shared with company/detail) */
+.modal-dialog.cb-held-standards-modal {
+  width: min(1080px, 96vw);
+  max-width: min(1080px, 96vw);
+}
+
+.modal-dialog.cb-held-standards-modal .modal-body,
+.modal-dialog.cb-held-standards-modal .table-responsive,
+.modal-dialog.cb-held-standards-modal #cb-held-table {
+  width: 100%;
+  max-width: none;
+}
+
 @media (max-width: 720px) {
   .cb-field-grid,
   .org-grid,
@@ -1082,4 +1209,756 @@ body.admin-page .data-table.admin-data-table th {
   margin-top: 10px;
   font: var(--font-body-small);
   min-height: 1.2em;
+}
+
+/* --------------------------------------------------------------------------
+   CB Portal — sidebar groups + 2-pane master-detail
+   -------------------------------------------------------------------------- */
+body.cb-portal-page .sidebar-group-label {
+  margin: 14px 4px 6px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--admin-faint);
+  text-transform: none;
+}
+
+body.cb-portal-page .sidebar-footer {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--admin-border);
+}
+
+body.cb-portal-page .cb-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+/* Dashboard rows: one horizontal line per section; scroll on narrow viewports (no wrap) */
+body.cb-portal-page .cb-dash-row {
+  display: grid;
+  gap: 16px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 24px;
+}
+
+body.cb-portal-page .cb-status-cards {
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  grid-auto-flow: column;
+}
+
+body.cb-portal-page .pipeline-cards {
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  grid-auto-flow: column;
+}
+
+body.cb-portal-page .pipeline-cards .pipe-count {
+  font: var(--font-h1);
+  color: var(--admin-primary, #1f6b4a);
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+
+body.cb-portal-page .cb-status-card {
+  min-height: 180px;
+}
+
+body.cb-portal-page .cb-status-block {
+  margin-top: 10px;
+}
+
+body.cb-portal-page .cb-status-label {
+  font: var(--font-caption);
+  color: var(--admin-muted);
+  margin-bottom: 2px;
+}
+
+body.cb-portal-page .cb-status-lines {
+  font: var(--font-body-small);
+  line-height: 1.45;
+}
+
+body.cb-portal-page .cb-status-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+body.cb-portal-page .cb-status-kpi > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+body.cb-portal-page .cb-kpi-label {
+  font: var(--font-caption);
+  color: var(--admin-muted);
+}
+
+body.cb-portal-page .cb-kpi-value {
+  font: var(--font-h3);
+  color: var(--admin-ink, #1a2e24);
+}
+
+/* Keep single-row card grids even when global .grid-cards breakpoints kick in */
+@media (max-width: 960px) {
+  body.cb-portal-page .cb-status-cards {
+    grid-template-columns: repeat(4, minmax(180px, 1fr));
+  }
+  body.cb-portal-page .pipeline-cards {
+    grid-template-columns: repeat(5, minmax(140px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  body.cb-portal-page .cb-status-cards {
+    grid-template-columns: repeat(4, minmax(180px, 1fr));
+  }
+  body.cb-portal-page .pipeline-cards {
+    grid-template-columns: repeat(5, minmax(140px, 1fr));
+  }
+}
+
+body.cb-portal-page .cb-calendar-wrap {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  box-shadow: var(--admin-shadow);
+  padding: 12px 14px 16px;
+}
+
+body.cb-portal-page .cb-calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+body.cb-portal-page .cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+body.cb-portal-page .cal-head {
+  text-align: center;
+  font: var(--font-caption);
+  color: var(--admin-muted);
+  padding: 4px 0;
+}
+
+body.cb-portal-page .cal-cell {
+  min-height: 64px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  padding: 4px;
+  background: #fbfdfb;
+}
+
+body.cb-portal-page .cal-cell.is-empty {
+  background: transparent;
+  border-color: transparent;
+}
+
+body.cb-portal-page .cal-cell.has-events {
+  background: #f3faf5;
+  border-color: var(--admin-border-strong, #c5ddd0);
+}
+
+body.cb-portal-page .cal-day {
+  font-size: 11px;
+  color: var(--admin-muted);
+  margin-bottom: 2px;
+}
+
+body.cb-portal-page .cal-event {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 1px 0;
+  font-size: 10px;
+  line-height: 1.25;
+  color: var(--admin-primary, #1f6b4a);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.cb-portal-page .cal-event:hover {
+  text-decoration: underline;
+}
+
+body.cb-portal-page .cal-more {
+  font-size: 10px;
+  color: var(--admin-faint);
+}
+
+body.cb-portal-page .cb-modal[hidden] {
+  display: none !important;
+}
+
+body.cb-portal-page .cb-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+}
+
+body.cb-portal-page .cb-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 40, 30, 0.35);
+}
+
+body.cb-portal-page .cb-modal-panel {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 92vw);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  box-shadow: var(--admin-shadow);
+  padding: 18px 20px;
+}
+
+body.cb-portal-page .std-perf-box {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  padding: 12px 14px;
+  min-height: 120px;
+}
+
+body.cb-portal-page .std-row,
+body.cb-portal-page .queue-link {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--admin-border);
+  font: var(--font-body-small);
+  color: inherit;
+  text-decoration: none;
+}
+
+body.cb-portal-page .std-row:last-child,
+body.cb-portal-page .queue-link:last-child {
+  border-bottom: 0;
+}
+
+body.cb-portal-page .queue-link:hover {
+  color: var(--admin-primary);
+}
+
+body.cb-portal-page .queue-link .meta {
+  color: var(--admin-faint);
+}
+
+body.cb-portal-page .master-detail {
+  display: grid;
+  grid-template-columns: 35% 65%;
+  gap: 16px;
+  min-height: 420px;
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  body.cb-portal-page .master-detail {
+    grid-template-columns: 1fr;
+  }
+}
+
+body.cb-portal-page .master-pane,
+body.cb-portal-page .detail-pane {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  min-height: 360px;
+}
+
+body.cb-portal-page .master-pane {
+  overflow: auto;
+  padding: 8px;
+}
+
+body.cb-portal-page .detail-pane {
+  padding: 16px 18px;
+}
+
+body.cb-portal-page .master-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+body.cb-portal-page .master-list-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  border-radius: var(--admin-radius);
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--admin-ink);
+}
+
+body.cb-portal-page .master-list-item strong {
+  display: block;
+  font-size: 14px;
+}
+
+body.cb-portal-page .master-list-item small,
+body.cb-portal-page .master-list-item .meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--admin-faint);
+  font-size: 12px;
+}
+
+body.cb-portal-page .master-list-item:hover {
+  background: var(--admin-bg);
+}
+
+body.cb-portal-page .master-list-item.is-active {
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+}
+
+body.cb-portal-page .ops-sub-btn.is-active,
+body.cb-portal-page .ops-scheme-btn.is-active {
+  background: var(--admin-primary);
+  color: #fff;
+  border-color: var(--admin-primary);
+}
+
+body.cb-portal-page .detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+}
+
+body.cb-portal-page .kv-grid {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 8px 12px;
+  margin: 12px 0 18px;
+  font: var(--font-body-small);
+}
+
+body.cb-portal-page .kv-grid dt {
+  color: var(--admin-faint);
+  margin: 0;
+}
+
+body.cb-portal-page .kv-grid dd {
+  margin: 0;
+}
+
+body.cb-portal-page .detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+body.cb-portal-page .detail-actions a.primary,
+body.cb-portal-page .detail-actions button.primary,
+body.cb-portal-page button.primary {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: var(--admin-radius);
+  background: var(--admin-primary);
+  color: #fff;
+  border: 0;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+body.cb-portal-page .detail-actions .btn.ghost,
+body.cb-portal-page a.btn.ghost,
+body.cb-portal-page button.btn.ghost {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: var(--admin-radius);
+  background: #fff;
+  color: var(--admin-primary);
+  border: 1px solid var(--admin-border-strong);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+body.cb-portal-page .hint {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--admin-faint);
+}
+
+body.cb-portal-page .form-label {
+  display: block;
+  margin: 0 0 6px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+body.cb-portal-page textarea.form-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg);
+  resize: vertical;
+}
+
+body.cb-portal-page .muted {
+  color: var(--admin-faint);
+}
+
+/* --------------------------------------------------------------------------
+   Enterprise cert application — standards one-line + aspects
+   -------------------------------------------------------------------------- */
+.std-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px 14px;
+  align-items: center;
+  overflow-x: auto;
+  padding: 8px 4px 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.std-row .std-item {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--admin-ink);
+  padding: 6px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+}
+
+.std-row .std-item:has(input:checked) {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary-soft);
+}
+
+.std-row .std-item input {
+  margin: 0;
+}
+
+.aspect-pre {
+  margin: 0 0 12px;
+  padding: 12px;
+  background: var(--admin-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+body.ent-cert-page .btn-primary,
+body.review-page .btn-primary {
+  background: var(--admin-primary);
+  border-color: var(--admin-primary);
+}
+
+/* --------------------------------------------------------------------------
+   Portal / cert-app form layout (scoped — does not alter admin org tables)
+   Scope: .portal-form, .cert-app-page, body.ent-cert-page, body.review-page,
+          body.register-page
+   -------------------------------------------------------------------------- */
+.portal-form,
+.cert-app-page,
+body.ent-cert-page,
+body.review-page {
+  --pf-label-w: 160px;
+  --pf-ctrl-h: 38px;
+  --pf-bd: var(--bd, var(--gray-line-2, var(--admin-border, #CBD5E1)));
+}
+
+body.register-page {
+  --pf-label-w: 140px;
+  --pf-ctrl-h: 38px;
+  --pf-bd: var(--bd, var(--gray-line-2, var(--admin-border, #CBD5E1)));
+}
+
+.portal-form .form-row,
+.portal-form .ff,
+.portal-form .org-field,
+.portal-form .ep-field,
+.cert-app-page .form-row,
+.cert-app-page .ff,
+.cert-app-page .org-field,
+body.ent-cert-page .form-row,
+body.ent-cert-page .ff,
+body.ent-cert-page .org-field,
+body.review-page .form-row,
+body.review-page .ff,
+body.review-page .org-field,
+body.register-page .form-row,
+body.register-page .ff {
+  display: grid;
+  grid-template-columns: var(--pf-label-w) 1fr;
+  gap: 6px 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.portal-form .form-row > label,
+.portal-form .ff > label,
+.portal-form .org-field > label,
+.portal-form .ep-field > label,
+.cert-app-page .form-row > label,
+.cert-app-page .ff > label,
+.cert-app-page .org-field > label,
+body.ent-cert-page .form-row > label,
+body.ent-cert-page .ff > label,
+body.ent-cert-page .org-field > label,
+body.review-page .form-row > label,
+body.review-page .ff > label,
+body.review-page .org-field > label,
+body.register-page .form-row > label,
+body.register-page .ff > label {
+  grid-column: 1;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--admin-muted, #5A675F);
+  line-height: 1.35;
+}
+
+.portal-form .form-row > :not(label),
+.portal-form .ff > :not(label),
+.portal-form .org-field > :not(label),
+.portal-form .ep-field > :not(label),
+.cert-app-page .form-row > :not(label),
+.cert-app-page .ff > :not(label),
+.cert-app-page .org-field > :not(label),
+body.ent-cert-page .form-row > :not(label),
+body.ent-cert-page .ff > :not(label),
+body.ent-cert-page .org-field > :not(label),
+body.review-page .form-row > :not(label),
+body.review-page .ff > :not(label),
+body.review-page .org-field > :not(label),
+body.register-page .form-row > :not(label),
+body.register-page .ff > :not(label) {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.portal-form .form-row.full,
+.portal-form .ff.full,
+.portal-form .ff.ff-full,
+.portal-form .org-field.full,
+.portal-form .ep-field.ep-full,
+.cert-app-page .ff.full,
+.cert-app-page .ff.ff-full,
+body.ent-cert-page .ff.full,
+body.ent-cert-page .ff.ff-full,
+body.review-page .ff.full,
+body.review-page .ff.ff-full {
+  grid-column: 1 / -1;
+}
+
+.portal-form .form-row:has(textarea),
+.portal-form .ff:has(textarea),
+.portal-form .org-field:has(textarea),
+.portal-form .ep-field:has(textarea),
+.cert-app-page .ff:has(textarea),
+body.ent-cert-page .ff:has(textarea),
+body.review-page .ff:has(textarea) {
+  align-items: start;
+}
+
+.portal-form .form-row input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.portal-form .form-row select,
+.portal-form .ff input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.portal-form .ff select,
+.portal-form .org-field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.portal-form .org-field select,
+.portal-form .ep-field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.portal-form .ep-field select,
+.portal-form .form-input:not(textarea),
+.cert-app-page .ff input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.cert-app-page .ff select,
+.cert-app-page .form-input:not(textarea),
+body.ent-cert-page .ff input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body.ent-cert-page .ff select,
+body.ent-cert-page .form-input:not(textarea),
+body.review-page .ff input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body.review-page .ff select,
+body.review-page .form-input:not(textarea),
+body.register-page .form-row input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body.register-page .form-row select,
+body.register-page .ff input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body.register-page .ff select,
+body.register-page .addr-row input:not([type="checkbox"]):not([type="radio"]),
+.portal-form .addr-row input:not([type="checkbox"]):not([type="radio"]),
+.portal-form .ep-addr-row input:not([type="checkbox"]):not([type="radio"]),
+body.ent-cert-page .addr-row input:not([type="checkbox"]):not([type="radio"]),
+body.review-page .addr-row input:not([type="checkbox"]):not([type="radio"]) {
+  height: var(--pf-ctrl-h);
+  padding: 8px 12px;
+  border: 1px solid var(--pf-bd);
+  border-radius: 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+  width: 100%;
+  background: var(--admin-surface, #fff);
+  color: var(--admin-ink, #1E2A24);
+}
+
+.portal-form .form-row textarea,
+.portal-form .ff textarea,
+.portal-form .org-field textarea,
+.portal-form .ep-field textarea,
+.portal-form textarea.form-input,
+.cert-app-page .ff textarea,
+.cert-app-page textarea.form-input,
+body.ent-cert-page .ff textarea,
+body.ent-cert-page textarea.form-input,
+body.review-page .ff textarea,
+body.review-page textarea.form-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--pf-bd);
+  border-radius: 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+  min-height: 72px;
+  resize: vertical;
+}
+
+.portal-form .radios,
+.portal-form .choice-group,
+.portal-form .check-group,
+.cert-app-page .radios,
+body.ent-cert-page .radios,
+body.review-page .radios,
+body.ent-cert-page .q-row .q-ctrl.radios,
+body.ent-cert-page .std-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+body.ent-cert-page .std-row {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding: 4px 0;
+}
+
+/* Daum/Kakao postcode address group */
+.addr-row,
+.ep-addr-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.addr-row .addr-zip,
+.ep-addr-row .addr-zip {
+  width: 120px;
+  max-width: 40%;
+  flex: 0 0 auto;
+}
+.addr-row .addr-main,
+.ep-addr-row .addr-main {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+.addr-row .btn-postcode,
+.ep-addr-row .btn-postcode,
+button.btn-postcode {
+  flex: 0 0 auto;
+  height: var(--pf-ctrl-h, 38px);
+  white-space: nowrap;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--pf-bd, var(--admin-border, #CBD5E1));
+  background: #fff;
+  color: var(--admin-ink, #1E2A24);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.addr-row .btn-postcode:hover,
+.ep-addr-row .btn-postcode:hover,
+button.btn-postcode:hover {
+  border-color: var(--admin-primary, #2F6B4F);
+  color: var(--admin-primary, #2F6B4F);
+}
+.addr-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.addr-stack > .form-input,
+.addr-stack > input:not(.addr-zip) {
+  width: 100%;
+  box-sizing: border-box;
+}
+.site-row.site-row-addr {
+  grid-template-columns: 1.1fr 90px 1.2fr auto 0.9fr 1fr 0.55fr auto;
+  align-items: stretch;
+}
+.site-row.site-row-addr .btn-postcode {
+  padding: 8px 10px;
+  align-self: center;
+}
+@media (max-width: 960px) {
+  .site-row.site-row-addr {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .portal-form .form-row,
+  .portal-form .ff,
+  .portal-form .org-field,
+  .portal-form .ep-field,
+  .cert-app-page .ff,
+  body.ent-cert-page .ff,
+  body.review-page .ff,
+  body.register-page .form-row,
+  body.register-page .ff {
+    grid-template-columns: 1fr;
+  }
+  .portal-form .form-row > label,
+  .portal-form .ff > label,
+  .portal-form .org-field > label,
+  .portal-form .ep-field > label,
+  .cert-app-page .ff > label,
+  body.ent-cert-page .ff > label,
+  body.review-page .ff > label,
+  body.register-page .form-row > label,
+  body.register-page .ff > label {
+    margin-bottom: 2px;
+  }
 }

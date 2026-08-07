@@ -30,6 +30,7 @@ from app.schemas.cb_admin import (
 from app.schemas.company import CompanyCreate, CompanyResponse
 from app.services.cb_admin import CBAdminService
 from app.services.md_calculator import MDCalculatorService
+from app.services.scope_expiry import enforce_scope_not_expired
 
 router = APIRouter(prefix="/cb-admin", tags=["CB Admin Dashboard"])
 
@@ -526,6 +527,8 @@ def approve_application(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"CB 인정범위에 포함되지 않은 표준: {', '.join(missing)}",
             )
+        # Domain 3: 인정만료 경과 시 제안(승인→PROPOSED) 차단
+        enforce_scope_not_expired(db, int(eapp.cb_id), [str(s) for s in standards])
 
     now = datetime.now(timezone.utc)
     if application is not None:

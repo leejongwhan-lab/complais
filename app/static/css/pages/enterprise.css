@@ -673,8 +673,37 @@ button.btn-navy:hover { background: #16304f; }
   gap: 8px;
   align-items: center;
 }
+.site-row.site-row-addr {
+  grid-template-columns: 1.1fr 90px 1.2fr auto 0.9fr 1fr 0.55fr auto;
+}
+.site-row.site-row-addr .btn-postcode {
+  padding: 8px 10px;
+  white-space: nowrap;
+}
 @media (max-width: 800px) {
-  .ep-grid-2, .ep-grid-3, .site-row { grid-template-columns: 1fr; }
+  .ep-grid-2, .ep-grid-3, .site-row, .site-row.site-row-addr { grid-template-columns: 1fr; }
+}
+/* Address row: shared with style.css `.addr-row` / `.ep-addr-row` */
+.ep-addr-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.ep-addr-row .addr-zip { width: 120px; flex: 0 0 auto; }
+.ep-addr-row .addr-main { flex: 1 1 220px; min-width: 160px; }
+.ep-addr-row .btn-postcode {
+  flex: 0 0 auto;
+  height: 38px;
+  white-space: nowrap;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--gray-line-2, #CBD5E1);
+  background: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  box-sizing: border-box;
 }
 
 /* Cert status */
@@ -805,4 +834,41 @@ button.btn-navy:hover { background: #16304f; }
   margin-top: 4px;
   padding: 5px 8px;
   font-size: 0.75rem;
+}
+
+/* Admin shell alignment (enterprise uses admin-sidebar + admin-main) */
+body.enterprise-portal-page .admin-main {
+  min-width: 0;
+}
+body.enterprise-portal-page .ep-field input,
+body.enterprise-portal-page .ep-field select,
+body.enterprise-portal-page .ep-field textarea,
+body.enterprise-portal-page .field input,
+body.enterprise-portal-page .field select,
+body.enterprise-portal-page .field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--admin-border, #E8ECE9);
+  border-radius: var(--admin-radius, 8px);
+  padding: 8px 10px;
+  font: inherit;
+  background: var(--admin-surface, #fff);
+  color: var(--admin-ink, #1E2A24);
+}
+body.enterprise-portal-page .ep-field input:focus,
+body.enterprise-portal-page .ep-field select:focus,
+body.enterprise-portal-page .ep-field textarea:focus,
+body.enterprise-portal-page .field input:focus,
+body.enterprise-portal-page .field select:focus,
+body.enterprise-portal-page .field textarea:focus {
+  outline: none;
+  border-color: var(--admin-primary, #2F6B4F);
+  box-shadow: 0 0 0 3px var(--admin-primary-soft, rgba(47, 107, 79, 0.15));
+}
+body.enterprise-portal-page .card {
+  background: var(--admin-surface, #fff);
+  border: 1px solid var(--admin-border, #E8ECE9);
+  border-radius: var(--admin-radius-lg, 12px);
+  padding: 16px 18px;
+  margin-bottom: 14px;
 }

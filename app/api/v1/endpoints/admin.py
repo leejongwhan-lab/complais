@@ -6,11 +6,14 @@ CB 인정서/인정 범위 승인·반려, 플랫폼 동적 계산식(MD/탄소�
 CB(인증원) 단위 데이터 격리 대상이 아니므로 `get_current_admin_user`(JWT + platform_admin)
 로 접근을 제한한다.
 """
+import json
+import logging
 from datetime import datetime
-from typing import List, Optional
+from decimal import Decimal
+from typing import Dict, List, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,16 +26,23 @@ from app.models.admin import (
     CBTier,
     PlatformCalculationRule,
 )
+from app.models.audit import AuditAssignments
 from app.models.auditor import Auditor
 from app.models.cb import CertificationBodies, CbAccreditationScopes
 from app.models.company import Companies
 from app.models.certification_body import CbAccreditationScope, CbStandardAccreditation
+from app.models.contract import Contracts
 from app.models.standard import StandardMaster
 from app.data.standards_catalog import held_standards_as_initials
+from app.services.name_masking import mask_auditor_name, mask_company_name
 from app.schemas.admin import (
     AccreditationActionResponse,
     AccreditationRejectRequest,
     AdminDashboardStats,
+    AdminMonitoringActiveAuditor,
+    AdminMonitoringOngoingAudit,
+    AdminMonitoringResponse,
+    AdminPlatformRevenue,
     CalculationRuleUpdateResponse,
     CBAccreditationRecordCreate,
     CBAccreditationRecordListResponse,
@@ -44,6 +54,39 @@ from app.schemas.admin import (
     PlatformCalculationRuleUpdate,
 )
 from app.services.cb_billing import ensure_default_cb_contract
+
+logger = logging.getLogger(__name__)
+
+# 진행 중으로 보는 계약 상태 (대소문자 혼용 대비)
+_ONGOING_CONTRACT_STATUSES = {
+    "scheduled",
+    "in_progress",
+    "note_submitted",
+    "report_ready",
+}
+
+_AUDIT_TYPE_LABELS = {
+    "initial": "최초",
+    "surveillance": "사후",
+    "surveillance1": "사후1",
+    "surveillance2": "사후2",
+    "recertification": "갱신",
+    "renewal": "갱신",
+    "special": "특별",
+    "transfer": "이전",
+}
+
+_AUDIT_FORM_LABELS = {
+    "single": "단일",
+    "integrated": "통합",
+}
+
+_ACTIVE_ASSIGNMENT_STATUSES = {
+    "assigned",
+    "confirmed",
+    "in_progress",
+    "active",
+}
 
 router = APIRouter(prefix="/admin", tags=["Platform Admin"])
 
@@ -259,18 +302,324 @@ def get_admin_stats(
     db: Session = Depends(get_db),
     admin: CurrentUser = Depends(get_current_admin_user),
 ) -> AdminDashboardStats:
-    """플랫폼 현황 카드용 집계."""
+    """플랫폼 현황 카드용 집계. 개별 집계 실패 시 0으로 폴백."""
+    def _safe_count(label: str, fn) -> int:
+        try:
+            return int(fn() or 0)
+        except Exception:
+            logger.exception("admin stats %s failed; using 0", label)
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            return 0
+
     return AdminDashboardStats(
-        cb_count=db.query(func.count(CertificationBodies.id)).scalar() or 0,
-        company_count=db.query(func.count(Companies.id)).scalar() or 0,
-        auditor_count=db.query(func.count(Auditor.id)).scalar() or 0,
-        pending_accreditation_count=(
-            db.query(func.count(CBAccreditation.id))
-            .filter(CBAccreditation.status == CBAccreditationStatus.PENDING.value)
-            .scalar()
-            or 0
+        cb_count=_safe_count(
+            "cb_count",
+            lambda: db.query(func.count(CertificationBodies.id)).scalar(),
+        ),
+        company_count=_safe_count(
+            "company_count",
+            lambda: db.query(func.count(Companies.id)).scalar(),
+        ),
+        auditor_count=_safe_count(
+            "auditor_count",
+            lambda: db.query(func.count(Auditor.id)).scalar(),
+        ),
+        pending_accreditation_count=_safe_count(
+            "pending_accreditation_count",
+            lambda: (
+                db.query(func.count(CBAccreditation.id))
+                .filter(CBAccreditation.status == CBAccreditationStatus.PENDING.value)
+                .scalar()
+            ),
         ),
     )
+
+
+def _empty_revenue() -> AdminPlatformRevenue:
+    zero = Decimal("0")
+    return AdminPlatformRevenue(
+        total=zero,
+        cb_subscription=zero,
+        consulting_subscription=zero,
+        education_matching_ads=zero,
+        company_promotion_fees=zero,
+        currency="KRW",
+    )
+
+
+@router.get("/revenue", response_model=AdminPlatformRevenue)
+def get_admin_revenue(
+    db: Session = Depends(get_db),
+    admin: CurrentUser = Depends(get_current_admin_user),
+) -> AdminPlatformRevenue:
+    """플랫폼 매출 계정별 집계.
+
+    인증기관 구독료: 당해 연도(UTC) active 계약의 `annual_base_fee` 합계.
+    CB 조건: status='정상' 또는 status NULL & is_active.
+    나머지 계정(컨설팅/교육매칭/기업홍보)은 준비중 — 0 고정.
+    테이블·스키마 오류 시 0으로 폴백해 대시보드가 깨지지 않게 한다.
+    """
+    try:
+        year = datetime.utcnow().year
+        raw = (
+            db.query(func.coalesce(func.sum(CBContract.annual_base_fee), 0))
+            .join(CertificationBodies, CertificationBodies.id == CBContract.cb_id)
+            .filter(
+                CBContract.is_active.is_(True),
+                CBContract.contract_year == year,
+                or_(
+                    CertificationBodies.status == "정상",
+                    and_(
+                        CertificationBodies.status.is_(None),
+                        CertificationBodies.is_active.is_(True),
+                    ),
+                ),
+            )
+            .scalar()
+        )
+        cb_subscription = Decimal(str(raw or 0))
+        consulting = Decimal("0")
+        education = Decimal("0")
+        company_promo = Decimal("0")
+        return AdminPlatformRevenue(
+            total=cb_subscription + consulting + education + company_promo,
+            cb_subscription=cb_subscription,
+            consulting_subscription=consulting,
+            education_matching_ads=education,
+            company_promotion_fees=company_promo,
+            currency="KRW",
+        )
+    except Exception:
+        logger.exception("admin revenue query failed; returning empty payload")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return _empty_revenue()
+
+
+def _label_audit_type(raw: Optional[str]) -> str:
+    if not raw:
+        return ""
+    key = str(raw).strip()
+    return _AUDIT_TYPE_LABELS.get(key.lower(), key)
+
+
+def _label_audit_form(raw: Optional[str]) -> str:
+    if not raw:
+        return ""
+    key = str(raw).strip()
+    return _AUDIT_FORM_LABELS.get(key.lower(), key)
+
+
+def _parse_id_list(raw: Optional[str]) -> List[int]:
+    """member_auditor_ids / observer_ids — JSON 배열 또는 콤마구분."""
+    if not raw:
+        return []
+    text = str(raw).strip()
+    if not text:
+        return []
+    ids: List[int] = []
+    if text.startswith("["):
+        try:
+            data = json.loads(text)
+            if isinstance(data, list):
+                for item in data:
+                    try:
+                        ids.append(int(item))
+                    except (TypeError, ValueError):
+                        continue
+                return ids
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
+    for part in text.replace(";", ",").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            ids.append(int(part))
+        except ValueError:
+            continue
+    return ids
+
+
+def _normalize_assignment_role(raw: Optional[str]) -> Optional[str]:
+    """역할 → lead|member|observer|tech_expert."""
+    if not raw:
+        return None
+    key = str(raw).strip().lower().replace("-", "_").replace(" ", "_")
+    if key in {"lead", "team_lead", "team_leader", "lead_auditor", "심사팀장", "팀장"}:
+        return "lead"
+    if key in {"member", "auditor", "팀원", "심사원"}:
+        return "member"
+    if key in {"observer", "참관", "참관인"}:
+        return "observer"
+    if key in {"expert", "tech_expert", "technical_expert", "기술전문가", "witness"}:
+        return "tech_expert"
+    return None
+
+
+def _empty_monitoring() -> AdminMonitoringResponse:
+    return AdminMonitoringResponse(
+        ongoing_audits_count=0,
+        active_auditors_count=0,
+        ongoing_audits=[],
+        active_auditors=[],
+    )
+
+
+def _build_monitoring(db: Session) -> AdminMonitoringResponse:
+    """contracts + audit_assignments 읽기 전용 집계.
+
+    테이블/스키마 드리프트 시 호출측에서 빈 응답으로 폴백한다.
+    """
+    status_expr = func.lower(Contracts.status)
+    ongoing_rows = (
+        db.query(
+            Contracts.id,
+            Contracts.company_id,
+            Companies.name.label("company_name"),
+            Contracts.standards,
+            Contracts.audit_type,
+            Contracts.audit_mode,
+            Contracts.lead_auditor_id,
+            Contracts.member_auditor_ids,
+            Contracts.observer_ids,
+            Contracts.verifier_auditor_id,
+        )
+        .outerjoin(Companies, Companies.id == Contracts.company_id)
+        .filter(status_expr.in_(sorted(_ONGOING_CONTRACT_STATUSES)))
+        .order_by(Contracts.updated_at.desc(), Contracts.id.desc())
+        .all()
+    )
+
+    ongoing_audits: List[AdminMonitoringOngoingAudit] = []
+    ongoing_contract_ids: List[int] = []
+    for row in ongoing_rows:
+        ongoing_contract_ids.append(int(row.id))
+        standards = (row.standards or "").strip()
+        ongoing_audits.append(
+            AdminMonitoringOngoingAudit(
+                company_name=mask_company_name((row.company_name or "").strip()),
+                standard=standards,
+                audit_type=_label_audit_type(row.audit_type),
+                audit_form=_label_audit_form(row.audit_mode),
+            )
+        )
+
+    # auditor_id -> role flags
+    role_map: Dict[int, Set[str]] = {}
+
+    def _mark(auditor_id: Optional[int], role: Optional[str]) -> None:
+        if not auditor_id or not role:
+            return
+        try:
+            aid = int(auditor_id)
+        except (TypeError, ValueError):
+            return
+        role_map.setdefault(aid, set()).add(role)
+
+    assignment_used = False
+    if ongoing_contract_ids:
+        assign_rows = (
+            db.query(
+                AuditAssignments.auditor_id,
+                AuditAssignments.auditor_user_id,
+                AuditAssignments.role,
+                AuditAssignments.assignment_role,
+                AuditAssignments.status,
+                AuditAssignments.completed_at,
+                AuditAssignments.contract_id,
+            )
+            .filter(AuditAssignments.contract_id.in_(ongoing_contract_ids))
+            .all()
+        )
+        for a in assign_rows:
+            st = (a.status or "").strip().lower()
+            if a.completed_at is not None:
+                continue
+            if st and st not in _ACTIVE_ASSIGNMENT_STATUSES and st not in {"", "pending"}:
+                # completed/declined 등은 제외; 상태 비어있으면 포함
+                if st in {"completed", "declined", "cancelled", "canceled", "rejected"}:
+                    continue
+            role = _normalize_assignment_role(a.assignment_role) or _normalize_assignment_role(a.role)
+            aid = a.auditor_id
+            if aid is None and a.auditor_user_id:
+                # auditor_user_id → auditors.user_id 매핑
+                linked = (
+                    db.query(Auditor.id)
+                    .filter(Auditor.user_id == a.auditor_user_id)
+                    .first()
+                )
+                aid = linked[0] if linked else None
+            if role:
+                _mark(aid, role)
+                assignment_used = True
+
+    if not assignment_used:
+        for row in ongoing_rows:
+            _mark(row.lead_auditor_id, "lead")
+            for mid in _parse_id_list(row.member_auditor_ids):
+                _mark(mid, "member")
+            for oid in _parse_id_list(row.observer_ids):
+                _mark(oid, "observer")
+            # verifier는 기술전문가 후보로만 사용 (별도 tech 컬럼 부재)
+            _mark(row.verifier_auditor_id, "tech_expert")
+
+    active_auditors: List[AdminMonitoringActiveAuditor] = []
+    if role_map:
+        auditor_ids = sorted(role_map.keys())
+        name_rows = (
+            db.query(Auditor.id, Auditor.name)
+            .filter(Auditor.id.in_(auditor_ids))
+            .all()
+        )
+        names = {int(r.id): (r.name or "").strip() for r in name_rows}
+        for aid in auditor_ids:
+            roles = role_map.get(aid) or set()
+            raw_name = names.get(aid) or ""
+            active_auditors.append(
+                AdminMonitoringActiveAuditor(
+                    auditor_name=mask_auditor_name(raw_name) or f"#{aid}",
+                    role_lead="팀장" if "lead" in roles else "",
+                    role_member="팀원" if "member" in roles else "",
+                    role_observer="참관" if "observer" in roles else "",
+                    role_tech_expert="기술전문가" if "tech_expert" in roles else "",
+                )
+            )
+        active_auditors.sort(key=lambda x: x.auditor_name)
+
+    return AdminMonitoringResponse(
+        ongoing_audits_count=len(ongoing_audits),
+        active_auditors_count=len(active_auditors),
+        ongoing_audits=ongoing_audits,
+        active_auditors=active_auditors,
+    )
+
+
+@router.get("/monitoring", response_model=AdminMonitoringResponse)
+def get_admin_monitoring(
+    db: Session = Depends(get_db),
+    admin: CurrentUser = Depends(get_current_admin_user),
+) -> AdminMonitoringResponse:
+    """실시간 모니터링 — 진행 중 심사 / 활동 중 심사원 (읽기 전용).
+
+    `contracts`(진행 상태) + `audit_assignments`를 조회한다.
+    배정 행이 없으면 계약의 lead/member/observer/verifier 필드로 폴백.
+    테이블·스키마 오류 시 빈 목록(0)을 반환해 대시보드가 깨지지 않게 한다.
+    """
+    try:
+        return _build_monitoring(db)
+    except Exception:
+        logger.exception("admin monitoring query failed; returning empty payload")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return _empty_monitoring()
 
 
 # 1. CB 인정서 및 인정 범위 승인/반려 API

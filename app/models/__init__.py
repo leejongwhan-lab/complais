@@ -13,6 +13,7 @@ from app.models.certification import *  # noqa: F403
 from app.models.certification_body import *  # noqa: F403
 from app.models.client import *  # noqa: F403
 from app.models.company import *  # noqa: F403
+from app.models.company_aspects import *  # noqa: F403
 from app.models.contract import *  # noqa: F403
 from app.models.edu import *  # noqa: F403
 from app.models.esg import *  # noqa: F403
@@ -26,3 +27,4 @@ from app.models.pricing import *  # noqa: F403
 from app.models.proposal_flow import *  # noqa: F403
 from app.models.standard import *  # noqa: F403
 from app.models.subscription import *  # noqa: F403
+from app.models.witnessing import *  # noqa: F403

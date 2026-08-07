@@ -37,6 +37,7 @@ from app.services.md_calculator import (
     map_engine_atype_to_api,
     normalize_standard_code,
 )
+from app.services.scope_expiry import enforce_scope_not_expired
 
 router = APIRouter(prefix="/enterprise-audit-applications", tags=["Enterprise Audit Applications (MD)"])
 
@@ -381,6 +382,12 @@ def cb_review_application(
                 status_code=400,
                 detail=f"상태 전이 불가: {row.status} → {new_status}",
             )
+        # Domain 3: PROPOSED(제안 송부) 전이 시 인정만료 잠금
+        if new_status == "PROPOSED" and new_status != row.status:
+            standards = row.applied_standards or []
+            if isinstance(standards, str):
+                standards = [standards]
+            enforce_scope_not_expired(db, int(row.cb_id), [str(s) for s in standards])
         row.status = new_status
 
     row.updated_at = datetime.utcnow()

@@ -2,19 +2,1624 @@
 <html lang="ko">
 <head>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-
-<meta charset="UTF-8" />
-  <meta http-equiv="refresh" content="0; url=/enterprise/dashboard" />
-  <title>Redirecting…</title>
-
-<link rel="stylesheet" href="/static/css/main.css" />
-  <link rel="stylesheet" href="/static/css/components/sidebar.css" />
-  <link rel="stylesheet" href="/static/css/pages/enterprise.css" />
-  <link rel="stylesheet" href="/static/css/portal.css" />
-
-  <script>location.replace("/enterprise/dashboard");</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>기업 포털 - complAIs</title>
+  <link rel="stylesheet" href="/static/css/main.css?v=20260807hs">
+  <link rel="stylesheet" href="/static/css/portal.css?v=20260807hs">
+  <link rel="stylesheet" href="/static/css/pages/enterprise.css?v=20260807hs">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260807hs">
+  <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  <script src="/static/js/daum_postcode.js?v=20260807hs"></script>
 </head>
-<body class="portal-page">
-  <p><a href="/enterprise/dashboard">기업 포털로 이동</a></p>
+<body class="portal-page admin-page enterprise-portal-page">
+  <aside class="admin-sidebar">
+    <div class="brand-lockup" style="margin-bottom:14px;padding:6px 4px;">
+      <a href="/enterprise">
+        <img src="/static/brand/complais-logo.png" alt="complAIs" class="brand-logo brand-logo-md" />
+      </a>
+    </div>
+    <div class="sidebar-profile" id="sidebar-profile" aria-live="polite" style="padding:0 4px 12px;">
+      <p class="sidebar-profile-name" id="sidebar-company-name" style="margin:0;font-weight:700;">기업 정보 로딩…</p>
+      <p class="sidebar-profile-code muted" id="sidebar-company-code" style="margin:2px 0 8px;font-size:12px;"></p>
+      <p class="muted" style="margin:0 0 4px;font-size:11px;">보유 표준</p>
+      <div class="sidebar-badges" id="sidebar-held-badges">
+        <span class="sidebar-badge empty">조회 중</span>
+      </div>
+      <p class="muted" style="margin:8px 0 4px;font-size:11px;">기타 인증</p>
+      <div class="sidebar-badges" id="sidebar-other-badges">
+        <span class="sidebar-badge empty">조회 중</span>
+      </div>
+    </div>
+    <nav>
+      <div class="sidebar-group-label">개요</div>
+      <ul class="sidebar-menu">
+        <li><a href="#" class="sidebar-menu-item side-link" data-panel="dashboard">대시보드</a></li>
+        <li><a href="#" class="sidebar-menu-item side-link active" data-panel="company">기업정보</a></li>
+      </ul>
+      <div class="sidebar-group-label">인증 관리</div>
+      <ul class="sidebar-menu">
+        <li><a href="#" class="sidebar-menu-item side-link" data-panel="cert">인증현황</a></li>
+        <li><a href="/enterprise/cert-application" class="sidebar-menu-item">인증신청</a></li>
+        <li><a href="#" class="sidebar-menu-item side-link" data-panel="archive">결과보관함</a></li>
+        <li><a href="#" class="sidebar-menu-item side-link" data-panel="ncr">시정조치 (NCR)</a></li>
+      </ul>
+      <div class="sidebar-group-label">ESG 관리</div>
+      <ul class="sidebar-menu">
+        <li><a href="#" class="sidebar-menu-item side-link" data-panel="esg">ESG관리</a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">
+      <a class="sidebar-menu-item" href="/client_portal.html">설문 신청 포털</a>
+      <a href="#" class="sidebar-menu-item" id="logout-btn">로그아웃</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+      <header class="cb-page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div>
+          <h1 id="page-title" style="font: var(--font-h1); margin: 0;">기업정보</h1>
+          <p class="muted" id="page-sub" style="margin: 6px 0 0;">기업 마스터 · 사업장 · 담당자</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <a class="btn-secondary" id="admin-switch" href="/admin/dashboard">플랫폼 어드민 전환</a>
+        </div>
+      </header>
+
+        <div class="error" id="global-error"></div>
+        <div class="success" id="global-success"></div>
+
+        
+        <section class="card" id="panel-dashboard" style="display:none;">
+          <h2 style="margin:0 0 8px;font:var(--font-h3);">대시보드</h2>
+          <p class="muted" style="margin:0 0 14px;">기업 마스터와 인증·ESG 현황을 한눈에 확인합니다.</p>
+          <dl class="kv" id="dashboard-kv"><dt>불러오는 중…</dt><dd></dd></dl>
+        </section>
+
+        <section class="card portal-form" id="panel-company">
+          <form id="company-form" class="portal-form" autocomplete="off">
+            <div class="ep-section">
+              <div class="ep-section-head">
+                <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>기본 정보</h2>
+              </div>
+              <div class="ep-grid-2">
+                <div class="ep-field">
+                  <label for="f-name">기업명 <span class="req">*</span></label>
+                  <input id="f-name" name="name" required />
+                </div>
+                <div class="ep-field">
+                  <label for="f-biz_no">사업자등록번호 <span class="req">*</span></label>
+                  <input id="f-biz_no" name="biz_no" placeholder="000-00-00000" required />
+                </div>
+                <div class="ep-field">
+                  <label for="f-entity_type">개인/법인 형태</label>
+                  <select id="f-entity_type" name="entity_type">
+                    <option value="">선택</option>
+                    <option value="개인">개인사업자</option>
+                    <option value="법인">법인</option>
+                  </select>
+                </div>
+                <div class="ep-field">
+                  <label for="f-corp_no">법인등록번호</label>
+                  <input id="f-corp_no" name="corp_no" placeholder="000000-0000000" />
+                </div>
+                <div class="ep-field">
+                  <label for="f-name_en">영문 기업명</label>
+                  <input id="f-name_en" name="name_en" />
+                </div>
+                <div class="ep-field">
+                  <label for="f-ceo_name">대표자명 <span class="req">*</span></label>
+                  <input id="f-ceo_name" name="ceo_name" required />
+                </div>
+                <div class="ep-field">
+                  <label for="f-biz_type">업태</label>
+                  <input id="f-biz_type" name="biz_type" />
+                </div>
+                <div class="ep-field">
+                  <label for="f-biz_class">업종</label>
+                  <input id="f-biz_class" name="biz_class" />
+                </div>
+              </div>
+            </div>
+
+            <div class="ep-section">
+              <div class="ep-section-head">
+                <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>인증 수행 범위</h2>
+                <span class="ep-section-note">(ISO 심사 기초 — 인증서에 기재됨)</span>
+              </div>
+              <div class="ep-field ep-full" style="margin-bottom:14px;">
+                <label for="f-scope_kr">인증 수행 범위 (국문) <span class="req">*</span></label>
+                <textarea id="f-scope_kr" name="scope_kr" rows="3" required></textarea>
+                <p class="ep-help">심사기관에 등록되는 공식 인증 범위입니다. 변경 시 인증기관에 사전 통보 필요.</p>
+              </div>
+              <div class="ep-field ep-full">
+                <label for="f-scope_en">인증 수행 범위 (영문) <span class="req">*</span></label>
+                <textarea id="f-scope_en" name="scope_en" rows="3" required></textarea>
+              </div>
+            </div>
+
+            <div class="ep-section">
+              <div class="ep-section-head">
+                <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>주소</h2>
+              </div>
+              <div class="ep-field ep-full" style="margin-bottom:12px;">
+                <label for="f-zip_code">우편번호 / 주소</label>
+                <div class="addr-stack">
+                  <div class="addr-row ep-addr-row">
+                    <input id="f-zip_code" name="zip_code" class="addr-zip" readonly placeholder="우편번호" />
+                    <button type="button" class="btn-postcode"
+                      data-postcode-zip="f-zip_code"
+                      data-postcode-addr="f-address"
+                      data-postcode-detail="f-detail_address"
+                      data-postcode-en="f-address_en">주소 검색</button>
+                  </div>
+                  <input id="f-address" name="address" class="addr-main" readonly placeholder="도로명/지번 주소" />
+                  <input id="f-detail_address" name="detail_address" placeholder="상세주소를 입력하세요" />
+                  <input id="f-address_en" name="address_en" placeholder="우편번호 검색 시 영문 주소가 자동 매핑됩니다." />
+                </div>
+              </div>
+            </div>
+
+            <div class="ep-section">
+              <div class="ep-section-head">
+                <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>연락처</h2>
+              </div>
+              <div class="ep-grid-3">
+                <div class="ep-field"><label for="f-tel">대표 전화</label><input id="f-tel" name="tel" /></div>
+                <div class="ep-field"><label for="f-email">대표 이메일</label><input id="f-email" name="email" type="email" /></div>
+                <div class="ep-field"><label for="f-website">홈페이지</label><input id="f-website" name="website" placeholder="https://" /></div>
+              </div>
+            </div>
+
+            <div class="ep-section">
+              <div class="ep-section-head">
+                <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>인원 현황</h2>
+                <span class="ep-section-note">매년 심사 기준 연도별로 저장됩니다</span>
+              </div>
+              <div class="ep-field" style="max-width:180px;margin-bottom:12px;">
+                <label for="f-headcount_year">기준 연도</label>
+                <select id="f-headcount_year" name="headcount_year"></select>
+              </div>
+              <p class="ep-help" style="margin-top:0;margin-bottom:12px;">인원 수치는 선택한 연도의 스냅샷으로 저장되며, 기업 마스터의 최신 값도 함께 갱신됩니다.</p>
+              <div class="ep-grid-3">
+                <div class="ep-field">
+                  <label for="f-employee_count">본사 인원수</label>
+                  <input id="f-employee_count" name="employee_count" type="number" min="0" />
+                </div>
+                <div class="ep-field">
+                  <label for="f-headcount_outsourced">외부 근무</label>
+                  <input id="f-headcount_outsourced" name="headcount_outsourced" type="number" min="0" />
+                </div>
+                <div class="ep-field">
+                  <label for="f-headcount_regular">정규직</label>
+                  <input id="f-headcount_regular" name="headcount_regular" type="number" min="0" />
+                </div>
+                <div class="ep-field">
+                  <label for="f-headcount_non_regular">비정규직</label>
+                  <input id="f-headcount_non_regular" name="headcount_non_regular" type="number" min="0" />
+                </div>
+                <div class="ep-field">
+                  <label for="f-ksic_code">KSIC 코드</label>
+                  <input id="f-ksic_code" name="ksic_code" />
+                </div>
+                <div class="ep-field">
+                  <label for="f-iaf_code">IAF 코드</label>
+                  <input id="f-iaf_code" name="iaf_code" />
+                </div>
+              </div>
+            </div>
+
+            <div class="ep-actions">
+              <span class="muted" id="company-updated-at"></span>
+              <button type="submit" class="btn-navy" id="company-save-btn">정보 저장</button>
+              <button type="button" class="ghost" id="company-cancel-btn">변경 취소</button>
+            </div>
+          </form>
+
+          <div class="ep-section" style="margin-top:28px;">
+            <div class="ep-section-head">
+              <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>추가사업장 관리 <span class="ep-count" id="site-count">0개소</span></h2>
+              <button type="button" class="btn-navy" id="site-add-btn">+ 사업장 추가</button>
+            </div>
+            <p class="muted" style="margin:0 0 10px;">ISO 심사 범위에 포함되는 추가 사업장 또는 생산현장을 등록하세요. 인증서 범위(Scope)에 자동 반영됩니다.</p>
+            <div id="site-list" class="site-list"></div>
+            <div class="ep-actions"><button type="button" class="btn-navy" id="site-save-btn">사업장 저장</button></div>
+          </div>
+
+          <div class="ep-section">
+            <div class="ep-section-head">
+              <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>부서 및 담당자 관리</h2>
+            </div>
+            <h3 style="margin:0 0 8px;font-size:.92rem;">부서 관리</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+              <input id="dept-input" placeholder="부서명 입력" style="flex:1;min-width:180px;padding:9px 12px;border:1px solid #d8d8d4;border-radius:8px;" />
+              <button type="button" id="dept-add-btn">+ 등록</button>
+            </div>
+            <div class="dept-tags" id="dept-tags"></div>
+            <div class="ep-actions"><button type="button" class="btn-navy" id="dept-save-btn">부서 저장</button></div>
+
+            <div class="ep-section-head" style="margin-top:18px;">
+              <h3 style="margin:0;font-size:.92rem;">담당자 관리</h3>
+              <button type="button" id="contact-add-btn">+ 등록</button>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table contact-table">
+                <thead>
+                  <tr>
+                    <th>권한</th><th>성명</th><th>부서</th><th>직책</th>
+                    <th>전화</th><th>휴대전화</th><th>이메일</th><th></th>
+                  </tr>
+                </thead>
+                <tbody id="contact-tbody"></tbody>
+              </table>
+            </div>
+            <div class="ep-actions"><button type="button" class="btn-navy" id="contact-save-btn">담당자 저장</button></div>
+          </div>
+
+          <div class="ep-section">
+            <div class="ep-section-head">
+              <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>직원 관리</h2>
+            </div>
+            <div class="filter-row">
+              <div class="field grow"><label for="staff-q">이름 검색</label><input id="staff-q" placeholder="이름 검색" /></div>
+              <div class="field"><label>&nbsp;</label><button type="button" class="ghost" id="staff-reload-btn">조회</button></div>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead><tr><th>이름</th><th>역할</th><th>이메일</th><th>전화</th><th>상태</th></tr></thead>
+                <tbody id="staff-user-tbody"><tr><td colspan="5">불러오는 중…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+<section class="card esg-panel" id="panel-esg" style="display:none;">
+          <div class="panel-header">
+            <div>
+              <h2 style="margin:0 0 6px;font:var(--font-h3);">ESG KPI</h2>
+              <p class="muted" style="margin:0;">심사원이 입력하는 KPI와 공공데이터 연동 KPI를 함께 표시합니다.</p>
+            </div>
+            <span class="count-badge">총 <span id="esg-total">0</span>건</span>
+          </div>
+
+          <div class="esg-legend-bar">
+            <div class="esg-legend">
+              <span class="esg-legend-title">데이터 입력 경로</span>
+              <span class="esg-dot-item"><i class="esg-dot public"></i>공공데이터 연동 가능</span>
+              <span class="esg-dot-item"><i class="esg-dot auditor"></i>심사 작성 가능</span>
+              <span class="esg-dot-item"><i class="esg-dot company"></i>기업 직접입력</span>
+            </div>
+            <div class="esg-legend-notes">
+              <span>최근 5개년 추세 · 직접입력은 당해년도만</span>
+              <span class="esg-req-hint"><span class="badge esg-req">필수</span> 기업 공통 외부 지표</span>
+            </div>
+          </div>
+
+          <div class="filter-row">
+            <div class="field">
+              <label for="esg-cat">ESG 영역</label>
+              <select id="esg-cat">
+                <option value="">전체</option>
+                <option value="E">E (환경)</option>
+                <option value="S">S (사회)</option>
+                <option value="G">G (거버넌스)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="esg-mode">입력 경로</label>
+              <select id="esg-mode">
+                <option value="">전체</option>
+                <option value="public">공공데이터</option>
+                <option value="auditor">심사 작성</option>
+                <option value="company">기업 직접입력</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="esg-std">관리 표준 필터</label>
+              <select id="esg-std"><option value="">전체</option></select>
+            </div>
+            <div class="field grow">
+              <label for="esg-q">검색</label>
+              <input id="esg-q" type="text" placeholder="KPI명 · 세부카테고리 · 조항" />
+            </div>
+            <div class="field" style="flex:0 0 auto;">
+              <label for="esg-held-only">&nbsp;</label>
+              <label style="display:inline-flex;align-items:center;gap:6px;font-weight:500;cursor:pointer;">
+                <input type="checkbox" id="esg-held-only" />
+                보유 표준만
+              </label>
+            </div>
+            <div class="field" style="flex:0 0 auto;">
+              <label>&nbsp;</label>
+              <button type="button" id="esg-search-btn">조회</button>
+            </div>
+          </div>
+          <p class="muted" id="esg-meta" style="margin:0 0 10px;"></p>
+          <div class="table-responsive esg-table-wrap">
+            <table class="data-table esg-kpi-table" id="esg-table">
+              <thead id="esg-thead">
+                <tr>
+                  <th class="col-kpi">KPI 지표</th>
+                  <th class="col-path">데이터 경로</th>
+                  <th class="col-unit">단위</th>
+                  <th class="col-year">—</th>
+                  <th class="col-year">—</th>
+                  <th class="col-year">—</th>
+                  <th class="col-year">—</th>
+                  <th class="col-year">—</th>
+                  <th class="col-trend">추세</th>
+                  <th class="col-goal">목표설정</th>
+                  <th class="col-action">입력</th>
+                </tr>
+              </thead>
+              <tbody id="esg-tbody">
+                <tr><td colspan="11">불러오는 중…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination" id="esg-pagination"></div>
+        </section>
+
+        
+
+        <section class="card" id="panel-cert" style="display:none;">
+          <div class="ep-section">
+            <div class="ep-section-head">
+              <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>보유 인증 현황</h2>
+              <button type="button" id="cert-apply-open-btn">+ 인증 신청</button>
+            </div>
+            <div id="held-certs"></div>
+          </div>
+
+          <div class="ep-section">
+            <div class="ep-section-head">
+              <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>인증 신청 관리</h2>
+              <span class="ep-section-note">신청부터 제안서, 계약, 심사, 시정조치까지 한 프로세스에서 확인합니다.</span>
+            </div>
+            <div id="cert-apps"></div>
+          </div>
+
+          <div class="ep-section" id="cert-apply-box" style="display:none;">
+            <div class="ep-section-head">
+              <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>인증 신청 · CB 선택</h2>
+            </div>
+            <p class="muted" style="margin:0 0 12px;">신청 ISO 표준과 기업 IAF를 기준으로 인정범위가 맞는 CB만 표시합니다. (인정번호/AB는 CB 전용)</p>
+            <div class="grid">
+              <div class="field" style="grid-column:1/-1;">
+                <label>신청 ISO 표준</label>
+                <div id="std-checks" style="display:flex;flex-wrap:wrap;gap:10px 14px;"></div>
+              </div>
+              <div class="field">
+                <label>IAF 코드 (비우면 기업 마스터 값)</label>
+                <input id="iaf-override" placeholder="예: 14,29" />
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+              <button type="button" id="load-cbs-btn">신청 가능 CB 조회</button>
+              <a class="btn ghost" href="/client_portal.html">설문 신청 포털</a>
+              <span class="muted" id="cb-meta"></span>
+            </div>
+            <div class="cb-grid" id="cb-grid"><div class="muted">표준을 선택한 뒤 조회하세요.</div></div>
+            <div class="field" style="margin-top:14px;">
+              <label>선택된 CB</label>
+              <input id="selected-cb" readonly placeholder="CB를 선택하세요" />
+            </div>
+          </div>
+        </section>
+
+
+        <section class="card" id="panel-archive" style="display:none;">
+          <div class="ep-section-head">
+            <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>결과보관함</h2>
+          </div>
+          <p class="muted" style="margin:0 0 16px;">계약서, 심사노트, 심사결과보고서, 인증서를 최근 5개년 단위로 보관합니다. 인증기관 심사 흐름에 맞춰 연도별로 확인할 수 있습니다.</p>
+          <div id="archive-years"></div>
+        </section>
+
+        <section class="card" id="panel-ncr" style="display:none;">
+          <h2 style="margin:0 0 8px;font:var(--font-h3);">시정조치 (NCR)</h2>
+          <p class="muted" style="margin:0 0 12px;">개선조치서 작성 및 증빙 제출</p>
+          <button type="button" class="ghost" id="reload-ncr-btn" style="margin-bottom:12px;">NCR 새로고침</button>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>표준/조항</th><th>등급</th><th>지적내용</th><th>상태</th><th>조치</th></tr></thead>
+              <tbody id="ncr-tbody"><tr><td colspan="6">불러오는 중…</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+  </main>
+
+  <div class="drawer-backdrop" id="ncr-backdrop"></div>
+  <aside class="drawer" id="ncr-drawer">
+    <div class="drawer-h">
+      <strong id="ncr-title">개선조치서 작성</strong>
+      <button type="button" class="ghost" id="ncr-close">닫기</button>
+    </div>
+    <div class="drawer-b">
+      <div class="muted" id="ncr-finding" style="margin-bottom:12px;"></div>
+      <div class="field"><label>원인분석</label><textarea id="ncr-cause" rows="3"></textarea></div>
+      <div class="field"><label>즉각시정 *</label><textarea id="ncr-correction" rows="3"></textarea></div>
+      <div class="field"><label>시정조치 계획 *</label><textarea id="ncr-action" rows="4"></textarea></div>
+      <div class="field"><label>증빙 설명</label><input id="ncr-note" /></div>
+      <div class="field"><label>증빙 파일</label><input id="ncr-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.zip" /></div>
+      <div class="error" id="ncr-error"></div>
+    </div>
+    <div class="drawer-f"><button type="button" id="ncr-submit">제출</button></div>
+  </aside>
+
+  <div class="drawer-backdrop" id="esg-backdrop"></div>
+  <aside class="drawer" id="esg-drawer">
+    <div class="drawer-h">
+      <strong id="esg-drawer-title">ESG</strong>
+      <button type="button" class="ghost" id="esg-drawer-close">닫기</button>
+    </div>
+    <div class="drawer-b">
+      <p class="muted" id="esg-drawer-sub" style="margin:0 0 12px;"></p>
+      <div id="esg-drawer-body"></div>
+      <div class="error" id="esg-drawer-error"></div>
+    </div>
+    <div class="drawer-f" id="esg-drawer-footer" style="display:none;">
+      <button type="button" id="esg-drawer-save">저장</button>
+    </div>
+  </aside>
+
+  <script>
+    const API = "/api/v1";
+    const token = localStorage.getItem("access_token");
+    const role = localStorage.getItem("role") || "";
+    if (!token || !["client_admin","client_staff","platform_admin"].includes(role)) {
+      alert("기업 계정 로그인이 필요합니다.");
+      window.location.href = "/login.html";
+    }
+    if (role !== "platform_admin") {
+      document.getElementById("admin-switch").style.display = "none";
+    }
+
+    const PANELS = ["dashboard","company","cert","archive","ncr","esg"];
+    const state = {
+      selectedCbId: null,
+      ncrId: null,
+      companyId: localStorage.getItem("company_id"),
+      availableStandards: [],
+      heldStandards: [],
+      esgPage: 0,
+      esgLimit: 80,
+      esgTotal: 0,
+      esgStdOptionsLoaded: false,
+      esgYears: [],
+      esgCurrentYear: new Date().getFullYear(),
+      esgRowsById: {},
+      esgDrawerMode: null,
+      esgDrawerKpiId: null,
+    };
+    const titles = {
+      dashboard: ["대시보드", "기업 현황 요약"],
+      company: ["기업정보", "기업 마스터 · 사업장 · 담당자"],
+      cert: ["인증현황", "보유 인증 · 신청 프로세스"],
+      archive: ["결과보관함", "최근 5개년 문서 보관"],
+      ncr: ["시정조치 (NCR)", "개선조치서 제출"],
+      esg: ["ESG관리", "공공연동 · 심사노트 · 기업 직접입력 · 최근 5개년"],
+    };
+    const CONTACT_ROLES = ["인증담당","품질담당","환경담당","안전담당","총무","기타"];
+    const orgState = { sites: [], departments: [], contacts: [], companySnapshot: null };
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+    function authHeaders() { return { Authorization: `Bearer ${token}` }; }
+    function setMsg(ok, err) {
+      document.getElementById("global-success").textContent = ok || "";
+      document.getElementById("global-error").textContent = err || "";
+    }
+
+    function switchPanel(name) {
+      if (!PANELS.includes(name)) name = "company";
+      document.querySelectorAll(".side-link[data-panel]").forEach((b) => b.classList.toggle("active", b.dataset.panel === name));
+      PANELS.forEach((p) => {
+        const el = document.getElementById(`panel-${p}`);
+        if (el) el.style.display = p === name ? "block" : "none";
+      });
+      document.querySelector(".admin-main")?.classList.toggle("content-wide", name === "esg");
+      const [t, s] = titles[name] || ["기업 포털", ""];
+      document.getElementById("page-title").textContent = t;
+      document.getElementById("page-sub").textContent = s;
+      if (name === "dashboard" || name === "company") loadCompany();
+      if (name === "company") { loadSites(); loadDepartments(); loadContacts(); loadPortalUsers(); }
+      if (name === "cert") loadCertStatus();
+      if (name === "esg") loadEsgKpis(true);
+      if (name === "archive") loadArchiveByYear();
+      if (name === "ncr") loadNcrs();
+      if (location.hash.replace("#","") !== name) {
+        history.replaceState(null, "", `#${name}`);
+      }
+    }
+    document.querySelectorAll(".side-link[data-panel]").forEach((b) => {
+      b.addEventListener("click", (e) => {
+        e.preventDefault();
+        switchPanel(b.dataset.panel);
+      });
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", (e) => {
+      e.preventDefault();
+      ["access_token","role","user_id","company_id","cb_id"].forEach((k) => localStorage.removeItem(k));
+      window.location.href = "/login";
+    });
+
+    function renderApplyStandards(standards) {
+      const box = document.getElementById("std-checks");
+      const list = standards?.length ? standards : state.availableStandards;
+      if (!list?.length) {
+        box.innerHTML = `<span class="muted">표준 목록을 불러오지 못했습니다.</span>`;
+        return;
+      }
+      box.innerHTML = list.map((s, i) => {
+        const code = s.standard_code || s;
+        const name = s.standard_name || "";
+        const checked = i === 0 ? "checked" : "";
+        return `<label style="display:inline-flex;align-items:center;gap:6px;">
+          <input type="checkbox" value="${esc(code)}" ${checked} />
+          <span>${esc(code)}${name ? ` · ${esc(name)}` : ""}</span>
+        </label>`;
+      }).join("");
+    }
+
+    function heldDisplayLabel(item) {
+      if (item == null) return "";
+      if (typeof item === "string") return item;
+      return (
+        item.label ||
+        [item.initial, item.iso_code, item.name_kr].filter(Boolean).join(" · ") ||
+        item.initial ||
+        item.standard_code ||
+        ""
+      );
+    }
+
+    function heldBadgeText(item) {
+      if (item == null) return "";
+      if (typeof item === "string") {
+        const head = item.split(" · ")[0];
+        return head || item;
+      }
+      return item.initial || heldDisplayLabel(item);
+    }
+
+    function renderSidebarBadges(held, other) {
+      const heldBox = document.getElementById("sidebar-held-badges");
+      const otherBox = document.getElementById("sidebar-other-badges");
+      heldBox.innerHTML = (held || []).length
+        ? held.map((b) => `<span class="sidebar-badge" title="${esc(heldDisplayLabel(b))}">${esc(heldBadgeText(b))}</span>`).join("")
+        : `<span class="sidebar-badge empty">등록된 표준 없음</span>`;
+      otherBox.innerHTML = (other || []).length
+        ? other.map((b) => `<span class="sidebar-badge other">${esc(typeof b === "string" ? b : heldDisplayLabel(b))}</span>`).join("")
+        : `<span class="sidebar-badge empty">기타 인증 없음</span>`;
+    }
+
+    function fillEsgStdOptions(standards) {
+      const sel = document.getElementById("esg-std");
+      const current = sel.value;
+      const opts = [`<option value="">전체</option>`].concat(
+        (standards || []).map((s) => `<option value="${esc(s)}">${esc(s)}</option>`)
+      );
+      sel.innerHTML = opts.join("");
+      if (current && [...sel.options].some((o) => o.value === current)) sel.value = current;
+      state.esgStdOptionsLoaded = true;
+    }
+
+    function fmtYearVal(v) {
+      if (v == null || v === "") return '<span class="esg-empty">-</span>';
+      const n = Number(String(v).replace(/,/g, ""));
+      if (!Number.isNaN(n) && String(v).trim() !== "" && /^-?[\d.,]+%?$/.test(String(v).trim())) {
+        const hasPct = String(v).includes("%");
+        return esc(n.toLocaleString("ko-KR") + (hasPct ? "%" : ""));
+      }
+      return esc(v);
+    }
+
+    function renderTrend(trend) {
+      if (!trend || trend.pct == null) return '<span class="esg-empty">-</span>';
+      const dir = trend.direction || "flat";
+      const arrow = dir === "down" ? "↓" : (dir === "up" ? "↑" : "→");
+      const cls = dir === "down" ? "down" : (dir === "up" ? "up" : "flat");
+      return `<span class="esg-trend ${cls}">${arrow} ${esc(trend.pct)}%</span>`;
+    }
+
+    function renderPathPill(row) {
+      const mode = row.input_mode || "company";
+      const label = row.data_path_label;
+      if (mode === "public" && label) {
+        return `<span class="esg-path-pill"><i class="esg-dot public"></i>${esc(label)}</span>`;
+      }
+      if (mode === "auditor") {
+        return `<span class="esg-path-pill auditor"><i class="esg-dot auditor"></i>심사노트</span>`;
+      }
+      if (mode === "company") {
+        return `<span class="esg-path-pill company"><i class="esg-dot company"></i>직접입력</span>`;
+      }
+      return '<span class="esg-empty">-</span>';
+    }
+
+    function closeEsgDrawer() {
+      document.getElementById("esg-backdrop").classList.remove("show");
+      document.getElementById("esg-drawer").classList.remove("show");
+      state.esgDrawerMode = null;
+      state.esgDrawerKpiId = null;
+      document.getElementById("esg-drawer-error").textContent = "";
+      document.getElementById("esg-drawer-footer").style.display = "none";
+    }
+
+    function openEsgDrawer(title, sub, bodyHtml, { showSave = false } = {}) {
+      document.getElementById("esg-drawer-title").textContent = title;
+      document.getElementById("esg-drawer-sub").textContent = sub || "";
+      document.getElementById("esg-drawer-body").innerHTML = bodyHtml;
+      document.getElementById("esg-drawer-error").textContent = "";
+      document.getElementById("esg-drawer-footer").style.display = showSave ? "flex" : "none";
+      document.getElementById("esg-backdrop").classList.add("show");
+      document.getElementById("esg-drawer").classList.add("show");
+    }
+
+    function openGoalDrawer(kpiId) {
+      const row = state.esgRowsById[kpiId];
+      if (!row) return;
+      state.esgDrawerMode = "goal";
+      state.esgDrawerKpiId = kpiId;
+      const y = row.goal_year || state.esgCurrentYear;
+      openEsgDrawer(
+        "목표설정",
+        `${row.kpi_code} · ${row.kpi_name}`,
+        `<div class="field"><label>목표 연도</label><input id="esg-goal-year" type="number" value="${esc(y)}" /></div>
+         <div class="field"><label>목표값 (${esc(row.unit_format || "-")})</label><input id="esg-goal-value" value="${esc(row.goal_value || "")}" placeholder="목표값 입력" /></div>`,
+        { showSave: true }
+      );
+    }
+
+    async function openNoteDrawer(kpiId) {
+      const row = state.esgRowsById[kpiId];
+      if (!row) return;
+      state.esgDrawerMode = "note";
+      state.esgDrawerKpiId = kpiId;
+      let noteText = "";
+      try {
+        const params = new URLSearchParams();
+        if (role === "platform_admin" && state.companyId) params.set("company_id", String(state.companyId));
+        const res = await fetch(`${API}/user/esg-kpi-audit-notes/${kpiId}?${params}`, {
+          headers: authHeaders(), cache: "no-store",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          noteText = data.note || "";
+        }
+      } catch (_) { /* empty */ }
+      const canEdit = role === "platform_admin";
+      openEsgDrawer(
+        "심사노트",
+        `${row.kpi_code} · ${row.kpi_name}`,
+        canEdit
+          ? `<p class="muted" style="margin:0 0 8px;">심사원이 작성하는 노트입니다. (플랫폼 어드민 스텁 편집)</p>
+             <div class="field"><label>노트</label><textarea id="esg-note-text" rows="8">${esc(noteText)}</textarea></div>`
+          : `<p class="muted" style="margin:0 0 8px;">심사원이 심사노트에서 작성합니다. 기업은 열람만 가능합니다.</p>
+             <div class="esg-note-view">${noteText ? esc(noteText) : "등록된 노트가 없습니다."}</div>`,
+        { showSave: canEdit }
+      );
+    }
+
+    function openCompanyInputDrawer(kpiId) {
+      const row = state.esgRowsById[kpiId];
+      if (!row || !row.can_company_input) return;
+      state.esgDrawerMode = "value";
+      state.esgDrawerKpiId = kpiId;
+      const cy = state.esgCurrentYear;
+      const cur = (row.year_values && row.year_values[String(cy)]) || "";
+      openEsgDrawer(
+        "당해년도 입력",
+        `${row.kpi_code} · ${row.kpi_name} · ${cy}년`,
+        `<p class="muted" style="margin:0 0 8px;">기업 직접입력 KPI만 당해년도 값을 입력할 수 있습니다.</p>
+         <div class="field"><label>값 (${esc(row.unit_format || "-")})</label><input id="esg-value-input" value="${esc(cur)}" placeholder="값 입력" /></div>`,
+        { showSave: true }
+      );
+    }
+
+    document.getElementById("esg-drawer-close").addEventListener("click", closeEsgDrawer);
+    document.getElementById("esg-backdrop").addEventListener("click", closeEsgDrawer);
+    document.getElementById("esg-drawer-save").addEventListener("click", async () => {
+      const err = document.getElementById("esg-drawer-error");
+      err.textContent = "";
+      const kpiId = state.esgDrawerKpiId;
+      if (!kpiId) return;
+      try {
+        if (state.esgDrawerMode === "goal") {
+          const target_year = Number(document.getElementById("esg-goal-year").value);
+          const target_value = document.getElementById("esg-goal-value").value.trim();
+          if (!target_year || !target_value) throw new Error("목표 연도와 목표값을 입력하세요.");
+          const body = { kpi_id: kpiId, target_year, target_value };
+          if (role === "platform_admin" && state.companyId) body.company_id = Number(state.companyId);
+          const res = await fetch(`${API}/user/esg-kpi-goals`, {
+            method: "PUT",
+            headers: { ...authHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `저장 실패 (${res.status})`);
+          setMsg("목표가 저장되었습니다.", "");
+        } else if (state.esgDrawerMode === "value") {
+          const value = document.getElementById("esg-value-input").value.trim();
+          if (!value) throw new Error("값을 입력하세요.");
+          const body = { kpi_id: kpiId, year: state.esgCurrentYear, value };
+          if (role === "platform_admin" && state.companyId) body.company_id = Number(state.companyId);
+          const res = await fetch(`${API}/user/esg-kpi-values`, {
+            method: "PUT",
+            headers: { ...authHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `저장 실패 (${res.status})`);
+          setMsg("당해년도 값이 저장되었습니다.", "");
+        } else if (state.esgDrawerMode === "note") {
+          const note = document.getElementById("esg-note-text").value.trim();
+          if (!note) throw new Error("노트 내용을 입력하세요.");
+          const body = { kpi_id: kpiId, note };
+          if (role === "platform_admin" && state.companyId) body.company_id = Number(state.companyId);
+          const res = await fetch(`${API}/user/esg-kpi-audit-notes`, {
+            method: "PUT",
+            headers: { ...authHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `저장 실패 (${res.status})`);
+          setMsg("심사노트가 저장되었습니다.", "");
+        }
+        closeEsgDrawer();
+        loadEsgKpis(false);
+      } catch (e) {
+        err.textContent = e.message;
+      }
+    });
+
+    
+    function companyQuery() {
+      if (role === "platform_admin" && state.companyId) return `?company_id=${encodeURIComponent(state.companyId)}`;
+      return "";
+    }
+
+    function formatBizNoInput(v) {
+      const d = String(v || "").replace(/\D/g, "").slice(0, 10);
+      if (d.length <= 3) return d;
+      if (d.length <= 5) return `${d.slice(0,3)}-${d.slice(3)}`;
+      return `${d.slice(0,3)}-${d.slice(3,5)}-${d.slice(5)}`;
+    }
+
+    function headcountYearQuery(extraYear) {
+      const base = companyQuery();
+      const yearEl = document.getElementById("f-headcount_year");
+      const year = extraYear || (yearEl && yearEl.value) || "";
+      if (!year) return base;
+      const sep = base.includes("?") ? "&" : "?";
+      return `${base}${sep}headcount_year=${encodeURIComponent(year)}`;
+    }
+
+    function fillHeadcountYearSelect(c) {
+      const sel = document.getElementById("f-headcount_year");
+      if (!sel) return;
+      const current = new Date().getFullYear();
+      const years = Array.isArray(c.headcount_years) && c.headcount_years.length
+        ? [...c.headcount_years]
+        : [current];
+      if (!years.includes(current)) years.unshift(current);
+      const selected = c.headcount_year || current;
+      if (!years.includes(selected)) years.unshift(selected);
+      sel.innerHTML = years.map((y) => `<option value="${y}" ${y === selected ? "selected" : ""}>${y}년</option>`).join("");
+    }
+
+    function fillCompanyForm(c) {
+      orgState.companySnapshot = c;
+      fillHeadcountYearSelect(c);
+      const map = {
+        name: c.name || "",
+        biz_no: c.biz_no || "",
+        entity_type: c.entity_type || "",
+        corp_no: c.corp_no || "",
+        name_en: c.name_en || "",
+        ceo_name: c.ceo_name || "",
+        biz_type: c.biz_type || "",
+        biz_class: c.biz_class || "",
+        scope_kr: c.scope_kr || "",
+        scope_en: c.scope_en || "",
+        address: c.address || "",
+        detail_address: c.detail_address || "",
+        address_en: c.address_en || "",
+        zip_code: c.zip_code || "",
+        tel: c.tel || "",
+        email: c.email || "",
+        website: c.website || "",
+        employee_count: c.employee_count ?? "",
+        headcount_outsourced: c.headcount_outsourced ?? "",
+        headcount_regular: c.headcount_regular ?? "",
+        headcount_non_regular: c.headcount_non_regular ?? "",
+        ksic_code: c.ksic_code || "",
+        iaf_code: c.iaf_code || (c.iaf_codes || []).join(",") || "",
+      };
+      Object.entries(map).forEach(([k, v]) => {
+        const el = document.getElementById(`f-${k}`);
+        if (el) el.value = v;
+      });
+      document.getElementById("company-updated-at").textContent = c.updated_at ? `최종 수정: ${c.updated_at}` : "";
+      document.getElementById("dashboard-kv").innerHTML = `
+        <dt>기업명</dt><dd>${esc(c.name)}</dd>
+        <dt>기업번호</dt><dd>${esc(c.cert_no || c.id)}</dd>
+        <dt>사업자번호</dt><dd>${esc(c.biz_no || "-")}</dd>
+        <dt>대표자</dt><dd>${esc(c.ceo_name || "-")}</dd>
+        <dt>KSIC / IAF</dt><dd>${esc(c.ksic_code || "-")} / ${esc((c.iaf_codes||[]).join(", ") || c.iaf_code || "-")}</dd>
+        <dt>보유 표준</dt><dd>${esc((c.held_standards||[]).map(heldDisplayLabel).filter(Boolean).join(", ") || "-")}</dd>
+        <dt>인원(${esc(c.headcount_year || new Date().getFullYear())})</dt><dd>${esc(c.employee_count ?? "-")}</dd>`;
+    }
+
+    async function loadCompany(opts = {}) {
+      try {
+        const keepYear = opts.keepYear;
+        const yearParam = keepYear ? headcountYearQuery() : companyQuery();
+        const res = await fetch(`${API}/user/company${yearParam}`, { headers: authHeaders(), cache: "no-store" });
+        const c = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof c.detail === "string" ? c.detail : `기업정보 조회 실패 (${res.status})`);
+        state.companyId = c.id;
+        state.availableStandards = c.available_standards || [];
+        state.heldStandards = c.held_standards || [];
+        localStorage.setItem("company_id", String(c.id));
+        document.getElementById("sidebar-company-name").textContent = c.name || "기업명 없음";
+        document.getElementById("sidebar-company-code").textContent = c.cert_no || String(c.id || "");
+        renderSidebarBadges(c.held_standards || [], c.other_certifications || []);
+        fillCompanyForm(c);
+        if ((c.iaf_codes||[]).length && !document.getElementById("iaf-override").value) {
+          document.getElementById("iaf-override").placeholder = c.iaf_codes.join(",");
+        }
+        renderApplyStandards(c.available_standards || []);
+      } catch (e) {
+        document.getElementById("sidebar-company-name").textContent = "기업 정보 없음";
+        document.getElementById("sidebar-company-code").textContent = "";
+        renderSidebarBadges([], []);
+        setMsg("", e.message);
+      }
+    }
+
+    document.getElementById("f-biz_no")?.addEventListener("input", (e) => {
+      e.target.value = formatBizNoInput(e.target.value);
+    });
+
+    document.getElementById("f-headcount_year")?.addEventListener("change", () => {
+      loadCompany({ keepYear: true });
+    });
+
+    document.getElementById("company-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      setMsg("", "");
+      const fields = [
+        "name","biz_no","entity_type","corp_no","name_en","ceo_name","biz_type","biz_class",
+        "scope_kr","scope_en","zip_code","address","detail_address","address_en","tel","email","website",
+        "employee_count","headcount_outsourced","headcount_regular","headcount_non_regular",
+        "ksic_code","iaf_code"
+      ];
+      const body = {};
+      fields.forEach((k) => {
+        const el = document.getElementById(`f-${k}`);
+        if (!el) return;
+        let v = el.value;
+        if (["employee_count","headcount_outsourced","headcount_regular","headcount_non_regular"].includes(k)) {
+          v = v === "" ? null : Number(v);
+        } else {
+          v = v.trim();
+          if (v === "") v = null;
+        }
+        body[k] = v;
+      });
+      const yearEl = document.getElementById("f-headcount_year");
+      body.headcount_year = yearEl && yearEl.value ? Number(yearEl.value) : new Date().getFullYear();
+      if (body.biz_no && !/^\d{3}-\d{2}-\d{5}$/.test(body.biz_no)) {
+        setMsg("", "사업자등록번호 형식이 올바르지 않습니다. (000-00-00000)");
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/user/company${companyQuery()}`, {
+          method: "PUT",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `저장 실패 (${res.status})`);
+        setMsg(`기업정보가 저장되었습니다. (인원현황 ${data.headcount_year || body.headcount_year}년)`, "");
+        loadCompany({ keepYear: true });
+      } catch (err) { setMsg("", err.message); }
+    });
+
+    document.getElementById("company-cancel-btn")?.addEventListener("click", () => {
+      if (orgState.companySnapshot) fillCompanyForm(orgState.companySnapshot);
+      setMsg("변경 사항을 취소했습니다.", "");
+    });
+
+    function renderSites() {
+      const box = document.getElementById("site-list");
+      document.getElementById("site-count").textContent = `${orgState.sites.length}개소`;
+      if (!orgState.sites.length) {
+        box.innerHTML = `<div class="ep-empty">등록된 추가사업장이 없습니다. 본사 외 심사 대상 사업장을 추가하세요.</div>`;
+        return;
+      }
+      box.innerHTML = orgState.sites.map((s, idx) => `
+        <div class="site-row site-row-addr" data-idx="${idx}">
+          <input data-k="site_name" value="${esc(s.site_name || "")}" placeholder="사업장명 *" />
+          <input id="site-zip-${idx}" data-k="zip_code" value="${esc(s.zip_code || "")}" placeholder="우편번호" readonly />
+          <input id="site-addr-${idx}" data-k="address" value="${esc(s.address || "")}" placeholder="주소" readonly />
+          <button type="button" class="btn-postcode"
+            data-postcode-zip="site-zip-${idx}"
+            data-postcode-addr="site-addr-${idx}"
+            data-postcode-detail="site-detail-${idx}"
+            data-postcode-en="site-en-${idx}">주소 검색</button>
+          <input id="site-detail-${idx}" data-k="detail_address" value="${esc(s.detail_address || "")}" placeholder="상세주소" />
+          <input id="site-en-${idx}" data-k="address_en" value="${esc(s.address_en || "")}" placeholder="영문 주소" />
+          <input data-k="employee_count" type="number" min="0" value="${esc(s.employee_count ?? 0)}" placeholder="인원" />
+          <button type="button" class="ghost site-del" data-idx="${idx}">삭제</button>
+        </div>`).join("");
+      box.querySelectorAll(".site-row input").forEach((inp) => {
+        const sync = () => {
+          const idx = Number(inp.closest(".site-row").dataset.idx);
+          const k = inp.dataset.k;
+          orgState.sites[idx][k] = k === "employee_count" ? Number(inp.value || 0) : inp.value;
+        };
+        inp.addEventListener("change", sync);
+        inp.addEventListener("input", sync);
+      });
+      if (typeof wireDaumPostcodeButtons === "function") wireDaumPostcodeButtons(box);
+      box.querySelectorAll(".site-del").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const idx = Number(btn.dataset.idx);
+          const site = orgState.sites[idx];
+          if (site.id) {
+            const res = await fetch(`${API}/user/company/sites/${site.id}${companyQuery()}`, {
+              method: "DELETE", headers: authHeaders(),
+            });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              setMsg("", typeof data.detail === "string" ? data.detail : "삭제 실패");
+              return;
+            }
+          }
+          orgState.sites.splice(idx, 1);
+          renderSites();
+        });
+      });
+    }
+
+    async function loadSites() {
+      try {
+        const res = await fetch(`${API}/user/company/sites${companyQuery()}`, { headers: authHeaders(), cache: "no-store" });
+        const data = await res.json().catch(() => ([]));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `사업장 조회 실패`);
+        orgState.sites = Array.isArray(data) ? data : [];
+        renderSites();
+      } catch (e) {
+        document.getElementById("site-list").innerHTML = `<div class="ep-empty">${esc(e.message)}</div>`;
+      }
+    }
+
+    document.getElementById("site-add-btn")?.addEventListener("click", () => {
+      orgState.sites.push({
+        site_name: "", zip_code: "", address: "", detail_address: "", address_en: "",
+        employee_count: 0, is_main: false,
+      });
+      renderSites();
+    });
+
+    document.getElementById("site-save-btn")?.addEventListener("click", async () => {
+      setMsg("", "");
+      try {
+        for (const s of orgState.sites) {
+          if (!(s.site_name || "").trim()) throw new Error("사업장명을 입력하세요.");
+          const body = {
+            site_name: s.site_name.trim(),
+            zip_code: s.zip_code || null,
+            address: s.address || null,
+            detail_address: s.detail_address || null,
+            address_en: s.address_en || null,
+            employee_count: Number(s.employee_count || 0),
+            is_main: false,
+            work_type: s.work_type || null,
+            biz_no: s.biz_no || null,
+          };
+          const url = s.id
+            ? `${API}/user/company/sites/${s.id}${companyQuery()}`
+            : `${API}/user/company/sites${companyQuery()}`;
+          const res = await fetch(url, {
+            method: s.id ? "PUT" : "POST",
+            headers: { ...authHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "사업장 저장 실패");
+        }
+        setMsg("사업장이 저장되었습니다.", "");
+        loadSites();
+      } catch (e) { setMsg("", e.message); }
+    });
+
+    function renderDepartments() {
+      const box = document.getElementById("dept-tags");
+      box.innerHTML = orgState.departments.map((d, idx) => `
+        <span class="dept-tag">${esc(d.name)} <button type="button" data-idx="${idx}" aria-label="삭제">×</button></span>
+      `).join("") || `<span class="muted">등록된 부서가 없습니다.</span>`;
+      box.querySelectorAll("button[data-idx]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          orgState.departments.splice(Number(btn.dataset.idx), 1);
+          renderDepartments();
+          renderContacts();
+        });
+      });
+    }
+
+    async function loadDepartments() {
+      try {
+        const res = await fetch(`${API}/user/company/departments${companyQuery()}`, { headers: authHeaders(), cache: "no-store" });
+        const data = await res.json().catch(() => ([]));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "부서 조회 실패");
+        orgState.departments = Array.isArray(data) ? data : [];
+        renderDepartments();
+      } catch (e) { setMsg("", e.message); }
+    }
+
+    document.getElementById("dept-add-btn")?.addEventListener("click", () => {
+      const inp = document.getElementById("dept-input");
+      const name = (inp.value || "").trim();
+      if (!name) return;
+      if (orgState.departments.some((d) => d.name === name)) { inp.value = ""; return; }
+      orgState.departments.push({ name });
+      inp.value = "";
+      renderDepartments();
+      renderContacts();
+    });
+
+    document.getElementById("dept-save-btn")?.addEventListener("click", async () => {
+      try {
+        const res = await fetch(`${API}/user/company/departments/bulk${companyQuery()}`, {
+          method: "PUT",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ names: orgState.departments.map((d) => d.name) }),
+        });
+        const data = await res.json().catch(() => ([]));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "부서 저장 실패");
+        orgState.departments = Array.isArray(data) ? data : [];
+        renderDepartments();
+        setMsg("부서가 저장되었습니다.", "");
+      } catch (e) { setMsg("", e.message); }
+    });
+
+    function renderContacts() {
+      const tbody = document.getElementById("contact-tbody");
+      const deptOpts = orgState.departments.map((d) => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join("");
+      if (!orgState.contacts.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="muted">등록된 담당자가 없습니다. + 등록으로 추가하세요.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = orgState.contacts.map((c, idx) => `
+        <tr data-idx="${idx}">
+          <td><select data-k="role">${CONTACT_ROLES.map((r) => `<option value="${r}" ${c.role===r?"selected":""}>${r}</option>`).join("")}</select></td>
+          <td><input data-k="staff_name" value="${esc(c.staff_name || "")}" /></td>
+          <td><select data-k="department"><option value="">-</option>${deptOpts.replace(`value="${esc(c.department || "")}"`, `value="${esc(c.department || "")}" selected`)}</select></td>
+          <td><input data-k="position" value="${esc(c.position || "")}" /></td>
+          <td><input data-k="phone" value="${esc(c.phone || "")}" /></td>
+          <td><input data-k="mobile" value="${esc(c.mobile || "")}" /></td>
+          <td><input data-k="email" value="${esc(c.email || "")}" /></td>
+          <td><button type="button" class="del-btn" data-idx="${idx}">×</button></td>
+        </tr>`).join("");
+      // fix department selected
+      tbody.querySelectorAll("tr").forEach((tr) => {
+        const idx = Number(tr.dataset.idx);
+        const sel = tr.querySelector('select[data-k="department"]');
+        if (sel) sel.value = orgState.contacts[idx].department || "";
+      });
+      tbody.querySelectorAll("input, select").forEach((el) => {
+        el.addEventListener("change", () => {
+          const idx = Number(el.closest("tr").dataset.idx);
+          orgState.contacts[idx][el.dataset.k] = el.value;
+        });
+      });
+      tbody.querySelectorAll(".del-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          orgState.contacts.splice(Number(btn.dataset.idx), 1);
+          renderContacts();
+        });
+      });
+    }
+
+    async function loadContacts() {
+      try {
+        const res = await fetch(`${API}/user/company/staff${companyQuery()}`, { headers: authHeaders(), cache: "no-store" });
+        const data = await res.json().catch(() => ([]));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "담당자 조회 실패");
+        orgState.contacts = Array.isArray(data) ? data : [];
+        renderContacts();
+      } catch (e) { setMsg("", e.message); }
+    }
+
+    document.getElementById("contact-add-btn")?.addEventListener("click", () => {
+      orgState.contacts.push({
+        role: "인증담당", staff_name: "", department: orgState.departments[0]?.name || "",
+        position: "", phone: "", mobile: "", email: "",
+      });
+      renderContacts();
+    });
+
+    document.getElementById("contact-save-btn")?.addEventListener("click", async () => {
+      try {
+        const items = orgState.contacts.filter((c) => (c.staff_name || "").trim());
+        const res = await fetch(`${API}/user/company/staff/bulk${companyQuery()}`, {
+          method: "PUT",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ items }),
+        });
+        const data = await res.json().catch(() => ([]));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "담당자 저장 실패");
+        orgState.contacts = Array.isArray(data) ? data : [];
+        renderContacts();
+        setMsg("담당자가 저장되었습니다.", "");
+      } catch (e) { setMsg("", e.message); }
+    });
+
+    async function loadPortalUsers() {
+      const tbody = document.getElementById("staff-user-tbody");
+      const q = document.getElementById("staff-q")?.value.trim() || "";
+      try {
+        const params = new URLSearchParams();
+        if (q) params.set("q", q);
+        if (role === "platform_admin" && state.companyId) params.set("company_id", String(state.companyId));
+        const qs = params.toString() ? `?${params}` : "";
+        const res = await fetch(`${API}/user/company/users${qs}`, { headers: authHeaders(), cache: "no-store" });
+        const data = await res.json().catch(() => ([]));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "직원 조회 실패");
+        if (!data.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="muted">등록된 직원이 없습니다. 직원은 회원가입·승인 후 표시됩니다.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = data.map((u) => `
+          <tr>
+            <td>${esc(u.name)}</td>
+            <td>${esc(u.role)}</td>
+            <td>${esc(u.email)}</td>
+            <td>${esc(u.phone || "-")}</td>
+            <td>${esc(u.membership_status || (u.is_active ? "active" : "inactive"))}</td>
+          </tr>`).join("");
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5">${esc(e.message)}</td></tr>`;
+      }
+    }
+    document.getElementById("staff-reload-btn")?.addEventListener("click", loadPortalUsers);
+    document.getElementById("staff-q")?.addEventListener("keyup", (e) => { if (e.key === "Enter") loadPortalUsers(); });
+
+    function renderStepper(step) {
+      const labels = ["제안서 송부","검토중","조율중","계약서","심사중","시정조치중","심사종료"];
+      return `<div class="stepper">${labels.map((lbl, i) => {
+        const n = i + 1;
+        const cls = n < step ? "done" : (n === step ? "active" : "");
+        return `<div class="stepper-item ${cls}"><span class="num">${n}</span><span class="lbl">${lbl}</span></div>`;
+      }).join("")}</div>`;
+    }
+
+    async function loadCertStatus() {
+      const heldBox = document.getElementById("held-certs");
+      const appsBox = document.getElementById("cert-apps");
+      heldBox.innerHTML = `<div class="muted">불러오는 중…</div>`;
+      appsBox.innerHTML = "";
+      try {
+        const res = await fetch(`${API}/user/cert-status${companyQuery()}`, { headers: authHeaders(), cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `인증현황 조회 실패 (${res.status})`);
+
+        if (!data.held_certificates?.length) {
+          heldBox.innerHTML = `<div class="ep-empty">보유 인증서가 없습니다<div class="sub">+ 인증 신청 버튼을 눌러 인증을 시작하세요</div></div>`;
+        } else {
+          heldBox.innerHTML = `<div class="held-cert-grid">${data.held_certificates.map((c) => `
+            <div class="held-cert-card">
+              <h4>${esc(c.standards)}</h4>
+              <div class="muted">인증번호 ${esc(c.cert_no || "-")}</div>
+              <div class="muted">유효기간 ${esc(c.valid_from || "-")} ~ ${esc(c.valid_until || "-")}</div>
+              <div style="margin-top:6px;"><span class="cert-badge ok">${esc(c.status)}</span></div>
+            </div>`).join("")}</div>`;
+        }
+
+        if (!data.applications?.length) {
+          appsBox.innerHTML = `<div class="ep-empty">진행 중인 인증 신청이 없습니다.<div class="sub">인증 신청 후 7단계 프로세스가 여기에 표시됩니다.</div></div>`;
+        } else {
+          appsBox.innerHTML = data.applications.map((a) => {
+            const badgeCls = a.process_step <= 1 ? "ok" : (a.process_step >= 7 ? "ok" : "warn");
+            const badgeText = a.process_step <= 1 ? "제출완료" : a.status_label;
+            const std = (a.standards || []).join(", ") || "-";
+            const submitted = (a.submitted_at || "").slice(0, 10);
+            return `<div class="cert-app-card">
+              <div class="cert-app-top">
+                <div>
+                  <h3>${esc(a.cb_name || a.company_name || "인증기관")}</h3>
+                  <div>${esc(a.audit_type || "심사")} · ${esc(std)}</div>
+                  <div class="muted" style="margin-top:4px;">신청번호 ${esc(a.application_no || "-")} · 신청일 ${esc(submitted || "-")}</div>
+                </div>
+                <div>
+                  <span class="cert-meta-label">희망 심사 시작일</span>
+                  <span class="cert-meta-value">${esc(a.preferred_start_date || "-")}</span>
+                </div>
+                <div>
+                  <span class="cert-meta-label">현재 단계</span>
+                  <span class="cert-meta-value">${esc(a.status_label || "-")}</span>
+                </div>
+                <div><span class="cert-badge ${badgeCls}">${esc(badgeText)}</span></div>
+              </div>
+              ${renderStepper(Number(a.process_step || 1))}
+              <div class="cert-docs"><strong>단계별 문서</strong><div class="muted" style="margin-top:4px;">${esc(a.documents_hint || "")}</div></div>
+            </div>`;
+          }).join("");
+        }
+        renderApplyStandards(state.availableStandards || []);
+      } catch (e) {
+        heldBox.innerHTML = `<div class="ep-empty">${esc(e.message)}</div>`;
+      }
+    }
+
+    document.getElementById("cert-apply-open-btn")?.addEventListener("click", () => {
+      const box = document.getElementById("cert-apply-box");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+      if (box.style.display === "block") renderApplyStandards(state.availableStandards || []);
+    });
+
+    async function loadArchiveByYear() {
+      const box = document.getElementById("archive-years");
+      box.innerHTML = `<div class="muted">불러오는 중…</div>`;
+      try {
+        const res = await fetch(`${API}/user/archive/by-year${companyQuery()}`, { headers: authHeaders(), cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `보관함 조회 실패 (${res.status})`);
+        const years = data.years || [];
+        box.innerHTML = years.map((y) => `
+          <div class="archive-year">
+            <div class="archive-year-head">
+              <h3>${y.year}년</h3>
+              <span class="muted">${y.count || 0}건</span>
+            </div>
+            <div class="archive-box">
+              ${(y.documents && y.documents.length)
+                ? y.documents.map((d) => `
+                  <div class="archive-doc">
+                    <strong>${esc(d.label)}</strong>
+                    <span class="muted">${esc(d.title || d.contract_no || "")}</span>
+                    ${d.document_id ? `<button type="button" class="ghost" onclick="downloadDoc(${d.document_id})">다운로드</button>` : ""}
+                  </div>`).join("")
+                : `<div class="empty-msg">보관 문서가 없습니다.</div>`}
+            </div>
+          </div>`).join("");
+      } catch (e) {
+        box.innerHTML = `<div class="ep-empty">${esc(e.message)}</div>`;
+      }
+    }
+
+    function renderEsgPagination() {
+      const box = document.getElementById("esg-pagination");
+      const pages = Math.max(1, Math.ceil(state.esgTotal / state.esgLimit));
+      const cur = state.esgPage;
+      if (state.esgTotal <= state.esgLimit) { box.innerHTML = ""; return; }
+      let html = `<button type="button" data-page="${cur - 1}" ${cur <= 0 ? "disabled" : ""}>이전</button>`;
+      const start = Math.max(0, cur - 2);
+      const end = Math.min(pages - 1, start + 4);
+      for (let i = start; i <= end; i++) {
+        html += `<button type="button" class="${i === cur ? "active" : ""}" data-page="${i}">${i + 1}</button>`;
+      }
+      html += `<button type="button" data-page="${cur + 1}" ${cur >= pages - 1 ? "disabled" : ""}>다음</button>`;
+      box.innerHTML = html;
+      box.querySelectorAll("button[data-page]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const p = Number(btn.dataset.page);
+          if (Number.isNaN(p) || p < 0 || p >= pages) return;
+          state.esgPage = p;
+          loadEsgKpis(false);
+        });
+      });
+    }
+
+    function updateEsgThead(years) {
+      const y = years?.length ? years : state.esgYears;
+      if (!y?.length) return;
+      state.esgYears = y;
+      document.getElementById("esg-thead").innerHTML = `<tr>
+        <th class="col-kpi">KPI 지표</th>
+        <th class="col-path">데이터 경로</th>
+        <th class="col-unit">단위</th>
+        ${y.map((yr) => `<th class="col-year">${yr}년</th>`).join("")}
+        <th class="col-trend">추세</th>
+        <th class="col-goal">목표설정</th>
+        <th class="col-action">입력</th>
+      </tr>`;
+    }
+
+    function renderEsgGroupedRows(rows, years) {
+      const groups = new Map();
+      rows.forEach((row) => {
+        const key = row.sub_category || "미분류";
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+      });
+      let html = "";
+      const colSpan = 3 + years.length + 3;
+      for (const [sub, items] of groups) {
+        html += `<tr class="esg-group-row"><td colspan="${colSpan}"><strong>${esc(sub)}</strong> <span class="esg-group-count">(${items.length}개)</span></td></tr>`;
+        items.forEach((row) => {
+          state.esgRowsById[row.kpi_id] = row;
+          const yearCells = years.map((yr) => {
+            const v = row.year_values ? row.year_values[String(yr)] : null;
+            return `<td class="col-year num">${fmtYearVal(v)}</td>`;
+          }).join("");
+          let action = '<span class="esg-empty">-</span>';
+          if (row.input_mode === "auditor") {
+            action = `<button type="button" class="ghost esg-mini-btn" data-esg-note="${row.kpi_id}">노트</button>`;
+          } else if (row.can_company_input) {
+            action = `<button type="button" class="ghost esg-mini-btn" data-esg-input="${row.kpi_id}">입력</button>`;
+          }
+          const goalLabel = row.goal_value != null && row.goal_value !== ""
+            ? esc(row.goal_value)
+            : "설정";
+          html += `<tr class="esg-data-row" data-mode="${esc(row.input_mode)}">
+            <td class="col-kpi">
+              <div class="esg-kpi-cell">
+                <span class="esg-kpi-code">${esc(row.kpi_code)}</span>
+                <span class="esg-kpi-name">${esc(row.kpi_name)}</span>
+                ${row.is_required ? '<span class="badge esg-req">필수</span>' : ""}
+              </div>
+            </td>
+            <td class="col-path">${renderPathPill(row)}</td>
+            <td class="col-unit">${esc(row.unit_format || "-")}</td>
+            ${yearCells}
+            <td class="col-trend">${renderTrend(row.trend)}</td>
+            <td class="col-goal"><button type="button" class="ghost esg-mini-btn" data-esg-goal="${row.kpi_id}">${goalLabel}</button></td>
+            <td class="col-action">${action}</td>
+          </tr>`;
+        });
+      }
+      return html;
+    }
+
+    async function loadEsgKpis(resetPage) {
+      if (resetPage) state.esgPage = 0;
+      const tbody = document.getElementById("esg-tbody");
+      const cat = document.getElementById("esg-cat").value;
+      const std = document.getElementById("esg-std").value;
+      const mode = document.getElementById("esg-mode").value;
+      const q = document.getElementById("esg-q").value.trim();
+      const heldOnly = document.getElementById("esg-held-only").checked;
+      const params = new URLSearchParams({
+        skip: String(state.esgPage * state.esgLimit),
+        limit: String(state.esgLimit),
+      });
+      if (cat) params.set("esg_category", cat);
+      if (std) params.set("managed_standard_name", std);
+      if (mode) params.set("source_mode", mode);
+      if (q) params.set("q", q);
+      if (heldOnly) params.set("held_only", "true");
+      if (role === "platform_admin" && state.companyId) params.set("company_id", String(state.companyId));
+
+      try {
+        const res = await fetch(`${API}/user/esg-master-kpis?${params}`, {
+          headers: authHeaders(),
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `ESG 조회 실패 (${res.status})`);
+
+        state.esgTotal = data.total || 0;
+        state.esgCurrentYear = data.current_year || state.esgCurrentYear;
+        state.esgRowsById = {};
+        document.getElementById("esg-total").textContent = String(state.esgTotal);
+        if (!state.esgStdOptionsLoaded && data.available_standards?.length) {
+          fillEsgStdOptions(data.available_standards);
+        }
+        const years = data.years?.length
+          ? data.years
+          : Array.from({ length: 5 }, (_, i) => state.esgCurrentYear - 4 + i);
+        updateEsgThead(years);
+
+        const held = (data.held_standards || state.heldStandards || []).map(heldDisplayLabel).filter(Boolean).join(", ") || "없음";
+        document.getElementById("esg-meta").textContent = data.matched_to_held
+          ? `보유 표준(${held})에 매칭된 KPI · ${state.esgPage * state.esgLimit + 1}–${Math.min((state.esgPage + 1) * state.esgLimit, state.esgTotal)} / ${state.esgTotal}`
+          : `전체 카탈로그 · ${state.esgTotal}건 중 ${state.esgPage * state.esgLimit + 1}–${Math.min((state.esgPage + 1) * state.esgLimit, state.esgTotal)} 표시`;
+
+        if (!data.data?.length) {
+          tbody.innerHTML = `<tr><td colspan="${3 + years.length + 3}">${heldOnly ? "보유 표준에 매칭되는 KPI가 없습니다. 필터를 해제해 보세요." : "조회 결과가 없습니다."}</td></tr>`;
+          renderEsgPagination();
+          return;
+        }
+        tbody.innerHTML = renderEsgGroupedRows(data.data, years);
+        tbody.querySelectorAll("[data-esg-goal]").forEach((btn) => {
+          btn.addEventListener("click", () => openGoalDrawer(Number(btn.dataset.esgGoal)));
+        });
+        tbody.querySelectorAll("[data-esg-note]").forEach((btn) => {
+          btn.addEventListener("click", () => openNoteDrawer(Number(btn.dataset.esgNote)));
+        });
+        tbody.querySelectorAll("[data-esg-input]").forEach((btn) => {
+          btn.addEventListener("click", () => openCompanyInputDrawer(Number(btn.dataset.esgInput)));
+        });
+        renderEsgPagination();
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="11">${esc(e.message)}</td></tr>`;
+        document.getElementById("esg-meta").textContent = "";
+        setMsg("", e.message);
+      }
+    }
+    document.getElementById("esg-search-btn").addEventListener("click", () => loadEsgKpis(true));
+    document.getElementById("esg-q").addEventListener("keyup", (e) => {
+      if (e.key === "Enter") loadEsgKpis(true);
+    });
+    document.getElementById("esg-cat").addEventListener("change", () => loadEsgKpis(true));
+    document.getElementById("esg-std").addEventListener("change", () => loadEsgKpis(true));
+    document.getElementById("esg-mode").addEventListener("change", () => loadEsgKpis(true));
+    document.getElementById("esg-held-only").addEventListener("change", () => loadEsgKpis(true));
+
+    async function loadAvailableCbs() {
+      setMsg("", "");
+      const standards = [...document.querySelectorAll("#std-checks input:checked")].map((el) => el.value);
+      if (!standards.length) { setMsg("", "신청 표준을 1개 이상 선택하세요."); return; }
+      const params = new URLSearchParams({ standards: standards.join(",") });
+      const iaf = document.getElementById("iaf-override").value.trim();
+      if (iaf) params.set("iaf_codes", iaf);
+      try {
+        const res = await fetch(`${API}/user/available-cbs?${params}`, { headers: authHeaders(), cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `조회 실패 (${res.status})`);
+        document.getElementById("cb-meta").textContent =
+          `${data.company_name || ""} · IAF [${(data.company_iaf_codes||[]).join(", ") || "-"}] · ${data.total}곳`;
+        const grid = document.getElementById("cb-grid");
+        if (!data.data?.length) {
+          grid.innerHTML = '<div class="muted">조건에 맞는 인증기관이 없습니다.</div>';
+          return;
+        }
+        grid.innerHTML = data.data.map((cb) => `
+          <div class="cb-card ${state.selectedCbId===cb.id?'selected':''}" data-id="${cb.id}" data-name="${esc(cb.cb_name)}">
+            <h4>${esc(cb.cb_name)}</h4>
+            <div class="muted">${esc(cb.cb_code)} · ${esc(cb.accreditation_body || "-")}</div>
+            <div class="muted">표준: ${esc((cb.matched_standards||[]).join(", "))}</div>
+            <div class="muted">IAF: ${esc((cb.matched_iaf_codes||[]).join(", "))}</div>
+          </div>`).join("");
+        grid.querySelectorAll(".cb-card").forEach((el) => {
+          el.addEventListener("click", () => {
+            state.selectedCbId = Number(el.dataset.id);
+            document.getElementById("selected-cb").value = `${el.dataset.name} (#${state.selectedCbId})`;
+            grid.querySelectorAll(".cb-card").forEach((c) => c.classList.toggle("selected", c === el));
+          });
+        });
+      } catch (e) { setMsg("", e.message); }
+    }
+    document.getElementById("load-cbs-btn").addEventListener("click", loadAvailableCbs);
+
+    async function loadAudits() {
+      const sel = document.getElementById("audit-select");
+      if (!sel) { return loadArchiveByYear(); }
+      try {
+        const res = await fetch(`${API}/user/archive/audits`, { headers: authHeaders(), cache: "no-store" });
+        const data = await res.json().catch(() => ([]));
+        if (!res.ok) throw new Error(data.detail || `심사건 조회 실패 (${res.status})`);
+        if (!data.length) {
+          sel.innerHTML = '<option value="">등록된 심사건이 없습니다</option>';
+          document.getElementById("archive-tbody").innerHTML = '<tr><td colspan="4">심사건이 없습니다.</td></tr>';
+          return;
+        }
+        sel.innerHTML = data.map((a) =>
+          `<option value="${a.audit_id}">#${a.audit_id} ${esc(a.contract_no||"")} · ${esc(a.audit_type||"")} · 발행 ${a.issued_count}/4</option>`
+        ).join("");
+        loadArchiveDocs(Number(sel.value));
+      } catch (e) {
+        sel.innerHTML = `<option value="">오류</option>`;
+        setMsg("", e.message);
+      }
+    }
+
+    async function loadArchiveDocs(auditId) {
+      const tbody = document.getElementById("archive-tbody");
+      if (!auditId) { tbody.innerHTML = '<tr><td colspan="4">심사건을 선택하세요.</td></tr>'; return; }
+      try {
+        const res = await fetch(`${API}/user/archive/documents/${auditId}`, { headers: authHeaders(), cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `문서 조회 실패 (${res.status})`);
+        tbody.innerHTML = (data.documents || []).map((d) => `
+          <tr>
+            <td>${esc(d.label)}</td>
+            <td><span class="badge ${d.issued?'ok':'no'}">${esc(d.badge)}</span></td>
+            <td>${esc(d.title || "-")}</td>
+            <td>${d.issued && d.document_id
+              ? `<button type="button" class="ghost" onclick="downloadDoc(${d.document_id})">다운로드</button>`
+              : "-"}</td>
+          </tr>`).join("");
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="4">${esc(e.message)}</td></tr>`;
+      }
+    }
+
+    async function downloadDoc(documentId) {
+      try {
+        const res = await fetch(`${API}/user/archive/download/${documentId}`, { headers: authHeaders() });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.detail || `다운로드 실패 (${res.status})`);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = `document-${documentId}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) { setMsg("", e.message); }
+    }
+    window.downloadDoc = downloadDoc;
+    
+    async function loadNcrs() {
+      const tbody = document.getElementById("ncr-tbody");
+      try {
+        const res = await fetch(`${API}/user/ncr`, { headers: authHeaders(), cache: "no-store" });
+        const data = await res.json().catch(() => ([]));
+        if (!res.ok) throw new Error(data.detail || `NCR 조회 실패 (${res.status})`);
+        if (!data.length) { tbody.innerHTML = '<tr><td colspan="6">발행된 NCR이 없습니다.</td></tr>'; return; }
+        tbody.innerHTML = data.map((n) => `
+          <tr>
+            <td>${n.id}</td>
+            <td>${esc(n.std_code)} / ${esc(n.clause_id)}</td>
+            <td>${esc(n.grade)}</td>
+            <td>${esc((n.finding||"").slice(0,120))}</td>
+            <td><span class="badge ${n.status==='ACTION_SUBMITTED'?'ok':(n.status==='PENDING'||n.status==='ISSUED'?'warn':'no')}">${esc(n.status)}</span></td>
+            <td><button type="button" class="ghost ncr-open-btn" data-id="${n.id}" data-finding="${esc(n.finding||"")}">개선조치서</button></td>
+          </tr>`).join("");
+        tbody.querySelectorAll(".ncr-open-btn").forEach((btn) => {
+          btn.addEventListener("click", () => openNcr(Number(btn.dataset.id), btn.dataset.finding || ""));
+        });
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6">${esc(e.message)}</td></tr>`;
+      }
+    }
+
+    function openNcr(id, finding) {
+      state.ncrId = id;
+      document.getElementById("ncr-title").textContent = `개선조치서 작성 — NCR #${id}`;
+      document.getElementById("ncr-finding").textContent = finding || "";
+      ["ncr-cause","ncr-correction","ncr-action","ncr-note"].forEach((id) => document.getElementById(id).value = "");
+      document.getElementById("ncr-file").value = "";
+      document.getElementById("ncr-error").textContent = "";
+      document.getElementById("ncr-backdrop").classList.add("show");
+      document.getElementById("ncr-drawer").classList.add("show");
+    }
+    function closeNcr() {
+      document.getElementById("ncr-backdrop").classList.remove("show");
+      document.getElementById("ncr-drawer").classList.remove("show");
+      state.ncrId = null;
+    }
+    document.getElementById("ncr-close").addEventListener("click", closeNcr);
+    document.getElementById("ncr-backdrop").addEventListener("click", closeNcr);
+    document.getElementById("reload-ncr-btn").addEventListener("click", loadNcrs);
+    document.getElementById("ncr-submit").addEventListener("click", async () => {
+      const err = document.getElementById("ncr-error");
+      err.textContent = "";
+      if (!state.ncrId) return;
+      const correction = document.getElementById("ncr-correction").value.trim();
+      const corrective_action = document.getElementById("ncr-action").value.trim();
+      if (!correction || !corrective_action) { err.textContent = "즉각시정과 시정조치 계획은 필수입니다."; return; }
+      const form = new FormData();
+      form.append("correction", correction);
+      form.append("corrective_action", corrective_action);
+      form.append("cause", document.getElementById("ncr-cause").value.trim());
+      form.append("note", document.getElementById("ncr-note").value.trim());
+      const file = document.getElementById("ncr-file").files?.[0];
+      if (file) form.append("file", file);
+      try {
+        const res = await fetch(`${API}/user/ncr/${state.ncrId}/action`, {
+          method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `제출 실패 (${res.status})`);
+        setMsg(data.message || "제출 완료", "");
+        closeNcr(); loadNcrs();
+      } catch (e) { err.textContent = e.message; }
+    });
+
+    const hash = (location.hash || "").replace("#","");
+    const legacy = { overview: "company", apply: "cert" };
+    const start = legacy[hash] || (PANELS.includes(hash) ? hash : "company");
+    switchPanel(start);
+  </script>
 </body>
 </html>

@@ -9,6 +9,8 @@ IAF 01–39는 9001/14001/45001만; 그 외는 MDQMS/FSMS/NQMS/BCMS 코드(컬�
 from datetime import date, datetime
 from typing import Any, Optional
 
+from decimal import Decimal
+
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -16,6 +18,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -63,7 +66,14 @@ class CbAccreditationScope(Base):
 
 
 class CbStandardAccreditation(Base):
-    """CB × ISO 표준별 인정기관(AB) + 인정번호. Scope 행렬(인증수행범위)과 독립 DB 관리."""
+    """CB × ISO 표준별 인정기관(AB) + 인정번호 + 인정만료일 + MD단가.
+
+    Scope 행렬과 독립 DB 관리.
+    MD 단가 조회 fallback:
+      1) cb_standard_accreditations.md_rate (표준별, source of truth when set)
+      2) cb_contracts.price_per_md (CB-level, backward compat)
+      3) 0
+    """
 
     __tablename__ = "cb_standard_accreditations"
     __table_args__ = (
@@ -80,6 +90,10 @@ class CbStandardAccreditation(Base):
     standard_code: Mapped[str] = mapped_column(String(50), nullable=False, comment="ISO 9001:2015 등")
     ab_code: Mapped[Optional[str]] = mapped_column(String(30), nullable=True, comment="인정기관 이니셜")
     registration_no: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="표준별 인정번호")
+    expiry_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, comment="표준별 인정만료일")
+    md_rate: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(12, 0), nullable=True, comment="표준별 MD 단가(KRW)"
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
@@ -151,6 +165,28 @@ def apply_spec_fields(cb: CertificationBodies, data: dict) -> None:
     if "logo_path" in data:
         cb.logo_path = data["logo_path"]
         cb.stamp_url = data["logo_path"]
+    if "fax" in data:
+        cb.fax = data["fax"]
+    if "tax_email" in data:
+        cb.tax_email = data["tax_email"]
+    if "corp_no" in data:
+        cb.corp_no = data["corp_no"]
+    if "personal_no" in data:
+        cb.personal_no = data["personal_no"]
+    if "bank_name" in data:
+        cb.bank_name = data["bank_name"]
+    if "account_no" in data:
+        cb.account_no = data["account_no"]
+    if "account_holder" in data:
+        cb.account_holder = data["account_holder"]
+    if "intro" in data:
+        cb.intro = data["intro"]
+    if "expire_date" in data:
+        cb.expire_date = data["expire_date"]
+    if "accreditation_region" in data:
+        cb.accreditation_region = data["accreditation_region"]
+    if "accreditation_country" in data:
+        cb.accreditation_country = data["accreditation_country"]
     if "status" in data and data["status"] is not None:
         st = str(data["status"]).strip().lower()
         if st in {"active", "정상"}:

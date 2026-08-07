@@ -168,6 +168,7 @@ class CertificationApplicationsBase(BaseModel):
     iaf_codes_json: Optional[str] = None
     questionnaire_json: Optional[str] = None
     company_snapshot_json: Optional[str] = None
+    integrated_check_json: Optional[str] = None
     scope_kr: Optional[str] = None
     scope_en: Optional[str] = None
     ksic_code: Optional[str] = None
@@ -206,6 +207,7 @@ class CertificationApplicationsUpdate(BaseModel):
     iaf_codes_json: Optional[str] = None
     questionnaire_json: Optional[str] = None
     company_snapshot_json: Optional[str] = None
+    integrated_check_json: Optional[str] = None
     scope_kr: Optional[str] = None
     scope_en: Optional[str] = None
     ksic_code: Optional[str] = None

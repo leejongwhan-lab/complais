@@ -61,6 +61,41 @@ class AdminDashboardStats(BaseModel):
     pending_accreditation_count: int = 0
 
 
+class AdminPlatformRevenue(BaseModel):
+    """플랫폼 매출 계정별 집계 (KRW)."""
+    total: Decimal = Decimal("0")
+    cb_subscription: Decimal = Decimal("0")
+    consulting_subscription: Decimal = Decimal("0")
+    education_matching_ads: Decimal = Decimal("0")
+    company_promotion_fees: Decimal = Decimal("0")
+    currency: str = "KRW"
+
+
+class AdminMonitoringOngoingAudit(BaseModel):
+    """진행 중인 심사 1건."""
+    company_name: str = ""
+    standard: str = ""
+    audit_type: str = ""
+    audit_form: str = ""
+
+
+class AdminMonitoringActiveAuditor(BaseModel):
+    """활동 중인 심사원 1명 — 역할별 표기(있으면 한글 라벨)."""
+    auditor_name: str = ""
+    role_lead: str = ""
+    role_member: str = ""
+    role_observer: str = ""
+    role_tech_expert: str = ""
+
+
+class AdminMonitoringResponse(BaseModel):
+    """대시보드 실시간 모니터링 (진행 심사 / 활동 심사원)."""
+    ongoing_audits_count: int = 0
+    active_auditors_count: int = 0
+    ongoing_audits: list[AdminMonitoringOngoingAudit] = Field(default_factory=list)
+    active_auditors: list[AdminMonitoringActiveAuditor] = Field(default_factory=list)
+
+
 # --- CBAccreditedScope ---
 
 class CBAccreditedScopeCreate(BaseModel):

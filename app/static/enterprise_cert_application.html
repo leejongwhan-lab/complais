@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ComplAIs — 인증신청</title>
+<link rel="stylesheet" href="/static/css/main.css?v=20260807pf">
+<link rel="stylesheet" href="/static/css/portal.css?v=20260807pf">
+<link rel="stylesheet" href="/static/css/style.css?v=20260807pf">
+<script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script src="/static/js/daum_postcode.js?v=20260807pf"></script>
+<style>
+  body.ent-cert-page { display:block; min-height:100vh; margin:0; background:var(--admin-bg,#F4F6F4); color:var(--admin-ink,#1E2A24); font-family:var(--font-family-main,Pretendard,sans-serif); }
+  .wrap { max-width:1040px; margin:0 auto; padding:24px 20px 64px; }
+  .hdr { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+  .hdr h1 { margin:0; font-size:22px; font-weight:800; }
+  .hdr .sub { color:var(--admin-muted,#5A675F); font-size:13px; margin-top:4px; }
+  .card { background:var(--admin-surface,#fff); border:1px solid var(--admin-border,#E8ECE9); border-radius:var(--admin-radius-lg,12px); margin-bottom:14px; overflow:hidden; }
+  .chd { padding:14px 18px; border-bottom:1px solid var(--admin-border); font-weight:800; font-size:15px; }
+  .cb { padding:18px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .readonly { background:var(--admin-success-soft,rgba(47,107,79,.12)); }
+  .req { color:var(--admin-danger,#C94C52); }
+  .hint { font-size:12px; color:var(--admin-faint,#8A948D); line-height:1.6; }
+  .note { padding:12px 14px; border-radius:10px; margin-bottom:12px; line-height:1.6; font-size:13px; }
+  .ok { background:var(--admin-success-soft); border:1px solid var(--admin-primary,#2F6B4F); color:#14532D; }
+  .err { background:var(--admin-danger-soft); border:1px solid var(--admin-danger); color:#7F1D1D; }
+  .mode-pill { font-size:13px; font-weight:700; color:var(--admin-primary); }
+  .q-block { margin-bottom:16px; }
+  .q-title { font-weight:800; font-size:13px; margin-bottom:8px; }
+  .q-row { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px dashed var(--admin-border); font-size:13px; }
+  .q-row .q-label { flex:1; line-height:1.5; }
+  .q-row .q-ctrl { min-width:180px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+  .aspect-sub { margin:16px 0 8px; font-size:13px; font-weight:800; color:var(--admin-primary); }
+  .aspect-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .aspect-chips { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; margin-bottom:8px; }
+  .aspect-chip { font-size:12px; display:inline-flex; gap:4px; align-items:center; }
+  @media (max-width:720px) {
+    .grid2, .aspect-grid { grid-template-columns:1fr; }
+    .q-row { flex-direction:column; }
+  }
+</style>
+</head>
+<body class="portal-page admin-page ent-cert-page cert-app-page">
+<div class="wrap">
+  <div class="hdr">
+    <div>
+      <h1 style="font:var(--font-h1);margin:0;">인증신청</h1>
+      <div class="sub">표준·KSIC/IAF·특성정보·설문을 DB에 저장합니다.</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn-secondary" href="/enterprise">← 기업포털</a>
+    </div>
+  </div>
+  <div id="msg"></div>
+  <form id="app-form" class="portal-form">
+    <div class="card">
+      <div class="chd">A. 기업 기본정보 · 신청 조건</div>
+      <div class="cb">
+        <div class="grid2">
+          <div class="ff"><label>기업명</label><input class="form-input readonly" id="co-name" readonly></div>
+          <div class="ff"><label>대표자</label><input class="form-input readonly" id="co-ceo" readonly></div>
+          <div class="ff ff-full" style="grid-column:1/-1">
+            <label>본사 주소</label>
+            <div class="addr-stack">
+              <div class="addr-row">
+                <input class="form-input addr-zip" id="co-zip" readonly placeholder="우편번호">
+                <button type="button" class="btn-postcode"
+                  data-postcode-zip="co-zip"
+                  data-postcode-addr="co-address"
+                  data-postcode-detail="co-detail">주소 검색</button>
+              </div>
+              <input class="form-input addr-main" id="co-address" readonly placeholder="도로명/지번 주소">
+              <input class="form-input" id="co-detail" placeholder="상세주소">
+            </div>
+          </div>
+          <div class="ff">
+            <label>KSIC 코드 (복수, 쉼표 구분) <span class="req">*</span></label>
+            <input class="form-input" id="ksic_codes" required placeholder="예: 29299, 62010">
+            <div class="hint" id="ksic-hint">변경 시 master_ksic_iaf에서 IAF 합집합을 제안합니다. IAF는 직접 수정 가능합니다.</div>
+          </div>
+          <div class="ff">
+            <label>IAF 코드 (복수, 쉼표 구분) <span class="req">*</span></label>
+            <input class="form-input" id="iaf_codes" required placeholder="예: 22, 33">
+          </div>
+          <div class="ff"><label>담당 이메일</label><input class="form-input readonly" id="co-email" readonly></div>
+          <div class="ff"><label>연락처</label><input class="form-input readonly" id="co-tel" readonly></div>
+          <div class="ff"><label>직원수 <span class="req">*</span></label><input class="form-input" type="number" id="employee_count" min="0" required></div>
+          <div class="ff"><label>사업장 수</label><input class="form-input" type="number" id="site_count" min="1" value="1"></div>
+          <div class="ff" style="grid-column:1/-1">
+            <label>공장·추가사업장 주소</label>
+            <div id="site-addr-list" class="hint">기업정보에서 등록한 추가사업장 주소를 불러옵니다.</div>
+            <button type="button" class="btn-secondary" id="site-addr-add" style="margin-top:8px;width:auto">사업장 행 추가</button>
+            <div class="hint" style="margin-top:6px">제출 시 본사 주소와 함께 사업장 주소가 기업정보에 저장됩니다.</div>
+          </div>
+          <div class="ff"><label>희망 심사 시작일 <span class="req">*</span></label><input class="form-input" type="date" id="desired_audit_start" required></div>
+          <div class="ff"><label>작업형태</label>
+            <select class="form-input" id="work_type">
+              <option value="">— 선택 —</option>
+              <option value="주간">주간</option>
+              <option value="교대">교대</option>
+              <option value="혼합">혼합</option>
+            </select>
+          </div>
+          <div class="ff">
+            <label>심사유형 <span class="req">*</span></label>
+            <select class="form-input" id="application_type" required></select>
+            <div class="hint" id="cb-filter-hint">최초·전환심사는 전체 CB, 그 외는 기존 CB만 표시합니다.</div>
+          </div>
+          <div class="ff">
+            <label>인증기관 <span class="req">*</span></label>
+            <select class="form-input" id="cb_id" required></select>
+          </div>
+          <div class="ff"><label>심사형태</label>
+            <input type="hidden" id="audit_mode" value="single">
+            <div class="mode-pill" id="audit_mode_label">단일</div>
+            <div class="hint">표준 2개 이상이면 통합으로 전환됩니다.</div>
+          </div>
+        </div>
+        <div class="ff"><label>신청 표준 <span class="req">*</span></label>
+          <div class="std-row" id="std-grid"></div>
+        </div>
+        <div class="ff"><label>국문 인증범위 <span class="req">*</span></label><textarea class="form-input" id="scope_kr" required></textarea></div>
+        <div class="ff"><label>영문 인증범위</label><textarea class="form-input" id="scope_en"></textarea></div>
+        <div class="ff"><label>비고</label><textarea class="form-input" id="note"></textarea></div>
+      </div>
+    </div>
+
+    <div class="card" id="aspects-card" style="display:none">
+      <div class="chd">A-2. 표준별 특성 정보 (EMS / OHS / EnMS)</div>
+      <div class="cb">
+        <div id="ems-section" style="display:none"><div class="q-title">EMS · ISO 14001:2015 · 환경경영시스템</div><div id="ems-box"></div></div>
+        <div id="ohs-section" style="display:none"><div class="q-title">OHSMS · ISO 45001:2018 · 안전보건경영시스템</div><div id="ohs-box"></div></div>
+        <div id="enms-section" style="display:none"><div class="q-title">EnMS · ISO 50001:2018 · 에너지경영시스템</div><div id="enms-box"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chd">B. 공통 질문</div>
+      <div class="cb" id="section-common"><div class="hint">불러오는 중…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="chd">C. 표준별 질문</div>
+      <div class="cb" id="section-b"><div class="hint">표준을 선택하면 해당 설문이 표시됩니다.</div></div>
+    </div>
+
+    <div class="card" id="integrated-survey-section" style="display:none">
+      <div class="chd">D. IAF MD 11 통합심사 설문</div>
+      <div class="cb" id="section-c"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+      <button type="submit" class="btn-primary" id="submit-btn">인증신청 제출</button>
+    </div>
+  </form>
+</div>
+<script src="/static/js/company_aspects_form.js?v=20260807pf"></script>
+<script>
+(function () {
+  const API = (window.COMPLAIS_API_BASE || "/api/v1").replace(/\/$/, "");
+  const token = () => localStorage.getItem("access_token");
+  const headers = () => {
+    const h = { "Content-Type": "application/json" };
+    const t = token();
+    if (t) h.Authorization = "Bearer " + t;
+    return h;
+  };
+  const msg = (text, ok) => {
+    document.getElementById("msg").innerHTML = text
+      ? `<div class="note ${ok ? "ok" : "err"}">${text}</div>` : "";
+  };
+  const esc = (s) => String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+  const splitCodes = (s) => String(s || "").split(/[,;]+/).map((x) => x.trim()).filter(Boolean);
+  let siteRows = [];
+
+  function renderSiteRows() {
+    const box = document.getElementById("site-addr-list");
+    if (!box) return;
+    if (!siteRows.length) {
+      box.innerHTML = '<div class="hint">등록된 추가사업장이 없습니다. 필요 시 행을 추가하세요.</div>';
+      document.getElementById("site_count").value = String(Math.max(1, siteRows.length + 1));
+      return;
+    }
+    box.innerHTML = siteRows.map((s, idx) => `
+      <div class="addr-stack" data-site-idx="${idx}" style="margin-bottom:10px;padding:10px;border:1px dashed var(--pf-bd,#CBD5E1);border-radius:10px">
+        <input class="form-input" data-k="site_name" value="${esc(s.site_name || "")}" placeholder="사업장명">
+        <div class="addr-row">
+          <input class="form-input addr-zip" id="ca-site-zip-${idx}" data-k="zip_code" value="${esc(s.zip_code || "")}" readonly placeholder="우편번호">
+          <button type="button" class="btn-postcode"
+            data-postcode-zip="ca-site-zip-${idx}"
+            data-postcode-addr="ca-site-addr-${idx}"
+            data-postcode-detail="ca-site-detail-${idx}"
+            data-postcode-en="ca-site-en-${idx}">주소 검색</button>
+        </div>
+        <input class="form-input addr-main" id="ca-site-addr-${idx}" data-k="address" value="${esc(s.address || "")}" readonly placeholder="도로명/지번 주소">
+        <input class="form-input" id="ca-site-detail-${idx}" data-k="detail_address" value="${esc(s.detail_address || "")}" placeholder="상세주소">
+        <input class="form-input" id="ca-site-en-${idx}" data-k="address_en" value="${esc(s.address_en || "")}" placeholder="영문 주소">
+        <button type="button" class="btn-secondary site-row-del" data-idx="${idx}" style="width:auto">행 삭제</button>
+      </div>`).join("");
+    box.querySelectorAll("[data-site-idx] input").forEach((inp) => {
+      const sync = () => {
+        const idx = Number(inp.closest("[data-site-idx]").dataset.siteIdx);
+        siteRows[idx][inp.dataset.k] = inp.value;
+      };
+      inp.addEventListener("input", sync);
+      inp.addEventListener("change", sync);
+    });
+    box.querySelectorAll(".site-row-del").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        siteRows.splice(Number(btn.dataset.idx), 1);
+        renderSiteRows();
+      });
+    });
+    if (typeof wireDaumPostcodeButtons === "function") wireDaumPostcodeButtons(box);
+    document.getElementById("site_count").value = String(Math.max(1, siteRows.length + 1));
+  }
+
+  async function loadSites() {
+    try {
+      const res = await fetch(API + "/user/company/sites", { headers: headers(), cache: "no-store" });
+      const data = await res.json().catch(() => ([]));
+      if (res.ok && Array.isArray(data)) siteRows = data;
+    } catch (_) {}
+    renderSiteRows();
+  }
+
+  async function persistAddressBeforeSubmit() {
+    const hq = {
+      zip_code: document.getElementById("co-zip").value.trim() || null,
+      address: document.getElementById("co-address").value.trim() || null,
+      detail_address: document.getElementById("co-detail").value.trim() || null,
+    };
+    await fetch(API + "/user/company", {
+      method: "PUT", headers: headers(), body: JSON.stringify(hq),
+    });
+    for (const s of siteRows) {
+      if (!(s.site_name || "").trim()) continue;
+      const body = {
+        site_name: s.site_name.trim(),
+        zip_code: s.zip_code || null,
+        address: s.address || null,
+        detail_address: s.detail_address || null,
+        address_en: s.address_en || null,
+        employee_count: Number(s.employee_count || 0),
+        is_main: false,
+        work_type: s.work_type || null,
+        biz_no: s.biz_no || null,
+      };
+      const url = s.id ? `${API}/user/company/sites/${s.id}` : `${API}/user/company/sites`;
+      await fetch(url, {
+        method: s.id ? "PUT" : "POST",
+        headers: headers(),
+        body: JSON.stringify(body),
+      });
+    }
+  }
+
+  document.getElementById("site-addr-add")?.addEventListener("click", () => {
+    siteRows.push({ site_name: "", zip_code: "", address: "", detail_address: "", address_en: "", employee_count: 0 });
+    renderSiteRows();
+  });
+
+  let catalogAll = {};
+  let commonQuestions = [];
+  let integratedItems = [];
+  let integratedIntro = "";
+  let standardsMeta = [];
+  let auditTypes = [];
+  let aspectsCatalog = {};
+  let aspectsPrefill = {};
+  let iafManual = false;
+  let ksicTimer = null;
+
+  function selectedStandards() {
+    return [...document.querySelectorAll('input[name="standards"]:checked')].map((el) => el.value);
+  }
+  function stdLabel(s) {
+    if (s.label) return s.label;
+    if (s.initial && s.iso_code && s.name_kr) return `${s.initial} · ${s.iso_code} · ${s.name_kr}`;
+    return s.name || s.code;
+  }
+  function hasStd(code) {
+    return selectedStandards().some((c) => String(c).includes(code));
+  }
+
+  function updateAspectSections() {
+    const ems = hasStd("14001");
+    const ohs = hasStd("45001");
+    const enms = hasStd("50001");
+    document.getElementById("aspects-card").style.display = (ems || ohs || enms) ? "block" : "none";
+    document.getElementById("ems-section").style.display = ems ? "block" : "none";
+    document.getElementById("ohs-section").style.display = ohs ? "block" : "none";
+    document.getElementById("enms-section").style.display = enms ? "block" : "none";
+    if (ems && !document.getElementById("ems-box").dataset.ready) {
+      CompanyAspectsForm.renderEms(document.getElementById("ems-box"), aspectsCatalog.ems, aspectsPrefill.ems);
+      document.getElementById("ems-box").dataset.ready = "1";
+    }
+    if (ohs && !document.getElementById("ohs-box").dataset.ready) {
+      CompanyAspectsForm.renderOhs(document.getElementById("ohs-box"), aspectsCatalog.ohs, aspectsPrefill.ohs);
+      document.getElementById("ohs-box").dataset.ready = "1";
+    }
+    if (enms && !document.getElementById("enms-box").dataset.ready) {
+      CompanyAspectsForm.renderEnms(document.getElementById("enms-box"), aspectsCatalog.enms, aspectsPrefill.enms);
+      document.getElementById("enms-box").dataset.ready = "1";
+    }
+  }
+
+  function updateAuditMode() {
+    const n = selectedStandards().length;
+    const showMd11 = n >= 2;
+    document.getElementById("audit_mode").value = showMd11 ? "integrated" : "single";
+    document.getElementById("audit_mode_label").textContent = showMd11 ? "통합" : "단일";
+    document.getElementById("integrated-survey-section").style.display = showMd11 ? "block" : "none";
+    const yes = document.querySelector('input[name="ans_common_q3"][value="yes"]');
+    const no = document.querySelector('input[name="ans_common_q3"][value="no"]');
+    if (yes && no) { if (n >= 2) yes.checked = true; else if (!document.querySelector('input[name="ans_common_q3"]:checked')) no.checked = true; }
+    renderQuestionnaire();
+    if (showMd11) renderIntegrated();
+    updateAspectSections();
+  }
+  window.__updateAuditMode = updateAuditMode;
+
+  function renderCtrl(std, q) {
+    const key = q.key, label = esc(q.label), input = q.input || "yes_no";
+    if (input === "select") {
+      const opts = (q.options || []).map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
+      return `<div class="q-row"><div class="q-label">${label}</div><div class="q-ctrl">
+        <select class="form-input" name="ans_${key}" data-std="${esc(std)}" data-key="${esc(key)}" data-text="${label}" required>
+          <option value="">— 선택 —</option>${opts}</select></div></div>`;
+    }
+    if (input === "fill") {
+      return `<div class="q-row"><div class="q-label">${label}</div><div class="q-ctrl">
+        <input class="form-input" type="text" name="ans_${key}" data-std="${esc(std)}" data-key="${esc(key)}" data-text="${label}" required placeholder="입력"></div></div>`;
+    }
+    return `<div class="q-row"><div class="q-label">${label}</div><div class="q-ctrl radios">
+      <label><input type="radio" name="ans_${key}" value="yes" data-std="${esc(std)}" data-key="${esc(key)}" data-text="${label}" required> 예</label>
+      <label><input type="radio" name="ans_${key}" value="no" data-std="${esc(std)}" data-key="${esc(key)}" data-text="${label}" required> 아니오</label>
+    </div></div>`;
+  }
+
+  function renderCommon() {
+    const box = document.getElementById("section-common");
+    box.innerHTML = commonQuestions.map((q) => renderCtrl("common", q)).join("") || '<div class="hint">공통 질문 없음</div>';
+    ["yes","no"].forEach((v) => {
+      const el = document.querySelector(`input[name="ans_common_q3"][value="${v}"]`);
+      if (el) el.addEventListener("change", updateAuditMode);
+    });
+  }
+
+  function renderStandards() {
+    document.getElementById("std-grid").innerHTML = standardsMeta.map((s) => `
+      <label class="std-item">
+        <input type="checkbox" name="standards" value="${esc(s.code)}" onchange="window.__updateAuditMode()">
+        <span>${esc(stdLabel(s))}</span>
+      </label>`).join("");
+  }
+
+  function renderAuditTypes() {
+    const sel = document.getElementById("application_type");
+    const list = auditTypes.length ? auditTypes : [
+      {value:"initial",label:"최초심사"},{value:"surveillance",label:"사후심사"},
+      {value:"recertification",label:"갱신심사"},{value:"transfer",label:"전환심사"},
+      {value:"scope_extension",label:"확대심사"},{value:"special",label:"특별심사"},
+    ];
+    sel.innerHTML = list.map((t) => `<option value="${esc(t.value)}">${esc(t.label)}</option>`).join("");
+    sel.value = "initial";
+  }
+
+  function fillCbSelect(cbs, selectedId) {
+    const cbSel = document.getElementById("cb_id");
+    const prev = selectedId != null ? String(selectedId) : cbSel.value;
+    cbSel.innerHTML = '<option value="">— 인증기관 선택 —</option>' +
+      (cbs || []).map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join("");
+    if (prev && [...cbSel.options].some((o) => o.value === prev)) cbSel.value = prev;
+    else if ((cbs || []).length === 1) cbSel.value = String(cbs[0].id);
+  }
+
+  async function reloadCbs() {
+    const at = document.getElementById("application_type").value || "initial";
+    try {
+      const res = await fetch(API + "/enterprise-cert-applications/available-cbs?audit_type=" + encodeURIComponent(at), {
+        headers: headers(), cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "CB 목록 조회 실패");
+      fillCbSelect(data.cbs || []);
+      const hint = document.getElementById("cb-filter-hint");
+      if (data.filter_mode === "existing_only") {
+        hint.textContent = "기존 계약/인증 이력이 있어 해당 인증기관만 표시됩니다. (최초·전환심사는 전체)";
+      } else if (at === "initial" || at === "transfer") {
+        hint.textContent = (at === "initial" ? "최초심사" : "전환심사") + " — 전체 인증기관 목록을 표시합니다.";
+      } else {
+        hint.textContent = "선택 가능한 인증기관 전체 목록입니다.";
+      }
+    } catch (e) { console.warn(e); }
+  }
+
+  function renderQuestionnaire() {
+    const box = document.getElementById("section-b");
+    const codes = selectedStandards();
+    if (!codes.length) { box.innerHTML = '<div class="hint">표준을 선택하면 해당 설문이 표시됩니다.</div>'; return; }
+    const parts = [];
+    codes.forEach((code) => {
+      const cat = catalogAll[code] || catalogAll[String(code).replace(/\D/g,"")];
+      if (!cat) return;
+      parts.push(`<div class="q-block"><div class="q-title">${esc(cat.title || stdLabel({code}))}</div>`);
+      (cat.items || []).forEach((q) => parts.push(renderCtrl(code, typeof q === "string" ? {key: code+"_q", label:q} : q)));
+      parts.push("</div>");
+    });
+    box.innerHTML = parts.join("") || '<div class="hint">선택한 표준에 대한 설문이 없습니다.</div>';
+  }
+
+  function renderIntegrated() {
+    const box = document.getElementById("section-c");
+    const intro = integratedIntro || "통합심사를 신청하시려면 아래 항목에 답해 주세요.";
+    box.innerHTML = `<div class="hint" style="margin-bottom:12px">${esc(intro)}</div>` +
+      (integratedItems || []).map((it) => `
+      <div class="q-row"><div class="q-label">${esc(it.label)}</div>
+        <div class="q-ctrl radios">
+          <label><input type="radio" name="intg_${esc(it.key)}" value="yes" required> 예</label>
+          <label><input type="radio" name="intg_${esc(it.key)}" value="no" required> 아니오</label>
+        </div></div>`).join("");
+  }
+
+  async function suggestIafFromKsic() {
+    const ksics = document.getElementById("ksic_codes").value.trim();
+    const hint = document.getElementById("ksic-hint");
+    if (ksics.length < 2) return;
+    try {
+      const res = await fetch(API + "/enterprise-cert-applications/ksic-iaf?ksic_code=" + encodeURIComponent(ksics), {
+        headers: headers(), cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !(data.iaf_codes || []).length) {
+        hint.textContent = "매핑된 IAF를 찾지 못했습니다. IAF를 직접 입력해 주세요.";
+        return;
+      }
+      if (!iafManual || !document.getElementById("iaf_codes").value.trim()) {
+        document.getElementById("iaf_codes").value = (data.iaf_codes || []).join(", ");
+        iafManual = false;
+      }
+      hint.textContent = `제안 IAF: ${(data.iaf_codes || []).join(", ")} (수정 가능)`;
+    } catch (e) {
+      hint.textContent = "IAF 조회에 실패했습니다. 직접 입력해 주세요.";
+    }
+  }
+
+  function collectAnswers() {
+    const answers = []; const seen = new Set();
+    document.querySelectorAll('select[name^="ans_"], input[type="text"][name^="ans_"], input[type=radio][name^="ans_"]:checked').forEach((el) => {
+      const key = el.dataset.key; if (!key || seen.has(key)) return;
+      const isFill = el.type === "text"; const isSelect = el.tagName === "SELECT";
+      if ((isFill || isSelect) && !el.value) return;
+      seen.add(key);
+      answers.push({
+        standard_code: el.dataset.std,
+        question_key: key,
+        answer_value: isFill ? "fill" : el.value,
+        answer_text: isFill ? el.value.trim() : (el.dataset.text || ""),
+      });
+    });
+    return answers;
+  }
+
+  async function loadPrefill() {
+    if (!token()) { location.replace("/login?next=/enterprise/cert-application"); return; }
+    const res = await fetch(API + "/enterprise-cert-applications/prefill", { headers: headers(), cache: "no-store" });
+    if (res.status === 401 || res.status === 403) { location.replace("/login?next=/enterprise/cert-application"); return; }
+    const data = await res.json();
+    if (!res.ok) { msg(data.detail || "미리채움 실패", false); return; }
+    const c = data.company || {};
+    document.getElementById("co-name").value = c.name || "";
+    document.getElementById("co-ceo").value = c.ceo_name || "";
+    document.getElementById("co-zip").value = c.zip_code || "";
+    document.getElementById("co-address").value = c.address || "";
+    document.getElementById("co-detail").value = c.detail_address || "";
+    document.getElementById("ksic_codes").value = (c.ksic_codes || []).join(", ") || (c.ksic_code || "");
+    document.getElementById("iaf_codes").value = (c.iaf_codes || []).join(", ") || (c.iaf_code || "");
+    document.getElementById("co-email").value = c.email || "";
+    document.getElementById("co-tel").value = c.tel || "";
+    document.getElementById("employee_count").value = c.employee_count || 0;
+    document.getElementById("scope_kr").value = c.scope_kr || "";
+    document.getElementById("scope_en").value = c.scope_en || "";
+    standardsMeta = data.standards || [];
+    auditTypes = data.audit_types || [];
+    commonQuestions = data.common_questions || [];
+    integratedItems = data.integrated_check_items || [];
+    integratedIntro = data.integrated_check_intro || "";
+    aspectsCatalog = data.aspects_catalog || {};
+    aspectsPrefill = data.aspects || {};
+    renderAuditTypes();
+    fillCbSelect(data.cbs || []);
+    renderStandards();
+
+    const catRes = await fetch(API + "/enterprise-cert-applications/catalog?standards=" +
+      encodeURIComponent(standardsMeta.map((s) => s.code).join(",")), { headers: headers() });
+    const cat = await catRes.json().catch(() => ({}));
+    catalogAll = cat.questionnaire || {};
+    if (cat.common_questions) commonQuestions = cat.common_questions;
+    if (cat.integrated_check_items) integratedItems = cat.integrated_check_items;
+    if (cat.integrated_check_intro) integratedIntro = cat.integrated_check_intro;
+    if (cat.aspects_catalog) aspectsCatalog = cat.aspects_catalog;
+    if (cat.audit_types && cat.audit_types.length) { auditTypes = cat.audit_types; renderAuditTypes(); }
+    if (cat.standards && cat.standards.length) { standardsMeta = cat.standards; renderStandards(); }
+    renderCommon();
+    await loadSites();
+  }
+
+  document.getElementById("application_type").addEventListener("change", () => reloadCbs());
+  document.getElementById("ksic_codes").addEventListener("input", () => {
+    clearTimeout(ksicTimer);
+    ksicTimer = setTimeout(suggestIafFromKsic, 350);
+  });
+  document.getElementById("iaf_codes").addEventListener("input", () => { iafManual = true; });
+
+  document.getElementById("app-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const standards = selectedStandards();
+    if (!standards.length) { msg("인증 표준을 하나 이상 선택하세요.", false); return; }
+    const ksic_codes = splitCodes(document.getElementById("ksic_codes").value);
+    const iaf_codes = splitCodes(document.getElementById("iaf_codes").value);
+    if (!ksic_codes.length || !iaf_codes.length) { msg("KSIC와 IAF 코드를 입력하세요.", false); return; }
+
+    for (const q of commonQuestions) {
+      const name = "ans_" + q.key;
+      if (q.input === "fill") {
+        const el = document.querySelector(`input[name="${name}"]`);
+        if (!el || !el.value.trim()) { msg("공통 질문에 모두 답해 주세요.", false); return; }
+      } else if (q.input === "select") {
+        const el = document.querySelector(`select[name="${name}"]`);
+        if (!el || !el.value) { msg("공통 질문에 모두 답해 주세요.", false); return; }
+      } else if (!document.querySelector(`input[name="${name}"]:checked`)) {
+        msg("공통 질문에 모두 답해 주세요.", false); return;
+      }
+    }
+
+    const answers = collectAnswers();
+    const mode = document.getElementById("audit_mode").value;
+    const integrated_check = {};
+    if (mode === "integrated") {
+      let missing = false;
+      integratedItems.forEach((it) => {
+        const el = document.querySelector(`input[name="intg_${it.key}"]:checked`);
+        if (!el) missing = true; else integrated_check[it.key] = el.value;
+      });
+      if (missing) { msg("통합심사 설문에 모두 답해 주세요.", false); return; }
+    }
+
+    const body = {
+      cb_id: Number(document.getElementById("cb_id").value),
+      standards,
+      application_type: document.getElementById("application_type").value || "initial",
+      ksic_codes,
+      iaf_codes,
+      ksic_code: ksic_codes[0],
+      iaf_code: iaf_codes[0],
+      scope_kr: document.getElementById("scope_kr").value.trim(),
+      scope_en: document.getElementById("scope_en").value.trim(),
+      employee_count: Number(document.getElementById("employee_count").value || 0),
+      site_count: Number(document.getElementById("site_count").value || 1),
+      work_type: document.getElementById("work_type").value || null,
+      desired_audit_start: document.getElementById("desired_audit_start").value,
+      note: document.getElementById("note").value || null,
+      answers,
+      integrated_check: Object.keys(integrated_check).length ? integrated_check : null,
+      ems: hasStd("14001") ? CompanyAspectsForm.collectEms() : null,
+      ohs: hasStd("45001") ? CompanyAspectsForm.collectOhs() : null,
+      enms: hasStd("50001") ? CompanyAspectsForm.collectEnms() : null,
+    };
+    const btn = document.getElementById("submit-btn");
+    btn.disabled = true;
+    try {
+      try { await persistAddressBeforeSubmit(); } catch (_) {}
+      const res = await fetch(API + "/enterprise-cert-applications", {
+        method: "POST", headers: headers(), body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "제출 실패");
+      msg(`신청이 완료되었습니다. (${data.application_no || data.id}) — DB 저장됨`, true);
+      window.scrollTo(0, 0);
+    } catch (err) {
+      msg(err.message || String(err), false);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  loadPrefill().catch((e) => msg(e.message || String(e), false));
+})();
+</script>
+</body>
+</html>

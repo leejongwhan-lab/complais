@@ -3,7 +3,11 @@
  * 백엔드: app/api/v1/endpoints/admin.py (get_current_admin_user / JWT RBAC)
  * 인증: Authorization: Bearer <access_token>
  */
-const API_BASE = "/api/v1";
+// Same-origin relative base when served from :8000; override via window.COMPLAIS_API_BASE if needed.
+const API_BASE =
+  typeof window !== "undefined" && window.COMPLAIS_API_BASE
+    ? String(window.COMPLAIS_API_BASE).replace(/\/$/, "")
+    : "/api/v1";
 const TOKEN_KEY = "access_token";
 
 function getAuthToken() {
@@ -148,19 +152,19 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function gradeLabel(grade) {
-    return GRADE_MAP[grade] || grade || "-";
+    return GRADE_MAP[grade] || grade || "—";
   }
 
   function employmentLabel(type) {
     if (type === "fulltime") return "정규직";
     if (type === "parttime") return "파트타임";
-    return type || "-";
+    return type || "—";
   }
 
   function genderLabel(gender) {
     if (gender === "M" || gender === "male" || gender === "남") return "남성";
     if (gender === "F" || gender === "female" || gender === "여") return "여성";
-    return gender || "-";
+    return gender || "—";
   }
 
   async function loadTabData(tabName) {
@@ -209,7 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (tbody) {
       tbody.innerHTML =
-        '<tr><td colspan="8" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td></tr>';
+        '<tr><td colspan="9" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td></tr>';
     }
 
     try {
@@ -237,7 +241,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!currentCompaniesData.length) {
           tbody.innerHTML =
-            '<tr><td colspan="8" style="text-align: center; color: var(--font-tertiary);">검색 결과가 없습니다.</td></tr>';
+            '<tr><td colspan="9" style="text-align: center; color: var(--font-tertiary);">검색 결과가 없습니다.</td></tr>';
         } else {
           tbody.innerHTML = currentCompaniesData
             .map((c, i) => {
@@ -250,6 +254,28 @@ document.addEventListener("DOMContentLoaded", () => {
                   ? c.website
                   : `http://${c.website}`
                 : null;
+              const held = Array.isArray(c.held_standards) ? c.held_standards : [];
+              const heldHtml = held.length
+                ? held
+                    .slice(0, 6)
+                    .map((h) => {
+                      const label =
+                        (typeof h === "string"
+                          ? h
+                          : h.label ||
+                            [h.initial, h.iso_code, h.name_kr].filter(Boolean).join(" · ") ||
+                            h.initial ||
+                            h.standard_code) || "";
+                      const ab = (typeof h === "object" && h && h.ab_code) || "—";
+                      const cb =
+                        (typeof h === "object" && h && (h.cb_initial || h.cb_name)) || "—";
+                      return escapeHtml(`${label} (AB:${ab} / CB:${cb})`);
+                    })
+                    .join("<br>") +
+                  (held.length > 6
+                    ? `<br><span class="muted">+${held.length - 6}</span>`
+                    : "")
+                : "—";
 
               return `
         <tr>
@@ -258,6 +284,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <td>${escapeHtml(c.biz_no || "-")}</td>
           <td>${escapeHtml(corpType)}</td>
           <td>${escapeHtml(c.ceo_name || "-")}</td>
+          <td style="font-size:11px;line-height:1.45;white-space:normal;min-width:160px">${heldHtml}</td>
           <td title="${escapeHtml(c.address_kr || "")}">${escapeHtml(c.address_kr || "-")}</td>
           <td>${websiteUrl ? `<a href="${escapeHtml(websiteUrl)}" target="_blank" rel="noopener" class="text-decoration-none">방문</a>` : "-"}</td>
           <td>
@@ -277,9 +304,45 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       console.error("Companies fetch failed:", error);
       if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--sec-red);">목록을 불러오지 못했습니다. (${escapeHtml(error.message)})</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--sec-red);">목록을 불러오지 못했습니다. (${escapeHtml(error.message)})</td></tr>`;
       }
     }
+  }
+
+  function renderAdminHeldStandards(held) {
+    const body = document.getElementById("ac-held-std-body");
+    const countEl = document.getElementById("ac-cert-count");
+    const rows = Array.isArray(held) ? held : [];
+    if (countEl) countEl.textContent = rows.length ? `(${rows.length})` : "";
+    if (!body) return;
+    if (!rows.length) {
+      body.innerHTML =
+        '<tr><td colspan="5" class="muted">등록된 보유 표준이 없습니다.</td></tr>';
+      return;
+    }
+    body.innerHTML = rows
+      .map((r) => {
+        const label =
+          (typeof r === "string"
+            ? r
+            : r.label ||
+              [r.initial, r.iso_code, r.name_kr].filter(Boolean).join(" · ") ||
+              r.standard_code) || "—";
+        const ab = (typeof r === "object" && r && r.ab_code) || "—";
+        const cb =
+          (typeof r === "object" && r && (r.cb_name || r.cb_initial)) ||
+          (typeof r === "object" && r && r.cb_id != null ? `CB#${r.cb_id}` : "—");
+        const certNo = (typeof r === "object" && r && r.cert_no) || "—";
+        const status = (typeof r === "object" && r && r.status) || "—";
+        return `<tr>
+          <td>${escapeHtml(label)}</td>
+          <td>${escapeHtml(ab)}</td>
+          <td>${escapeHtml(cb)}</td>
+          <td>${escapeHtml(certNo)}</td>
+          <td>${escapeHtml(status)}</td>
+        </tr>`;
+      })
+      .join("");
   }
 
   function setText(id, value) {
@@ -384,6 +447,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderAdminSites();
     renderAdminDepartments();
     renderAdminStaff();
+    renderAdminHeldStandards(detail.held_standards || []);
     ["ac-basic-msg", "ac-headcount-msg", "ac-site-msg", "ac-dept-msg", "ac-staff-msg"].forEach((id) =>
       setOrgMsg(id, ""),
     );
@@ -413,66 +477,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function collectBasicPayload() {
-    const numOrNull = (v) => {
-      if (v === "" || v == null) return null;
-      const n = Number(v);
-      return Number.isFinite(n) ? n : null;
-    };
-    return {
-      name: document.getElementById("ac-name")?.value?.trim() || null,
-      company_name: document.getElementById("ac-name")?.value?.trim() || null,
-      name_en: document.getElementById("ac-name_en")?.value?.trim() || null,
-      biz_no: document.getElementById("ac-biz_no")?.value?.trim() || null,
-      corp_no: document.getElementById("ac-corp_no")?.value?.trim() || null,
-      entity_type: document.getElementById("ac-entity_type")?.value || null,
-      ceo_name: document.getElementById("ac-ceo_name")?.value?.trim() || null,
-      biz_type: document.getElementById("ac-biz_type")?.value?.trim() || null,
-      biz_class: document.getElementById("ac-biz_class")?.value?.trim() || null,
-      scope_kr: document.getElementById("ac-scope_kr")?.value?.trim() || null,
-      scope_en: document.getElementById("ac-scope_en")?.value?.trim() || null,
-      address: document.getElementById("ac-address")?.value?.trim() || null,
-      detail_address: document.getElementById("ac-detail_address")?.value?.trim() || null,
-      address_en: document.getElementById("ac-address_en")?.value?.trim() || null,
-      tel: document.getElementById("ac-tel")?.value?.trim() || null,
-      email: document.getElementById("ac-email")?.value?.trim() || null,
-      website: document.getElementById("ac-website")?.value?.trim() || null,
-      ksic_code: document.getElementById("ac-ksic_code")?.value?.trim() || null,
-      iaf_code: document.getElementById("ac-iaf_code")?.value?.trim() || null,
-      status: document.getElementById("ac-status")?.value || null,
-      employee_count: numOrNull(document.getElementById("ac-employee_count")?.value),
-      headcount_outsourced: numOrNull(document.getElementById("ac-headcount_outsourced")?.value),
-      headcount_regular: numOrNull(document.getElementById("ac-headcount_regular")?.value),
-      headcount_non_regular: numOrNull(document.getElementById("ac-headcount_non_regular")?.value),
-      headcount_year: numOrNull(document.getElementById("ac-headcount_year")?.value) || new Date().getFullYear(),
-    };
-  }
-
-  async function saveCompanyProfile(msgId, includeHeadcount) {
+  async function saveCompanyStatus() {
     if (!currentCompanyId) return;
-    const body = collectBasicPayload();
-    if (!includeHeadcount) {
-      delete body.employee_count;
-      delete body.headcount_outsourced;
-      delete body.headcount_regular;
-      delete body.headcount_non_regular;
-      delete body.headcount_year;
-    }
-    setOrgMsg(msgId, "저장 중...");
-    const res = await authFetch(`${API_BASE}/admin/companies/${currentCompanyId}`, {
-      method: "PUT",
-      body: JSON.stringify(body),
+    const statusVal = document.getElementById("ac-status")?.value || "";
+    if (!statusVal) throw new Error("상태를 선택하세요.");
+    setOrgMsg("ac-basic-msg", "저장 중...");
+    const res = await authFetch(`${API_BASE}/admin/companies/${currentCompanyId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: statusVal }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       const detail = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail || err);
-      throw new Error(detail || `저장 실패 (HTTP ${res.status})`);
+      throw new Error(detail || `상태 저장 실패 (HTTP ${res.status})`);
     }
-    const data = await res.json();
-    const year = includeHeadcount ? body.headcount_year : undefined;
-    const detail = await fetchCompanyDetail(currentCompanyId, year);
+    const detail = await fetchCompanyDetail(currentCompanyId);
     bindCompanyDetail(detail);
-    setOrgMsg(msgId, includeHeadcount ? `인원현황 ${data.headcount_year}년 저장 완료` : "기본정보 저장 완료", "ok");
+    setOrgMsg("ac-basic-msg", "상태 저장 완료", "ok");
     fetchCompanies(companyPage);
   }
 
@@ -493,88 +514,24 @@ document.addEventListener("DOMContentLoaded", () => {
             <th>영문주소</th>
             <th>인원</th>
             <th>업무유형</th>
-            <th></th>
           </tr>
         </thead>
         <tbody>
           ${draftSites
             .map(
-              (s, idx) => `
-            <tr data-idx="${idx}">
-              <td><input data-field="site_name" value="${escapeHtml(s.site_name || "")}" /></td>
-              <td><input data-field="address" value="${escapeHtml(s.address || "")}" /></td>
-              <td><input data-field="detail_address" value="${escapeHtml(s.detail_address || "")}" /></td>
-              <td><input data-field="address_en" value="${escapeHtml(s.address_en || "")}" /></td>
-              <td><input data-field="employee_count" type="number" min="0" value="${escapeHtml(s.employee_count ?? 0)}" /></td>
-              <td><input data-field="work_type" value="${escapeHtml(s.work_type || "")}" /></td>
-              <td><button type="button" class="btn-secondary" data-site-del="${idx}">삭제</button></td>
+              (s) => `
+            <tr>
+              <td>${escapeHtml(s.site_name || "—")}</td>
+              <td>${escapeHtml(s.address || "—")}</td>
+              <td>${escapeHtml(s.detail_address || "—")}</td>
+              <td>${escapeHtml(s.address_en || "—")}</td>
+              <td>${escapeHtml(s.employee_count ?? 0)}</td>
+              <td>${escapeHtml(s.work_type || "—")}</td>
             </tr>`,
             )
             .join("")}
         </tbody>
       </table>`;
-  }
-
-  function syncSitesFromDom() {
-    const rows = document.querySelectorAll("#ac-site-list tr[data-idx]");
-    rows.forEach((tr) => {
-      const idx = Number(tr.getAttribute("data-idx"));
-      if (!draftSites[idx]) return;
-      tr.querySelectorAll("[data-field]").forEach((input) => {
-        const field = input.getAttribute("data-field");
-        let val = input.value;
-        if (field === "employee_count") val = Number(val || 0);
-        draftSites[idx][field] = val;
-      });
-    });
-  }
-
-  async function saveAdminSites() {
-    if (!currentCompanyId) return;
-    syncSitesFromDom();
-    setOrgMsg("ac-site-msg", "저장 중...");
-    const existing = (currentCompanyDetail?.sites || []).slice();
-    const keepIds = new Set(draftSites.filter((s) => s.id).map((s) => s.id));
-
-    for (const old of existing) {
-      if (old.id && !keepIds.has(old.id)) {
-        const res = await authFetch(`${API_BASE}/admin/companies/${currentCompanyId}/sites/${old.id}`, {
-          method: "DELETE",
-        });
-        if (!res.ok && res.status !== 204) {
-          throw new Error(`사업장 삭제 실패 (HTTP ${res.status})`);
-        }
-      }
-    }
-
-    for (const site of draftSites) {
-      const payload = {
-        site_name: (site.site_name || "").trim(),
-        address: site.address || null,
-        detail_address: site.detail_address || null,
-        address_en: site.address_en || null,
-        biz_no: site.biz_no || null,
-        employee_count: Number(site.employee_count || 0),
-        is_main: false,
-        work_type: site.work_type || null,
-      };
-      if (!payload.site_name) continue;
-      const url = site.id
-        ? `${API_BASE}/admin/companies/${currentCompanyId}/sites/${site.id}`
-        : `${API_BASE}/admin/companies/${currentCompanyId}/sites`;
-      const res = await authFetch(url, {
-        method: site.id ? "PUT" : "POST",
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `사업장 저장 실패 (HTTP ${res.status})`);
-      }
-    }
-
-    const detail = await fetchCompanyDetail(currentCompanyId, document.getElementById("ac-headcount_year")?.value);
-    bindCompanyDetail(detail);
-    setOrgMsg("ac-site-msg", "사업장 저장 완료", "ok");
   }
 
   function renderAdminDepartments() {
@@ -585,102 +542,31 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     box.innerHTML = draftDepartments
-      .map(
-        (name, idx) =>
-          `<span class="dept-tag">${escapeHtml(name)} <button type="button" data-dept-del="${idx}" aria-label="삭제">×</button></span>`,
-      )
+      .map((name) => `<span class="dept-tag">${escapeHtml(name)}</span>`)
       .join("");
-  }
-
-  async function saveAdminDepartments() {
-    if (!currentCompanyId) return;
-    setOrgMsg("ac-dept-msg", "저장 중...");
-    const res = await authFetch(`${API_BASE}/admin/companies/${currentCompanyId}/departments/bulk`, {
-      method: "PUT",
-      body: JSON.stringify({ names: draftDepartments }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `부서 저장 실패 (HTTP ${res.status})`);
-    }
-    const detail = await fetchCompanyDetail(currentCompanyId, document.getElementById("ac-headcount_year")?.value);
-    bindCompanyDetail(detail);
-    setOrgMsg("ac-dept-msg", "부서 저장 완료", "ok");
   }
 
   function renderAdminStaff() {
     const body = document.getElementById("ac-staff-body");
     if (!body) return;
     if (!draftStaff.length) {
-      body.innerHTML = `<tr><td colspan="8" class="org-empty">등록된 담당자가 없습니다.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="7" class="org-empty">등록된 담당자가 없습니다.</td></tr>`;
       return;
     }
-    const deptOptions = draftDepartments
-      .map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`)
-      .join("");
     body.innerHTML = draftStaff
-      .map((s, idx) => {
-        const deptSelect = `
-          <select data-field="department">
-            <option value="">선택</option>
-            ${deptOptions}
-          </select>`;
-        return `
-          <tr data-idx="${idx}">
-            <td><input data-field="role" value="${escapeHtml(s.role || "")}" /></td>
-            <td><input data-field="staff_name" value="${escapeHtml(s.staff_name || "")}" /></td>
-            <td>${deptSelect}</td>
-            <td><input data-field="position" value="${escapeHtml(s.position || "")}" /></td>
-            <td><input data-field="phone" value="${escapeHtml(s.phone || "")}" /></td>
-            <td><input data-field="mobile" value="${escapeHtml(s.mobile || "")}" /></td>
-            <td><input data-field="email" value="${escapeHtml(s.email || "")}" /></td>
-            <td><button type="button" class="btn-secondary" data-staff-del="${idx}">삭제</button></td>
-          </tr>`;
-      })
+      .map(
+        (s) => `
+          <tr>
+            <td>${escapeHtml(s.role || "—")}</td>
+            <td>${escapeHtml(s.staff_name || "—")}</td>
+            <td>${escapeHtml(s.department || "—")}</td>
+            <td>${escapeHtml(s.position || "—")}</td>
+            <td>${escapeHtml(s.phone || "—")}</td>
+            <td>${escapeHtml(s.mobile || "—")}</td>
+            <td>${escapeHtml(s.email || "—")}</td>
+          </tr>`,
+      )
       .join("");
-    body.querySelectorAll("tr[data-idx]").forEach((tr) => {
-      const idx = Number(tr.getAttribute("data-idx"));
-      const sel = tr.querySelector('select[data-field="department"]');
-      if (sel) sel.value = draftStaff[idx]?.department || "";
-    });
-  }
-
-  function syncStaffFromDom() {
-    document.querySelectorAll("#ac-staff-body tr[data-idx]").forEach((tr) => {
-      const idx = Number(tr.getAttribute("data-idx"));
-      if (!draftStaff[idx]) return;
-      tr.querySelectorAll("[data-field]").forEach((input) => {
-        draftStaff[idx][input.getAttribute("data-field")] = input.value;
-      });
-    });
-  }
-
-  async function saveAdminStaff() {
-    if (!currentCompanyId) return;
-    syncStaffFromDom();
-    setOrgMsg("ac-staff-msg", "저장 중...");
-    const items = draftStaff
-      .map((s) => ({
-        staff_name: (s.staff_name || "").trim(),
-        role: s.role || null,
-        department: s.department || null,
-        position: s.position || null,
-        phone: s.phone || null,
-        mobile: s.mobile || null,
-        email: s.email || null,
-      }))
-      .filter((s) => s.staff_name);
-    const res = await authFetch(`${API_BASE}/admin/companies/${currentCompanyId}/staff/bulk`, {
-      method: "PUT",
-      body: JSON.stringify({ items }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `담당자 저장 실패 (HTTP ${res.status})`);
-    }
-    const detail = await fetchCompanyDetail(currentCompanyId, document.getElementById("ac-headcount_year")?.value);
-    bindCompanyDetail(detail);
-    setOrgMsg("ac-staff-msg", "담당자 저장 완료", "ok");
   }
 
   // 모달 닫기 / 탭 전환
@@ -700,19 +586,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("admin-company-basic-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      await saveCompanyProfile("ac-basic-msg", false);
+      await saveCompanyStatus();
     } catch (err) {
-      setOrgMsg("ac-basic-msg", err.message || "저장 실패", "err");
+      setOrgMsg("ac-basic-msg", err.message || "상태 저장 실패", "err");
     }
   });
 
-  document.getElementById("admin-company-headcount-form")?.addEventListener("submit", async (e) => {
+  document.getElementById("admin-company-headcount-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
-    try {
-      await saveCompanyProfile("ac-headcount-msg", true);
-    } catch (err) {
-      setOrgMsg("ac-headcount-msg", err.message || "저장 실패", "err");
-    }
   });
 
   document.getElementById("ac-headcount_year")?.addEventListener("change", async () => {
@@ -724,85 +605,6 @@ document.addEventListener("DOMContentLoaded", () => {
       setOrgMsg("ac-headcount-msg", `${year}년 인원 불러옴`, "ok");
     } catch (err) {
       setOrgMsg("ac-headcount-msg", err.message || "조회 실패", "err");
-    }
-  });
-
-  document.getElementById("ac-site-add")?.addEventListener("click", () => {
-    syncSitesFromDom();
-    draftSites.push({
-      site_name: "",
-      address: "",
-      detail_address: "",
-      address_en: "",
-      employee_count: 0,
-      work_type: "",
-    });
-    renderAdminSites();
-  });
-  document.getElementById("ac-site-list")?.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-site-del]");
-    if (!btn) return;
-    syncSitesFromDom();
-    draftSites.splice(Number(btn.getAttribute("data-site-del")), 1);
-    renderAdminSites();
-  });
-  document.getElementById("ac-site-save")?.addEventListener("click", async () => {
-    try {
-      await saveAdminSites();
-    } catch (err) {
-      setOrgMsg("ac-site-msg", err.message || "저장 실패", "err");
-    }
-  });
-
-  document.getElementById("ac-dept-add")?.addEventListener("click", () => {
-    const inp = document.getElementById("ac-dept-input");
-    const name = (inp?.value || "").trim();
-    if (!name) return;
-    if (!draftDepartments.some((d) => String(d).toLowerCase() === name.toLowerCase())) {
-      draftDepartments.push(name);
-    }
-    if (inp) inp.value = "";
-    renderAdminDepartments();
-  });
-  document.getElementById("ac-dept-tags")?.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-dept-del]");
-    if (!btn) return;
-    draftDepartments.splice(Number(btn.getAttribute("data-dept-del")), 1);
-    renderAdminDepartments();
-  });
-  document.getElementById("ac-dept-save")?.addEventListener("click", async () => {
-    try {
-      await saveAdminDepartments();
-    } catch (err) {
-      setOrgMsg("ac-dept-msg", err.message || "저장 실패", "err");
-    }
-  });
-
-  document.getElementById("ac-staff-add")?.addEventListener("click", () => {
-    syncStaffFromDom();
-    draftStaff.push({
-      role: "",
-      staff_name: "",
-      department: "",
-      position: "",
-      phone: "",
-      mobile: "",
-      email: "",
-    });
-    renderAdminStaff();
-  });
-  document.getElementById("ac-staff-body")?.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-staff-del]");
-    if (!btn) return;
-    syncStaffFromDom();
-    draftStaff.splice(Number(btn.getAttribute("data-staff-del")), 1);
-    renderAdminStaff();
-  });
-  document.getElementById("ac-staff-save")?.addEventListener("click", async () => {
-    try {
-      await saveAdminStaff();
-    } catch (err) {
-      setOrgMsg("ac-staff-msg", err.message || "저장 실패", "err");
     }
   });
 
@@ -933,12 +735,12 @@ document.addEventListener("DOMContentLoaded", () => {
               return `
         <tr>
           <td>${seq}</td>
-          <td class="fw-bold">${escapeHtml(a.name || "-")}</td>
-          <td>${escapeHtml(a.email || "-")}</td>
-          <td>${escapeHtml(a.phone || "-")}</td>
+          <td class="fw-bold">${escapeHtml(a.name || "—")}</td>
+          <td>${escapeHtml(a.email || "—")}</td>
+          <td>${escapeHtml(a.phone || "—")}</td>
           <td>${escapeHtml(gradeLabel(a.grade))}</td>
           <td>${escapeHtml(employmentLabel(a.employment_type))}</td>
-          <td>${a.is_freelance ? "프리랜서" : "-"}</td>
+          <td>${a.is_freelance ? "프리랜서" : "—"}</td>
           <td>
             <button type="button" class="btn-detail" onclick="openAuditorDetailModal(${Number(a.id)})">상세</button>
           </td>
@@ -967,29 +769,8 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
-  function openAuditorDetailModalShell() {
-    const modal = document.getElementById("auditorDetailModal");
-    if (!modal) return;
-    modal.classList.add("show");
-    modal.setAttribute("aria-hidden", "false");
-    switchAuditorDetailTab("aud-basic-info");
-  }
-
-  function closeAuditorDetailModal() {
-    const modal = document.getElementById("auditorDetailModal");
-    if (!modal) return;
-    modal.classList.remove("show");
-    modal.setAttribute("aria-hidden", "true");
-  }
-
-  function switchAuditorDetailTab(tabId) {
-    document.querySelectorAll("#auditorDetailTab .nav-link").forEach((btn) => {
-      btn.classList.toggle("active", btn.getAttribute("data-auditor-detail-tab") === tabId);
-    });
-    document.querySelectorAll("#auditorDetailTabContent .detail-tab-pane").forEach((pane) => {
-      pane.classList.toggle("active", pane.id === tabId);
-    });
-  }
+  /* ---- 심사원 상세정보 (CB 상세정보와 동일 UX) ---- */
+  const auditorDetailState = { editingId: null };
 
   function membershipStatusLabel(status) {
     const map = {
@@ -1001,58 +782,59 @@ document.addEventListener("DOMContentLoaded", () => {
       suspended: "정지",
       expired: "만료",
     };
-    return map[status] || status || "-";
+    return map[status] || status || "—";
   }
 
-  function renderMembershipCards(memberships) {
-    const el = document.getElementById("cb-membership-list");
+  function renderMembershipPlain(memberships) {
+    const el = document.getElementById("aud-membership-list");
     if (!el) return;
     if (!memberships.length) {
-      el.innerHTML =
-        '<div class="placeholder-box">신청 및 승인된 인증기관 자격 정보가 없습니다.</div>';
+      el.textContent = "—";
       return;
     }
     el.innerHTML = memberships
       .map((m) => {
-        const approvedGrade = gradeLabel(m.approved_grade || m.grade_at_cb || m.apply_grade);
-        return `
-      <div class="membership-block">
-        <div class="membership-card-header">
-          <h6 class="fw-bold">CB ID: ${escapeHtml(m.cb_id)}</h6>
-          <span class="panel-count">${escapeHtml(membershipStatusLabel(m.status))}</span>
-        </div>
-        <table class="detail-table" style="margin-top: 8px;">
-          <tr>
-            <th style="width:25%;">승인 등급</th>
-            <td>${escapeHtml(approvedGrade)}</td>
-          </tr>
-          <tr>
-            <th>승인 ISO 표준</th>
-            <td><span class="fw-bold text-primary">${escapeHtml(m.cert_standards || "검토 중")}</span></td>
-          </tr>
-          <tr>
-            <th>승인 IAF 코드</th>
-            <td>${escapeHtml(m.approved_iaf_codes || "검토 중")}</td>
-          </tr>
-          <tr>
-            <th>자격 부여일</th>
-            <td>${escapeHtml(m.qualification_granted_at || "-")}</td>
-          </tr>
-          <tr>
-            <th>자격 만료일</th>
-            <td>${escapeHtml(m.qualification_expires_at || "-")}</td>
-          </tr>
-          <tr>
-            <th>지식평가 / CPD</th>
-            <td>${escapeHtml(m.knowledge_eval_score ?? "-")}점 / ${escapeHtml(m.cpd_hours_completed ?? 0)}h</td>
-          </tr>
-          <tr>
-            <th>이해상충 선언</th>
-            <td>${m.conflict_of_interest_cleared ? "완료" : "미완료"}</td>
-          </tr>
-        </table>
-      </div>`;
+        const cbLabel = m.cb_name
+          ? `${m.cb_name}${m.cb_code ? ` (${m.cb_code})` : ""}`
+          : `CB #${m.cb_id}`;
+        const grade = gradeLabel(m.approved_grade || m.grade_at_cb || m.apply_grade);
+        const standards = m.cert_standards || "—";
+        const iaf = m.approved_iaf_codes || "—";
+        const period =
+          m.qualification_granted_at || m.qualification_expires_at
+            ? `${m.qualification_granted_at || "—"} ~ ${m.qualification_expires_at || "—"}`
+            : "—";
+        return `<div class="history-item" style="margin-bottom:8px;">
+          <strong>${escapeHtml(cbLabel)}</strong>
+          <small>
+            ${escapeHtml(membershipStatusLabel(m.status))}
+            · 등급 ${escapeHtml(grade)}
+            · 표준 ${escapeHtml(standards)}
+            · IAF ${escapeHtml(iaf)}
+            · 자격기간 ${escapeHtml(period)}
+            ${m.is_primary ? " · 주소속" : ""}
+            · ${escapeHtml(employmentLabel(m.employment_type))}
+            · 프리랜서 ${m.is_freelance ? "예" : "아니오"}
+          </small>
+        </div>`;
       })
+      .join("");
+  }
+
+  function renderExternalCertsPlain(certs) {
+    const el = document.getElementById("aud-external-certs");
+    if (!el) return;
+    if (!certs.length) {
+      el.textContent = "—";
+      return;
+    }
+    el.innerHTML = certs
+      .map(
+        (c) => `<div class="history-item" style="margin-bottom:6px;">
+          <strong>${escapeHtml(c.cert_name || "—")} · ${escapeHtml(gradeLabel(c.grade))}</strong>
+          <small>${escapeHtml(c.issuer || "—")} · ${escapeHtml(c.cert_no || "—")} · ${escapeHtml(c.issued_date || "—")} ~ ${escapeHtml(c.expiry_date || "—")}</small>
+        </div>`,
+      )
       .join("");
   }
 
@@ -1060,7 +842,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const el = document.getElementById("aud-edu-list");
     if (!el) return;
     if (!educations.length) {
-      el.innerHTML = '<div class="placeholder-box">학력 정보가 없습니다.</div>';
+      el.textContent = "—";
       return;
     }
     el.innerHTML = educations
@@ -1068,7 +850,7 @@ document.addEventListener("DOMContentLoaded", () => {
         (e) => `
       <div class="history-item">
         <strong>${escapeHtml(e.school_name)} · ${escapeHtml(e.degree)}</strong>
-        <small>전공: ${escapeHtml(e.major || "-")} · ${escapeHtml(e.entered_at || "-")} ~ ${escapeHtml(e.graduated_at || "-")}</small>
+        <small>전공: ${escapeHtml(e.major || "—")} · ${escapeHtml(e.entered_at || "—")} ~ ${escapeHtml(e.graduated_at || "—")}</small>
       </div>`,
       )
       .join("");
@@ -1078,82 +860,132 @@ document.addEventListener("DOMContentLoaded", () => {
     const el = document.getElementById("aud-career-list");
     if (!el) return;
     if (!careers.length) {
-      el.innerHTML = '<div class="placeholder-box">실무 경력 정보가 없습니다.</div>';
+      el.textContent = "—";
       return;
     }
     el.innerHTML = careers
       .map(
         (c) => `
       <div class="history-item">
-        <strong>${escapeHtml(c.company_name)} · ${escapeHtml(c.position || "-")}</strong>
-        <small>${escapeHtml(c.start_date || "-")} ~ ${c.is_current ? "재직중" : escapeHtml(c.end_date || "-")}${c.note ? ` · ${escapeHtml(c.note)}` : ""}</small>
+        <strong>${escapeHtml(c.company_name)} · ${escapeHtml(c.position || "—")}</strong>
+        <small>${escapeHtml(c.start_date || "—")} ~ ${c.is_current ? "재직중" : escapeHtml(c.end_date || "—")}${c.note ? ` · ${escapeHtml(c.note)}` : ""}</small>
       </div>`,
       )
       .join("");
   }
 
+  function profileStatusLabel(status) {
+    const map = {
+      pending: "대기",
+      submitted: "제출",
+      reviewing: "검토중",
+      approved: "승인",
+      rejected: "반려",
+      active: "활성",
+    };
+    return map[status] || status || "—";
+  }
+
+  function fillAuditorDetailForm(profile = {}) {
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val == null || val === "" ? "" : String(val);
+    };
+    const setText = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = dashText(val);
+    };
+
+    setText("aud-f-id", profile.id);
+    set("aud-f-complais-no", profile.complais_no);
+    set("aud-f-name", profile.name);
+    set("aud-f-name-en", profile.name_en);
+    set("aud-f-birth", profile.birth_date ? String(profile.birth_date).slice(0, 10) : "");
+    set("aud-f-gender", profile.gender === "male" ? "M" : profile.gender === "female" ? "F" : profile.gender || "");
+    set("aud-f-reg-no", profile.registration_no);
+    set("aud-f-status", profile.status || "");
+    setText("aud-f-profile-status", profileStatusLabel(profile.profile_status));
+    setText(
+      "aud-f-is-active",
+      profile.is_active == null ? "—" : profile.is_active ? "활성" : "비활성",
+    );
+    setText("aud-f-created", fmtDateOnly(profile.created_at));
+    setText("aud-f-updated", fmtDateOnly(profile.updated_at));
+
+    set("aud-f-email", profile.email);
+    set("aud-f-phone", profile.phone);
+    set("aud-f-address", profile.address);
+    set("aud-f-address-detail", profile.detail_address);
+
+    // grade select: map legacy senior → keep value so option matches
+    set("aud-f-grade", profile.grade || "");
+    set("aud-f-iaf", profile.iaf_codes);
+    set("aud-f-edu-level", profile.education_level);
+    set("aud-f-school", profile.school_name);
+    set("aud-f-major", profile.major);
+
+    set("aud-f-emp-type", profile.employment_type || "");
+    set(
+      "aud-f-freelance",
+      profile.is_freelance == null ? "" : profile.is_freelance ? "true" : "false",
+    );
+    set("aud-f-contract-type", profile.contract_type);
+    set("aud-f-cb-affiliation", profile.cb_affiliation);
+    const primaryCb =
+      profile.primary_cb_name || profile.primary_cb_code
+        ? `${profile.primary_cb_name || "—"}${profile.primary_cb_code ? ` (${profile.primary_cb_code})` : ""}${profile.primary_cb_id ? ` · #${profile.primary_cb_id}` : ""}`
+        : profile.primary_cb_id
+          ? `#${profile.primary_cb_id}`
+          : "—";
+    setText("aud-f-primary-cb", primaryCb);
+    set("aud-f-income-type", profile.income_type);
+    set("aud-f-commission-type", profile.commission_type);
+    set("aud-f-daily-rate", profile.daily_rate != null ? profile.daily_rate : "");
+    set("aud-f-fee-ratio", profile.fee_ratio != null ? profile.fee_ratio : "");
+    set("aud-f-monthly-fee", profile.monthly_fee != null ? profile.monthly_fee : "");
+
+    set("aud-f-bank", profile.bank_name);
+    set("aud-f-account", profile.account_no);
+    set("aud-f-holder", profile.account_holder);
+    set("aud-f-career-summary", profile.career_summary);
+    set("aud-f-intro", profile.intro);
+  }
+
   async function openAuditorDetailModal(id) {
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      redirectToLogin("로그인이 필요합니다.");
-      return;
-    }
-
     try {
-      const response = await fetch(`${API_BASE}/admin/auditors/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.status === 401 || response.status === 403) {
-        clearAuthToken();
-        redirectToLogin(
-          response.status === 401
-            ? "인증이 만료되었습니다. 다시 로그인해주세요."
-            : "관리자 권한이 없습니다.",
-        );
-        return;
-      }
+      const response = await authFetch(`${API_BASE}/admin/auditors/${id}`);
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || `요청 실패 (HTTP ${response.status})`);
+        throw new Error(
+          typeof data.detail === "string" ? data.detail : `상세 조회 실패 (HTTP ${response.status})`,
+        );
       }
-
-      const data = await response.json();
       const profile = data.profile || {};
-
-      setText("modal-auditor-title", `${profile.name || "심사원"} 심사원 상세 정보`);
-      setText("a-id", profile.id);
-      setText("a-status", profile.status || "active");
-      setText("a-name", profile.name || "-");
-      setText("a-email", profile.email || "-");
-      setText("a-phone", profile.phone || "-");
-      setText(
-        "a-birth-gender",
-        `${profile.birth_date || "-"} / ${genderLabel(profile.gender)}`,
-      );
-      setText("a-emp-type", employmentLabel(profile.employment_type));
-      setText("a-freelance", profile.is_freelance ? "예" : "아니오");
-      setText(
-        "a-address",
-        `${profile.address || ""} ${profile.detail_address || ""}`.trim() || "-",
-      );
-      setText(
-        "a-bank-account",
-        profile.bank_name
-          ? `${profile.bank_name} ${profile.account_no || ""} (예금주: ${profile.account_holder || "-"})`
-          : "미등록",
-      );
-
-      // 2. 자격 & 소속 CB 탭 바인딩
-      renderMembershipCards(data.memberships || []);
-      // 3. 학력 & 실무경력
+      auditorDetailState.editingId = id;
+      const titleEl = document.getElementById("auditor-detail-modal-title");
+      const subEl = document.getElementById("auditor-detail-modal-sub");
+      if (titleEl) titleEl.textContent = "심사원 상세정보";
+      if (subEl) {
+        subEl.textContent = `${profile.name || "—"} · ${gradeLabel(profile.grade)}`;
+      }
+      fillAuditorDetailForm(profile);
+      renderMembershipPlain(data.memberships || []);
+      renderExternalCertsPlain(data.external_certs || []);
       renderEduList(data.educations || []);
       renderCareerList(data.careers || []);
-
-      openAuditorDetailModalShell();
+      const err = document.getElementById("auditor-detail-modal-error");
+      if (err) err.textContent = "";
+      setOrgMsg("auditor-action-msg", "");
+      showModal("auditorDetailModal", true);
     } catch (error) {
       console.error("Auditor detail fetch failed:", error);
-      alert(`심사원 상세를 불러오지 못했습니다.\n${error.message}`);
+      alert(error.message || "심사원 상세를 불러오지 못했습니다.");
     }
+  }
+
+  function closeAuditorDetailModal() {
+    showModal("auditorDetailModal", false);
+    auditorDetailState.editingId = null;
   }
 
   document.querySelectorAll("[data-auditor-modal-close]").forEach((btn) => {
@@ -1162,13 +994,63 @@ document.addEventListener("DOMContentLoaded", () => {
   const auditorModal = document.getElementById("auditorDetailModal");
   if (auditorModal) {
     auditorModal.addEventListener("click", (e) => {
-      if (e.target === auditorModal) closeAuditorDetailModal();
+      if (e.target.id === "auditorDetailModal") closeAuditorDetailModal();
     });
   }
-  document.querySelectorAll("#auditorDetailTab [data-auditor-detail-tab]").forEach((btn) => {
-    btn.addEventListener("click", () =>
-      switchAuditorDetailTab(btn.getAttribute("data-auditor-detail-tab")),
+
+  async function refreshAuditorDetailAfterAction() {
+    if (!auditorDetailState.editingId) return;
+    const response = await authFetch(
+      `${API_BASE}/admin/auditors/${auditorDetailState.editingId}`,
     );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(
+        typeof data.detail === "string" ? data.detail : `상세 조회 실패 (HTTP ${response.status})`,
+      );
+    }
+    const profile = data.profile || {};
+    fillAuditorDetailForm(profile);
+    renderMembershipPlain(data.memberships || []);
+    renderExternalCertsPlain(data.external_certs || []);
+    renderEduList(data.educations || []);
+    renderCareerList(data.careers || []);
+    const subEl = document.getElementById("auditor-detail-modal-sub");
+    if (subEl) subEl.textContent = `${profile.name || "—"} · ${gradeLabel(profile.grade)}`;
+    await fetchAuditors(auditorPage);
+  }
+
+  async function postAuditorAction(path, body, successMsg) {
+    const err = document.getElementById("auditor-detail-modal-error");
+    if (err) err.textContent = "";
+    if (!auditorDetailState.editingId) return;
+    setOrgMsg("auditor-action-msg", "처리 중...");
+    const opts = { method: "PATCH" };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await authFetch(
+      `${API_BASE}/admin/auditors/${auditorDetailState.editingId}${path}`,
+      opts,
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail =
+        typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || data);
+      throw new Error(detail || `처리 실패 (HTTP ${res.status})`);
+    }
+    await refreshAuditorDetailAfterAction();
+    setOrgMsg("auditor-action-msg", successMsg, "ok");
+  }
+
+  document.getElementById("auditor-status-save")?.addEventListener("click", async () => {
+    try {
+      const statusVal = (document.getElementById("aud-f-status")?.value || "").trim();
+      if (!statusVal) throw new Error("상태를 선택하세요.");
+      await postAuditorAction("/status", { status: statusVal }, "상태 저장 완료");
+    } catch (error) {
+      setOrgMsg("auditor-action-msg", error.message || "상태 저장 실패", "err");
+      const err = document.getElementById("auditor-detail-modal-error");
+      if (err) err.textContent = error.message || "상태 저장 실패";
+    }
   });
 
   const searchAuditorsBtn = document.getElementById("search-auditors-btn");
@@ -1220,7 +1102,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!records || records.length === 0) {
       tbody.innerHTML =
-        '<tr><td colspan="9" style="text-align: center; color: var(--font-tertiary);">등록된 인증기관이 없습니다.</td></tr>';
+        '<tr><td colspan="8" style="text-align: center; color: var(--font-tertiary);">등록된 인증기관이 없습니다.</td></tr>';
       return;
     }
 
@@ -1239,7 +1121,7 @@ document.addEventListener("DOMContentLoaded", () => {
           ? `<div class="held-std-cell">${stds
               .map(
                 (ini) =>
-                  `<button type="button" class="held-std-link" data-cb-held="${cbId}" data-std-initial="${escapeHtml(ini)}" title="${escapeHtml(ini)} 인증수행범위">${escapeHtml(ini)}</button>`,
+                  `<button type="button" class="held-std-link" data-cb-held="${cbId}" data-std-initial="${escapeHtml(ini)}" title="${escapeHtml(ini)} 인정·인증수행범위">${escapeHtml(ini)}</button>`,
               )
               .join("")}</div>`
           : "—";
@@ -1253,7 +1135,6 @@ document.addEventListener("DOMContentLoaded", () => {
           <td class="col-held-std">${heldCell}</td>
           <td>${escapeHtml(abDisplay)}</td>
           <td>${fmtMoney(r.annual_base_fee)}</td>
-          <td>${fmtMoney(r.price_per_md)}</td>
           <td>
             <button type="button" class="btn-detail" data-cb-detail="${cbId}">상세정보</button>
           </td>
@@ -1262,16 +1143,23 @@ document.addEventListener("DOMContentLoaded", () => {
       .join("");
   }
 
-  /* ---- CB 상세정보 (목록에 없는 필드만) / 보유 표준·IAF 팝업 ---- */
+  /* ---- CB 상세정보 (목록에 없는 필드) / 보유 표준·IAF 팝업 ---- */
   const cbDetailState = {
     editingId: null,
-    legacyRegNo: null,
     accreditationBody: "KAB",
     cbInitial: null,
     cbCode: "",
     cbName: "",
     status: "active",
     contractYear: new Date().getFullYear(),
+    // CB-level legacy (상세정보에서 편집 제거 — 저장 시 기존값 유지)
+    legacyRegNo: null,
+    legacyExpireDate: null,
+  };
+
+  const cbHeldState = {
+    cbId: null,
+    familyInitial: null,
   };
 
   function showModal(id, show) {
@@ -1281,8 +1169,20 @@ document.addEventListener("DOMContentLoaded", () => {
     modal.setAttribute("aria-hidden", show ? "false" : "true");
   }
 
+  function dashText(v) {
+    if (v == null) return "—";
+    const s = String(v).trim();
+    return s ? s : "—";
+  }
+
+  function fmtDateOnly(v) {
+    if (!v) return "—";
+    const s = String(v).trim();
+    if (!s) return "—";
+    return s.slice(0, 10);
+  }
+
   function fillCbDetailForm(d = {}) {
-    cbDetailState.legacyRegNo = d.reg_no || null;
     cbDetailState.accreditationBody = d.accreditation_body || "KAB";
     cbDetailState.cbInitial = d.cb_initial || null;
     cbDetailState.cbCode = d.cb_code || "";
@@ -1293,25 +1193,50 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const set = (id, val) => {
       const el = document.getElementById(id);
-      if (el) el.value = val ?? "";
+      if (el) el.value = val == null || val === "" ? "" : String(val);
     };
+    const setText = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = dashText(val);
+    };
+
+    cbDetailState.legacyRegNo = d.reg_no || null;
+    cbDetailState.legacyExpireDate = d.expire_date || null;
+
     set("cb-f-name-en", d.cb_name_en);
     set("cb-f-initial", d.cb_initial);
     set("cb-f-biz", d.biz_reg_no);
-    set("cb-f-ceo", d.ceo_name);
-    set("cb-f-email", d.email);
-    set("cb-f-web", d.website);
-    set("cb-f-tel", d.tel);
-    set("cb-f-address", d.address);
-    set("cb-f-fax", d.fax);
     set("cb-f-corp", d.corp_no);
+    set("cb-f-personal", d.personal_no);
+    set("cb-f-ceo", d.ceo_name);
+    set("cb-f-acc-region", d.accreditation_region);
+    set("cb-f-acc-country", d.accreditation_country);
+    setText("cb-f-activated", fmtDateOnly(d.activated_at));
+    setText("cb-f-eval-score", d.evaluation_score);
+
+    set("cb-f-tel", d.tel);
+    set("cb-f-fax", d.fax);
+    set("cb-f-email", d.email);
     set("cb-f-tax-email", d.tax_email);
+    set("cb-f-web", d.website);
+    set("cb-f-zip", "");
+    set("cb-f-address", d.address);
+    set("cb-f-address-detail", "");
+
     set("cb-f-bank", d.bank_name);
     set("cb-f-account", d.account_no);
     set("cb-f-holder", d.account_holder);
-    set("cb-f-expire", d.expire_date);
-    set("cb-f-intro", d.intro);
     set("cb-f-tier", contract.tier || "MEDIUM");
+    set("cb-f-base-fee", contract.annual_base_fee != null ? contract.annual_base_fee : "");
+    setText("cb-f-contract-year", contract.contract_year || cbDetailState.contractYear);
+    const start = fmtDateOnly(contract.contract_start_date);
+    const end = fmtDateOnly(contract.contract_end_date);
+    setText(
+      "cb-f-contract-period",
+      start === "—" && end === "—" ? "—" : `${start} ~ ${end}`,
+    );
+
+    set("cb-f-intro", d.intro);
   }
 
   async function openCbDetailModal(cbId) {
@@ -1322,9 +1247,9 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(typeof data.detail === "string" ? data.detail : `상세 조회 실패 (HTTP ${res.status})`);
       }
       cbDetailState.editingId = cbId;
-      document.getElementById("cb-detail-modal-title").textContent = "인증기관 상세정보";
+      document.getElementById("cb-detail-modal-title").textContent = "상세정보";
       document.getElementById("cb-detail-modal-sub").textContent =
-        `${data.cb_code || ""} · ${data.cb_name || ""} (목록에 없는 항목)`;
+        `${data.cb_name || "—"} · ${data.cb_code || "—"}`;
       fillCbDetailForm(data);
       const err = document.getElementById("cb-detail-modal-error");
       if (err) err.textContent = "";
@@ -1356,8 +1281,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function openCbHeldStandardsModal(cbId, familyInitial = null) {
     const tbody = document.getElementById("cb-held-tbody");
+    const errEl = document.getElementById("cb-held-modal-error");
+    if (errEl) errEl.textContent = "";
+    cbHeldState.cbId = cbId;
+    cbHeldState.familyInitial = familyInitial;
     if (tbody) {
-      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--font-tertiary);">불러오는 중…</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--font-tertiary);">불러오는 중…</td></tr>';
     }
     showModal("cbHeldStandardsModal", true);
     try {
@@ -1370,7 +1299,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const titleEl = document.getElementById("cb-held-modal-title");
       const subEl = document.getElementById("cb-held-modal-sub");
       if (titleEl) {
-        titleEl.textContent = ini ? `${ini} · 인증수행범위` : "보유 표준 · 인증수행범위";
+        titleEl.textContent = ini ? `${ini} · 인정·인증수행범위` : "보유 표준 · 인정·인증수행범위";
       }
       if (subEl) {
         subEl.textContent = `${data.cb_code || ""} · ${data.cb_name || ""}`;
@@ -1383,28 +1312,93 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!tbody) return;
       if (!rows.length) {
         tbody.innerHTML =
-          '<tr><td colspan="3" style="text-align:center;color:var(--font-tertiary);">해당 표준의 인증수행범위가 없습니다.</td></tr>';
+          '<tr><td colspan="6" style="text-align:center;color:var(--font-tertiary);">해당 표준의 보유 정보가 없습니다.</td></tr>';
         return;
       }
       tbody.innerHTML = rows
         .map((r) => {
           const iaf = formatIafPlain(r.iaf_codes);
-          return `<tr>
+          const exp = r.expiry_date ? String(r.expiry_date).slice(0, 10) : "";
+          const md =
+            r.md_rate != null && r.md_rate !== ""
+              ? Number(r.md_rate).toLocaleString("ko-KR")
+              : "—";
+          const warn =
+            r.expiry_warning ||
+            (r.expiry_status === "warn" || r.expiry_status === "locked"
+              ? `만료 ${r.days_remaining != null ? `D-${r.days_remaining}` : ""}`
+              : "");
+          const warnHtml = warn
+            ? `<div style="font-size:12px;margin-top:4px;color:${
+                r.expiry_status === "locked" ? "var(--sec-red)" : "var(--font-secondary)"
+              };">${escapeHtml(warn)}</div>`
+            : "";
+          return `<tr data-std="${escapeHtml(r.standard_code || "")}" data-ab="${escapeHtml(r.ab_code || "")}">
             <td><strong>${escapeHtml(r.family_initial)}</strong></td>
             <td>${escapeHtml(r.standard_code || "")}${r.standard_name ? `<div style="font-size:12px;color:var(--font-secondary);">${escapeHtml(r.standard_name)}</div>` : ""}</td>
+            <td><input type="text" data-held-reg class="form-input" value="${escapeHtml(r.registration_no || "")}" placeholder="인정번호" style="width:100%;min-width:100px;" /></td>
+            <td><input type="date" data-held-exp class="form-input" value="${escapeHtml(exp)}" style="width:100%;min-width:130px;" />${warnHtml}</td>
+            <td><span class="muted" title="CB 포털에서만 수정 가능">${escapeHtml(md)}</span></td>
             <td><span class="iaf-plain">${escapeHtml(iaf)}</span></td>
           </tr>`;
         })
         .join("");
     } catch (error) {
       if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--sec-red);">${escapeHtml(error.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--sec-red);">${escapeHtml(error.message)}</td></tr>`;
       }
     }
   }
 
   function closeCbHeldStandardsModal() {
     showModal("cbHeldStandardsModal", false);
+    cbHeldState.cbId = null;
+    cbHeldState.familyInitial = null;
+  }
+
+  async function saveCbHeldStandards() {
+    const errEl = document.getElementById("cb-held-modal-error");
+    if (errEl) errEl.textContent = "";
+    if (!cbHeldState.cbId) return;
+    const rows = [...document.querySelectorAll("#cb-held-tbody tr[data-std]")];
+    if (!rows.length) {
+      if (errEl) errEl.textContent = "저장할 표준 행이 없습니다.";
+      return;
+    }
+    const items = rows.map((tr) => {
+      const std = tr.getAttribute("data-std") || "";
+      const ab = (tr.getAttribute("data-ab") || "").trim() || null;
+      const reg = (tr.querySelector("[data-held-reg]")?.value || "").trim() || null;
+      const exp = (tr.querySelector("[data-held-exp]")?.value || "").trim() || null;
+      return {
+        standard_code: std,
+        ab_code: ab,
+        registration_no: reg,
+        expiry_date: exp,
+        is_active: true,
+      };
+    }).filter((it) => it.standard_code);
+    const saveBtn = document.getElementById("cb-held-save");
+    try {
+      if (saveBtn) saveBtn.disabled = true;
+      const res = await authFetch(
+        `${API_BASE}/admin/certification-bodies/${cbHeldState.cbId}/standard-accreditations`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ items, replace_all: false }),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data.detail === "string" ? data.detail : `저장 실패 (HTTP ${res.status})`);
+      }
+      closeCbHeldStandardsModal();
+      await refreshCbContractsList();
+    } catch (error) {
+      if (errEl) errEl.textContent = error.message || "저장에 실패했습니다.";
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
+    }
   }
 
   window.openCbDetailModal = openCbDetailModal;
@@ -1435,6 +1429,12 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-cb-held-close]").forEach((btn) => {
     btn.addEventListener("click", closeCbHeldStandardsModal);
   });
+  const cbHeldSave = document.getElementById("cb-held-save");
+  if (cbHeldSave) {
+    cbHeldSave.addEventListener("click", () => {
+      saveCbHeldStandards();
+    });
+  }
   const cbDetailModal = document.getElementById("cbDetailModal");
   if (cbDetailModal) {
     cbDetailModal.addEventListener("click", (e) => {
@@ -1452,6 +1452,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ComplaisValidation.bindField(document.getElementById("cb-f-biz"), "biz");
     ComplaisValidation.bindField(document.getElementById("cb-f-tel"), "phone");
     ComplaisValidation.bindField(document.getElementById("cb-f-email"), "email");
+    ComplaisValidation.bindField(document.getElementById("cb-f-tax-email"), "email");
   }
 
   const cbDetailSave = document.getElementById("cb-detail-save");
@@ -1465,6 +1466,7 @@ document.addEventListener("DOMContentLoaded", () => {
           { el: document.getElementById("cb-f-biz"), kind: "biz", required: false },
           { el: document.getElementById("cb-f-tel"), kind: "phone", required: false },
           { el: document.getElementById("cb-f-email"), kind: "email", required: false },
+          { el: document.getElementById("cb-f-tax-email"), kind: "email", required: false },
         ]);
         if (!v.ok) {
           if (err) err.textContent = v.message;
@@ -1472,23 +1474,48 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
       const val = (id) => (document.getElementById(id)?.value || "").trim();
+      const numOrNull = (id) => {
+        const raw = val(id);
+        if (!raw) return null;
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : null;
+      };
       const payload = {
         cb_code: cbDetailState.cbCode,
         cb_name: cbDetailState.cbName,
         cb_name_en: val("cb-f-name-en") || null,
         cb_initial: val("cb-f-initial") || cbDetailState.cbInitial,
         accreditation_body: cbDetailState.accreditationBody || "KAB",
+        // 인정번호·만료일은 표준별(보유 표준 모달). CB 레거시 값은 유지.
         reg_no: cbDetailState.legacyRegNo,
+        expire_date: cbDetailState.legacyExpireDate,
         biz_reg_no: val("cb-f-biz") || null,
+        corp_no: val("cb-f-corp") || null,
+        personal_no: val("cb-f-personal") || null,
         ceo_name: val("cb-f-ceo") || null,
         email: val("cb-f-email") || null,
+        tax_email: val("cb-f-tax-email") || null,
         website: val("cb-f-web") || null,
         tel: val("cb-f-tel") || null,
-        address: val("cb-f-address") || null,
+        fax: val("cb-f-fax") || null,
+        address: (() => {
+          const base = val("cb-f-address") || "";
+          const detail = val("cb-f-address-detail") || "";
+          const joined = [base, detail].filter(Boolean).join(" ").trim();
+          return joined || null;
+        })(),
+        bank_name: val("cb-f-bank") || null,
+        account_no: val("cb-f-account") || null,
+        account_holder: val("cb-f-holder") || null,
+        accreditation_region: val("cb-f-acc-region") || null,
+        accreditation_country: val("cb-f-acc-country") || null,
+        intro: val("cb-f-intro") || null,
         status: cbDetailState.status,
         contract: {
           contract_year: cbDetailState.contractYear,
           tier: val("cb-f-tier") || "MEDIUM",
+          annual_base_fee: numOrNull("cb-f-base-fee"),
+          // MD단가는 어드민 미관리 — 미전송 시 기존 DB 값 유지
         },
       };
       try {
@@ -1501,8 +1528,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!res.ok) {
           throw new Error(typeof data.detail === "string" ? data.detail : `저장 실패 (HTTP ${res.status})`);
         }
-        // 목록에 없는 확장 필드 추가 반영 (fax/bank 등)
-        // PUT schema may ignore unknown; best-effort local only
         closeCbDetailModal();
         await refreshCbContractsList();
       } catch (error) {
@@ -1617,9 +1642,176 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function formatKRW(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "₩0";
+    return `₩${Math.round(n).toLocaleString("ko-KR")}`;
+  }
+
+  function applyRevenue(r) {
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = formatKRW(val);
+    };
+    set("rev-total", r.total);
+    set("rev-cb-sub", r.cb_subscription);
+    set("rev-consulting", r.consulting_subscription);
+    set("rev-education", r.education_matching_ads);
+    set("rev-promotion", r.company_promotion_fees);
+    const cur = document.getElementById("rev-currency-label");
+    if (cur) cur.textContent = `${r.currency || "KRW"} · 연간`;
+  }
+
+  async function loadDashboardRevenue() {
+    try {
+      const res = await authFetch(`${API_BASE}/admin/revenue`);
+      if (!res.ok) return;
+      applyRevenue(await res.json());
+    } catch (err) {
+      console.error("Dashboard revenue failed:", err);
+    }
+  }
+
+  let monitoringCache = {
+    ongoing_audits_count: 0,
+    active_auditors_count: 0,
+    ongoing_audits: [],
+    active_auditors: [],
+  };
+
+  function applyMonitoringCounts(data) {
+    monitoringCache = {
+      ongoing_audits_count: Number(data?.ongoing_audits_count) || 0,
+      active_auditors_count: Number(data?.active_auditors_count) || 0,
+      ongoing_audits: Array.isArray(data?.ongoing_audits) ? data.ongoing_audits : [],
+      active_auditors: Array.isArray(data?.active_auditors) ? data.active_auditors : [],
+    };
+    const auditsEl = document.getElementById("monitor-ongoing-audits-count");
+    if (auditsEl) auditsEl.textContent = `${monitoringCache.ongoing_audits_count} 건`;
+    const auditorsEl = document.getElementById("monitor-active-auditors-count");
+    if (auditorsEl) auditorsEl.textContent = `${monitoringCache.active_auditors_count} 명`;
+  }
+
+  function closeMonitoringModal() {
+    showModal("monitoringDetailModal", false);
+  }
+
+  function openMonitoringModal(panel) {
+    const titleEl = document.getElementById("monitoring-modal-title");
+    const subEl = document.getElementById("monitoring-modal-sub");
+    const thead = document.getElementById("monitoring-detail-thead");
+    const tbody = document.getElementById("monitoring-detail-tbody");
+    if (!thead || !tbody) return;
+
+    const isAudits = panel === "audits";
+    if (titleEl) titleEl.textContent = isAudits ? "진행중인 심사" : "활동중인 심사원";
+    if (subEl) {
+      subEl.textContent = isAudits
+        ? `총 ${monitoringCache.ongoing_audits_count}건`
+        : `총 ${monitoringCache.active_auditors_count}명`;
+    }
+
+    if (isAudits) {
+      thead.innerHTML = `
+        <tr>
+          <th style="width:28%;">기업명</th>
+          <th style="width:28%;">심사표준</th>
+          <th style="width:22%;">심사유형</th>
+          <th style="width:22%;">심사형태</th>
+        </tr>`;
+      const rows = monitoringCache.ongoing_audits;
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--font-tertiary);">진행 중인 심사 없음</td></tr>`;
+      } else {
+        tbody.innerHTML = rows
+          .map(
+            (r) => `
+          <tr>
+            <td>${escapeHtml(r.company_name || "—")}</td>
+            <td>${escapeHtml(r.standard || "—")}</td>
+            <td>${escapeHtml(r.audit_type || "—")}</td>
+            <td>${escapeHtml(r.audit_form || "—")}</td>
+          </tr>`
+          )
+          .join("");
+      }
+    } else {
+      thead.innerHTML = `
+        <tr>
+          <th style="width:28%;">심사원명</th>
+          <th style="width:18%;">팀장</th>
+          <th style="width:18%;">팀원</th>
+          <th style="width:18%;">참관</th>
+          <th style="width:18%;">기술전문가</th>
+        </tr>`;
+      const rows = monitoringCache.active_auditors;
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--font-tertiary);">활동 중인 심사원 없음 · 연동 예정</td></tr>`;
+      } else {
+        tbody.innerHTML = rows
+          .map(
+            (r) => `
+          <tr>
+            <td>${escapeHtml(r.auditor_name || "—")}</td>
+            <td>${escapeHtml(r.role_lead || "—")}</td>
+            <td>${escapeHtml(r.role_member || "—")}</td>
+            <td>${escapeHtml(r.role_observer || "—")}</td>
+            <td>${escapeHtml(r.role_tech_expert || "—")}</td>
+          </tr>`
+          )
+          .join("");
+      }
+    }
+
+    showModal("monitoringDetailModal", true);
+  }
+
+  async function loadDashboardMonitoring() {
+    try {
+      const res = await authFetch(`${API_BASE}/admin/monitoring`);
+      if (!res.ok) {
+        applyMonitoringCounts({
+          ongoing_audits_count: 0,
+          active_auditors_count: 0,
+          ongoing_audits: [],
+          active_auditors: [],
+        });
+        return;
+      }
+      applyMonitoringCounts(await res.json());
+    } catch (err) {
+      console.error("Dashboard monitoring failed:", err);
+      applyMonitoringCounts({
+        ongoing_audits_count: 0,
+        active_auditors_count: 0,
+        ongoing_audits: [],
+        active_auditors: [],
+      });
+    }
+  }
+
+  document.querySelectorAll("[data-monitor-panel]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      openMonitoringModal(btn.getAttribute("data-monitor-panel"));
+    });
+  });
+  document.querySelectorAll("[data-monitoring-modal-close]").forEach((btn) => {
+    btn.addEventListener("click", closeMonitoringModal);
+  });
+  const monitoringModal = document.getElementById("monitoringDetailModal");
+  if (monitoringModal) {
+    monitoringModal.addEventListener("click", (e) => {
+      if (e.target === monitoringModal) closeMonitoringModal();
+    });
+  }
+
   async function loadDashboardStats() {
     try {
-      const statsRes = await authFetch(`${API_BASE}/admin/stats`);
+      const [statsRes] = await Promise.all([
+        authFetch(`${API_BASE}/admin/stats`),
+        loadDashboardRevenue(),
+        loadDashboardMonitoring(),
+      ]);
       if (statsRes.ok) {
         const s = await statsRes.json();
         const cbEl = document.getElementById("stat-cb");

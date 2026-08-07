@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CB 포털 - complAIs</title>
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/portal.css" />
+  <style>
+    body {
+      min-height: 100vh; margin: 0; background: var(--bg-secondary, #f5f7fb);
+      font-family: system-ui, -apple-system, sans-serif; padding: 24px 16px 40px;
+      box-sizing: border-box;
+    }
+    .wrap { width: min(1100px, 100%); margin: 0 auto; }
+    .brand-wrap {
+      display: flex; justify-content: center; align-items: center;
+      margin: 0 0 16px; padding: 8px 10px; background: #fff; border-radius: 10px;
+    }
+    .brand-wrap .brand-logo { height: 34px; }
+    .card {
+      background: #fff; border-radius: 12px; padding: 24px;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+    }
+    h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    h2 { margin: 0 0 10px; font-size: 1.1rem; }
+    .lead { margin: 0 0 16px; color: #64748b; }
+    .meta { font-size: 0.92rem; color: #334155; line-height: 1.6; margin-bottom: 18px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+    .tabs button {
+      border: 1px solid #d0d7e2; background: #fff; border-radius: 8px;
+      padding: 8px 12px; font-weight: 700; cursor: pointer;
+    }
+    .tabs button.active { background: #eff6ff; border-color: #2563eb; color: #1d4ed8; }
+    .panel { display: none; }
+    .panel.show { display: block; }
+    .actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+    a.btn, button.btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 10px 14px; border-radius: 8px; text-decoration: none; font-weight: 700;
+      border: 0; cursor: pointer; font-size: 0.92rem;
+    }
+    a.primary, button.primary { background: #2563eb; color: #fff; }
+    a.ghost, button.ghost { background: #fff; color: #2563eb; border: 1px solid #bfdbfe; }
+    button.danger { background: #fff; color: #b91c1c; border: 1px solid #fecaca; }
+    .form-label { display: block; margin: 0 0 6px; font-weight: 700; }
+    .hint { margin: 8px 0 0; font-size: 0.85rem; color: #64748b; line-height: 1.5; }
+    .error { color: #dc2626; margin-top: 12px; min-height: 1.2em; }
+    .success { color: #047857; margin-top: 12px; white-space: pre-wrap; }
+    code {
+      display: block; background: #f8fafc; border: 1px solid #e2e8f0;
+      border-radius: 8px; padding: 10px 12px; font-size: 0.8rem; overflow: auto;
+      margin-top: 10px;
+    }
+    input[type="file"], input[type="date"], select, input[type="text"] {
+      width: 100%; box-sizing: border-box; padding: 10px 12px;
+      border: 1px solid #d0d7e2; border-radius: 8px; background: #fff;
+    }
+    .item {
+      border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px;
+      margin-bottom: 10px; display: flex; justify-content: space-between;
+      gap: 12px; align-items: center; flex-wrap: wrap;
+    }
+    .item strong { display: block; }
+    .item small { color: #64748b; display: block; margin-top: 2px; }
+    .item-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .table-wrap { overflow: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+    table.scope-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    table.scope-table th, table.scope-table td {
+      padding: 10px 12px; border-bottom: 1px solid #eef2f7; text-align: left; white-space: nowrap;
+    }
+    table.scope-table th { background: #f8fafc; font-weight: 700; color: #334155; }
+    table.scope-table tr:last-child td { border-bottom: 0; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 0.78rem; font-weight: 700; background: #ecfdf5; color: #047857;
+    }
+    .badge.warn { background: #fff7ed; color: #c2410c; }
+    .badge.no { background: #fef2f2; color: #b91c1c; }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);
+      display: none; align-items: center; justify-content: center; z-index: 1000; padding: 24px;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal-dialog {
+      width: min(480px, 100%); background: #fff; border-radius: 12px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2); overflow: hidden;
+    }
+    .modal-header, .modal-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid #e2e8f0;
+    }
+    .modal-footer { border-bottom: 0; border-top: 1px solid #e2e8f0; justify-content: flex-end; gap: 8px; }
+    .modal-title { margin: 0; font-size: 1.05rem; font-weight: 700; }
+    .modal-body { padding: 18px; }
+    .mb-3 { margin-bottom: 14px; }
+    .btn-close {
+      border: 0; background: transparent; cursor: pointer; font-size: 18px; line-height: 1;
+    }
+  </style>
+  <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  <script src="/static/js/daum_postcode.js?v=20260807pc"></script>
+  <script src="/static/js/validation.js?v=20260807pc"></script>
+  <script src="/static/js/cb_admin_api.js?v=20260807pc"></script>
+</head>
+<body class="portal-page">
+  <div class="wrap">
+    <div class="brand-wrap">
+      <img src="/static/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
+    </div>
+    <div class="card">
+      <h1>인증기관(CB) 포털</h1>
+      <p class="lead">세션 CB 스코프 내에서만 심사원·인정 Scope를 관리합니다.</p>
+      <div class="meta" id="session-meta">세션 확인 중…</div>
+
+      <div class="tabs">
+        <button type="button" data-tab="home" class="active">홈</button>
+        <button type="button" data-tab="profile">기관정보 / Scope</button>
+        <button type="button" data-tab="members">구성원 / 승인</button>
+        <button type="button" data-tab="import">심사원 CSV</button>
+      </div>
+
+      <section id="panel-home" class="panel show">
+        <p class="lead">인정 Scope는 ‘인정 Scope’ 탭, 소속 신청은 ‘구성원 / 승인’ 탭에서 처리하세요.</p>
+        <div class="actions">
+          <a class="btn primary" href="#" onclick="switchTab('profile');return false;">Scope 관리</a>
+          <a class="btn ghost" href="/admin">관리 화면</a>
+          <a class="btn ghost" href="#" id="logout-btn">로그아웃</a>
+        </div>
+      </section>
+
+      <section id="panel-profile" class="panel">
+        <h2>인증기관 정보</h2>
+        <p class="lead">세션 CB 기준 기관 프로필과 승인 Scope를 함께 관리합니다.</p>
+        <div id="profile-empty" class="empty-state" style="display:none;"></div>
+        <div class="error" id="profile-error"></div>
+        <div class="success" id="profile-success"></div>
+
+        <form id="cb-profile-form" autocomplete="off">
+          <div class="profile-grid">
+            <div>
+              <label class="form-label" for="pf-code">기관 코드</label>
+              <input type="text" id="pf-code" readonly />
+            </div>
+            <div>
+              <label class="form-label" for="pf-name">기관명 *</label>
+              <input type="text" id="pf-name" required />
+            </div>
+            <div>
+              <label class="form-label" for="pf-ceo">대표자</label>
+              <input type="text" id="pf-ceo" />
+            </div>
+            <div>
+              <label class="form-label" for="pf-biz">사업자번호</label>
+              <input type="text" id="pf-biz" />
+            </div>
+            <div class="full">
+              <label class="form-label" for="pf-zip">우편번호 / 주소</label>
+              <div class="addr-row">
+                <input type="text" id="pf-zip" class="addr-zip" readonly placeholder="우편번호" />
+                <input type="text" id="pf-address" class="addr-main" readonly placeholder="도로명/지번 주소" />
+                <button type="button" class="btn ghost btn-postcode"
+                  data-postcode-zip="pf-zip"
+                  data-postcode-addr="pf-address"
+                  data-postcode-detail="pf-detail">주소 검색</button>
+              </div>
+              <input type="text" id="pf-detail" placeholder="상세주소" style="margin-top:8px;width:100%;" />
+            </div>
+            <div>
+              <label class="form-label" for="pf-phone">연락처</label>
+              <input type="text" id="pf-phone" />
+            </div>
+            <div>
+              <label class="form-label" for="pf-email">이메일</label>
+              <input type="text" id="pf-email" />
+            </div>
+            <div>
+              <label class="form-label" for="pf-fax">팩스</label>
+              <input type="text" id="pf-fax" />
+            </div>
+            <div>
+              <label class="form-label" for="pf-website">웹사이트</label>
+              <input type="text" id="pf-website" />
+            </div>
+            <div>
+              <label class="form-label" for="pf-acc-body">인정기구</label>
+              <input type="text" id="pf-acc-body" placeholder="KAB" />
+            </div>
+            <div>
+              <label class="form-label" for="pf-acc-no">인정번호</label>
+              <input type="text" id="pf-acc-no" />
+            </div>
+            <div>
+              <label class="form-label" for="pf-expire">인정 만료일</label>
+              <input type="text" id="pf-expire" placeholder="YYYY-MM-DD" />
+            </div>
+            <div>
+              <label class="form-label" for="pf-status">상태</label>
+              <input type="text" id="pf-status" placeholder="정상" />
+            </div>
+            <div class="full">
+              <label class="form-label" for="pf-intro">기관 소개</label>
+              <input type="text" id="pf-intro" />
+            </div>
+          </div>
+          <div class="actions" style="margin-top:0;">
+            <button type="submit" class="btn primary" id="profile-save-btn">프로필 저장</button>
+            <button type="button" class="btn ghost" id="reload-profile">새로고침</button>
+          </div>
+        </form>
+
+        <div class="section-divider">
+          <h2>CB 인증 자격 Scope</h2>
+          <p class="lead">1행 = 1개 ISO 표준 + 1개 IAF 코드. 콤마로 묶지 않고 개별 레코드로 관리합니다.</p>
+        </div>
+        <div class="actions" style="margin-top:0; margin-bottom:14px;">
+          <button type="button" class="btn primary" id="open-scope-modal">Scope 추가</button>
+          <button type="button" class="btn ghost" id="reload-scopes">Scope 새로고침</button>
+          <label class="btn ghost" style="cursor:pointer;">
+            Scope CSV 업로드
+            <input type="file" id="scope-csv" accept=".csv,text/csv" style="display:none;" />
+          </label>
+          <button type="button" class="btn ghost" id="scope-sample">샘플 CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table class="scope-table">
+            <thead>
+              <tr>
+                <th>ISO 표준</th>
+                <th>IAF 코드</th>
+                <th>산업 분야명</th>
+                <th>인정기구</th>
+                <th>만료일</th>
+                <th>상태</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="scope-tbody">
+              <tr><td colspan="7">불러오는 중…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="error" id="scope-error"></div>
+        <div class="success" id="scope-success"></div>
+        <p class="hint">CSV 컬럼: standard_code, iaf_code, accreditation_body, approval_date, expiry_date, status<br />
+          IAF 셀에 콤마가 있으면 자동으로 개별 행으로 분리 저장됩니다.</p>
+
+        <div class="section-divider">
+          <h2>보유 표준 · MD단가</h2>
+          <p class="lead">표준(Scope)별 MD 단가(원). 제안/정산 시 이 값이 우선 적용됩니다. (미입력 시 계약 price_per_md → 0)</p>
+        </div>
+        <div class="actions" style="margin-top:0; margin-bottom:14px;">
+          <button type="button" class="btn ghost" id="reload-md-rates">MD단가 새로고침</button>
+          <button type="button" class="btn primary" id="save-md-rates">MD단가 저장</button>
+        </div>
+        <div class="table-wrap">
+          <table class="scope-table">
+            <thead>
+              <tr>
+                <th>ISO 표준</th>
+                <th>인정번호</th>
+                <th>인정만료일</th>
+                <th>MD단가 (원)</th>
+              </tr>
+            </thead>
+            <tbody id="md-rate-tbody">
+              <tr><td colspan="4">불러오는 중…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="error" id="md-rate-error"></div>
+        <div class="success" id="md-rate-success"></div>
+      </section>
+
+      <section id="panel-members" class="panel">
+        <h2>소속 신청 대기 · 소속 심사원</h2>
+        <div class="actions" style="margin-top:0; margin-bottom:12px;">
+          <button type="button" class="btn ghost" id="reload-pending">대기 목록 새로고침</button>
+          <button type="button" class="btn ghost" id="reload-approved">승인 목록 새로고침</button>
+        </div>
+        <h3 style="font-size:0.95rem; margin:8px 0;">대기 (requested)</h3>
+        <div id="pending-list">불러오는 중…</div>
+        <h3 style="font-size:0.95rem; margin:16px 0 8px;">승인됨 (approved)</h3>
+        <div id="approved-list">-</div>
+        <div class="error" id="members-error"></div>
+      </section>
+
+      <section id="panel-import" class="panel">
+        <h2>심사원 CSV 대량 업로드</h2>
+        <p class="lead">업로드 CB의 membership만 upsert합니다. 신규 임시 비밀번호: <strong>ISO17021!!</strong></p>
+        <label class="form-label" for="csv-file">CSV 파일</label>
+        <input type="file" id="csv-file" accept=".csv,text/csv" />
+        <div class="actions">
+          <button type="button" class="btn primary" id="upload-btn">업로드</button>
+          <button type="button" class="btn ghost" id="download-sample">샘플 CSV</button>
+        </div>
+        <div class="error" id="upload-error"></div>
+        <div class="success" id="upload-success"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Scope 추가 모달 -->
+  <div class="modal-backdrop" id="scopeModal" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <h5 class="modal-title">Scope 개별 추가</h5>
+        <button type="button" class="btn-close" data-modal-close aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="scope-standard">ISO 표준</label>
+          <select id="scope-standard"></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="scope-iaf">IAF 코드</label>
+          <select id="scope-iaf"></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="scope-body">인정기구</label>
+          <input type="text" id="scope-body" value="KAB" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="scope-approval">승인일</label>
+          <input type="date" id="scope-approval" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="scope-expiry">만료일 (유효기간)</label>
+          <input type="date" id="scope-expiry" />
+        </div>
+        <div class="error" id="scope-modal-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn ghost" data-modal-close>취소</button>
+        <button type="button" class="btn primary" id="scope-add-btn">Scope 추가</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = "/api/v1";
+    const role = localStorage.getItem("role") || "";
+    const token = localStorage.getItem("access_token");
+    const canManage = ["cb_admin", "cb_manager"].includes(role);
+
+    if (!token) {
+      alert("로그인이 필요합니다.");
+      window.location.href = "/login.html";
+    } else if (!["cb_admin", "cb_manager", "cb_staff", "cb_reviewer"].includes(role)) {
+      alert("CB 포털 접근 권한이 없습니다.");
+      window.location.href = "/login.html";
+    }
+
+    document.getElementById("session-meta").innerHTML = [
+      `이름: ${localStorage.getItem("user_name") || "-"}`,
+      `역할: ${role || "-"}`,
+      `session cb_id: ${localStorage.getItem("cb_id") || "-"}`,
+    ].join("<br>");
+
+    const EMPTY_PROFILE_MSG =
+      "등록된 인증기관 정보가 없습니다. 정보를 입력하거나 CSV를 업로드해 주세요.";
+    const EMPTY_SCOPE_MSG =
+      "등록된 Scope가 없습니다. [Scope 추가] 또는 CSV 업로드로 등록해 주세요.";
+
+    function switchTab(tab) {
+      document.querySelectorAll(".tabs button").forEach((btn) => {
+        btn.classList.toggle("active", btn.getAttribute("data-tab") === tab);
+      });
+      document.querySelectorAll(".panel").forEach((p) => p.classList.remove("show"));
+      const el = document.getElementById(`panel-${tab}`) || document.getElementById("panel-home");
+      el.classList.add("show");
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", tab);
+      history.replaceState(null, "", url);
+      if (tab === "members") {
+        loadList("pending");
+        loadList("approved");
+      }
+      if (tab === "profile") {
+        refreshProfilePanel();
+      }
+    }
+    window.switchTab = switchTab;
+
+    document.querySelectorAll("[data-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => switchTab(btn.getAttribute("data-tab")));
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", (e) => {
+      e.preventDefault();
+      ["access_token","user_id","user_name","role","cb_id","company_id","client_company_id","membership_status"]
+        .forEach((k) => localStorage.removeItem(k));
+      window.location.href = "/login.html";
+    });
+
+    function escapeHtml(t) {
+      const d = document.createElement("div");
+      d.textContent = t ?? "";
+      return d.innerHTML;
+    }
+
+    function statusBadge(status, label) {
+      if (status === "active") return `<span class="badge">${escapeHtml(label || "정상")}</span>`;
+      if (status === "suspended") return `<span class="badge warn">${escapeHtml(label || "정지")}</span>`;
+      return `<span class="badge no">${escapeHtml(label || status || "-")}</span>`;
+    }
+
+    function setVal(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.value = value ?? "";
+    }
+
+    async function refreshProfileTab() {
+      await Promise.all([loadCbProfile(), loadCbScopes(), loadMetaOptions(), loadMdRates()]);
+    }
+
+    // ----- Profile -----
+    async function loadCbProfile() {
+      const err = document.getElementById("profile-error");
+      const ok = document.getElementById("profile-success");
+      const empty = document.getElementById("profile-empty");
+      err.textContent = "";
+      if (ok) ok.textContent = "";
+      empty.style.display = "none";
+      empty.textContent = "";
+
+      if (!canManage) {
+        empty.style.display = "block";
+        empty.textContent = "조회 권한이 없습니다. (cb_admin / cb_manager)";
+        return null;
+      }
+      if (!localStorage.getItem("cb_id")) {
+        empty.style.display = "block";
+        empty.textContent = EMPTY_PROFILE_MSG;
+        return null;
+      }
+
+      try {
+        const res = await fetch(`${API}/cb/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const detail = typeof data.detail === "string" ? data.detail : EMPTY_PROFILE_MSG;
+          empty.style.display = "block";
+          empty.textContent = detail;
+          return null;
+        }
+
+        setVal("pf-code", data.code);
+        setVal("pf-name", data.name);
+        setVal("pf-ceo", data.ceo_name);
+        setVal("pf-biz", data.biz_no);
+        setVal("pf-zip", data.zip_code || "");
+        setVal("pf-address", data.address);
+        // 상세주소는 별도 컬럼이 없으면 주소 필드만 사용
+        setVal("pf-detail", data.detail_address || "");
+        setVal("pf-phone", data.phone || data.tel);
+        setVal("pf-email", data.email);
+        setVal("pf-fax", data.fax);
+        setVal("pf-website", data.website);
+        setVal("pf-acc-body", data.accreditation_body);
+        setVal("pf-acc-no", data.accreditation_no);
+        setVal("pf-expire", data.expire_date);
+        setVal("pf-status", data.status || "정상");
+        setVal("pf-intro", data.intro);
+
+        if (!data.has_profile) {
+          empty.style.display = "block";
+          empty.textContent = data.message || EMPTY_PROFILE_MSG;
+        }
+
+        // Scope 테이블도 프로필 응답으로 즉시 바인딩 (누락 방지)
+        if (Array.isArray(data.scopes)) {
+          renderScopes(data.scopes);
+        }
+        return data;
+      } catch (e) {
+        err.textContent = e.message;
+        empty.style.display = "block";
+        empty.textContent = EMPTY_PROFILE_MSG;
+        return null;
+      }
+    }
+
+    document.getElementById("cb-profile-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const err = document.getElementById("profile-error");
+      const ok = document.getElementById("profile-success");
+      err.textContent = "";
+      ok.textContent = "";
+      if (!canManage) {
+        err.textContent = "저장 권한이 없습니다.";
+        return;
+      }
+      if (window.ComplaisValidation) {
+        const v = ComplaisValidation.validateFields([
+          { el: document.getElementById("pf-biz"), kind: "biz" },
+          { el: document.getElementById("pf-phone"), kind: "phone" },
+          { el: document.getElementById("pf-email"), kind: "email" },
+        ]);
+        if (!v.ok) { err.textContent = v.message; return; }
+      }
+      const payload = {
+        name: document.getElementById("pf-name").value.trim(),
+        ceo_name: document.getElementById("pf-ceo").value.trim() || null,
+        biz_no: document.getElementById("pf-biz").value.trim() || null,
+        address: (() => {
+          const base = document.getElementById("pf-address").value.trim();
+          const detail = (document.getElementById("pf-detail")?.value || "").trim();
+          if (!base && !detail) return null;
+          return detail ? `${base} ${detail}`.trim() : base;
+        })(),
+        phone: document.getElementById("pf-phone").value.trim() || null,
+        tel: document.getElementById("pf-phone").value.trim() || null,
+        email: document.getElementById("pf-email").value.trim() || null,
+        fax: document.getElementById("pf-fax").value.trim() || null,
+        website: document.getElementById("pf-website").value.trim() || null,
+        accreditation_body: document.getElementById("pf-acc-body").value.trim() || null,
+        accreditation_no: document.getElementById("pf-acc-no").value.trim() || null,
+        expire_date: document.getElementById("pf-expire").value.trim() || null,
+        status: document.getElementById("pf-status").value.trim() || null,
+        intro: document.getElementById("pf-intro").value.trim() || null,
+      };
+      if (!payload.name) {
+        err.textContent = "기관명은 필수입니다.";
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/cb/profile`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(typeof data.detail === "string" ? data.detail : `저장 실패 (${res.status})`);
+        }
+        ok.textContent = "프로필이 저장되었습니다.";
+        // 저장 성공 즉시 재조회
+        await refreshProfileTab();
+      } catch (ex) {
+        err.textContent = ex.message;
+      }
+    });
+
+    document.getElementById("reload-profile").addEventListener("click", () => refreshProfileTab());
+
+    // ----- Scope -----
+    async function loadMetaOptions() {
+      const [stdRes, iafRes] = await Promise.all([
+        fetch(`${API}/meta/iso-standards`, { cache: "no-store" }),
+        fetch(`${API}/meta/iaf-codes`, { cache: "no-store" }),
+      ]);
+      const standards = await stdRes.json().catch(() => []);
+      const iafs = await iafRes.json().catch(() => []);
+      const stdSel = document.getElementById("scope-standard");
+      const iafSel = document.getElementById("scope-iaf");
+      stdSel.innerHTML = (standards || [])
+        .map((s) => `<option value="${s.standard_id}">${escapeHtml(s.standard_code)} — ${escapeHtml(s.standard_name_ko)}</option>`)
+        .join("");
+      iafSel.innerHTML = (iafs || [])
+        .map((i) => `<option value="${i.iaf_code_id}">IAF ${escapeHtml(i.iaf_code)} — ${escapeHtml(i.industry_name_ko)}</option>`)
+        .join("");
+    }
+
+    function renderScopes(data) {
+      const tbody = document.getElementById("scope-tbody");
+      if (!data || !data.length) {
+        tbody.innerHTML = `<tr><td colspan="7">${EMPTY_SCOPE_MSG}</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = data.map((s) => `
+        <tr>
+          <td>${escapeHtml(s.standard_code || "-")}</td>
+          <td>IAF ${escapeHtml(s.iaf_code || "-")}</td>
+          <td>${escapeHtml(s.industry_name_ko || "-")}</td>
+          <td>${escapeHtml(s.accreditation_body || "-")}</td>
+          <td>${escapeHtml(s.expiry_date || "-")}</td>
+          <td>${statusBadge(s.status, s.status_label)}</td>
+          <td><button type="button" class="btn danger" onclick="deleteScope(${s.scope_id})">삭제</button></td>
+        </tr>`).join("");
+    }
+
+    async function loadCbScopes() {
+      const tbody = document.getElementById("scope-tbody");
+      const err = document.getElementById("scope-error");
+      err.textContent = "";
+      if (!canManage) {
+        tbody.innerHTML = `<tr><td colspan="7">조회 권한이 없습니다. (cb_admin / cb_manager)</td></tr>`;
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/cb/scopes`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => []);
+        if (!res.ok) {
+          throw new Error(typeof data.detail === "string" ? data.detail : `조회 실패 (${res.status})`);
+        }
+        renderScopes(data);
+      } catch (e) {
+        err.textContent = e.message;
+        tbody.innerHTML = `<tr><td colspan="7">${EMPTY_SCOPE_MSG}</td></tr>`;
+      }
+    }
+    // 하위 호환 별칭
+    const loadScopes = loadCbScopes;
+
+    async function deleteScope(scopeId) {
+      if (!canManage) return;
+      if (!confirm("이 Scope를 삭제하시겠습니까?")) return;
+      try {
+        const res = await fetch(`${API}/cb/scopes/${scopeId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.detail || `삭제 실패 (${res.status})`);
+        }
+        await refreshProfileTab();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+    window.deleteScope = deleteScope;
+
+    function openScopeModal() {
+      document.getElementById("scope-modal-error").textContent = "";
+      document.getElementById("scopeModal").classList.add("show");
+      document.getElementById("scopeModal").setAttribute("aria-hidden", "false");
+    }
+    function closeScopeModal() {
+      document.getElementById("scopeModal").classList.remove("show");
+      document.getElementById("scopeModal").setAttribute("aria-hidden", "true");
+    }
+
+    document.getElementById("open-scope-modal").addEventListener("click", async () => {
+      await loadMetaOptions();
+      openScopeModal();
+    });
+    document.querySelectorAll("[data-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", closeScopeModal);
+    });
+    document.getElementById("scopeModal").addEventListener("click", (e) => {
+      if (e.target.id === "scopeModal") closeScopeModal();
+    });
+    document.getElementById("scope-add-btn").addEventListener("click", async () => {
+      const err = document.getElementById("scope-modal-error");
+      err.textContent = "";
+      const payload = {
+        standard_id: Number(document.getElementById("scope-standard").value),
+        iaf_code_id: Number(document.getElementById("scope-iaf").value),
+        accreditation_body: document.getElementById("scope-body").value.trim() || "KAB",
+        approval_date: document.getElementById("scope-approval").value || null,
+        expiry_date: document.getElementById("scope-expiry").value || null,
+        status: "active",
+      };
+      if (!payload.standard_id || !payload.iaf_code_id) {
+        err.textContent = "표준과 IAF 코드를 선택하세요.";
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/cb/scopes`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `추가 실패 (${res.status})`);
+        closeScopeModal();
+        await refreshProfileTab();
+      } catch (e) {
+        err.textContent = e.message;
+      }
+    });
+
+    document.getElementById("scope-sample").addEventListener("click", () => {
+      const sample =
+        "standard_code,iaf_code,accreditation_body,approval_date,expiry_date,status\n" +
+        "ISO 9001:2015,14,KAB,2024-01-01,2028-12-31,active\n" +
+        "ISO 9001:2015,19,KAB,2024-01-01,2028-12-31,active\n" +
+        "ISO 14001:2015,14,KAB,2023-05-20,2027-05-20,active\n";
+      const blob = new Blob([sample], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "cb_scopes_sample.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    document.getElementById("scope-csv").addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      const err = document.getElementById("scope-error");
+      const ok = document.getElementById("scope-success");
+      err.textContent = "";
+      ok.textContent = "";
+      if (!file || !canManage) return;
+      const form = new FormData();
+      form.append("csv_file", file);
+      try {
+        const res = await fetch(`${API}/cb/scopes/bulk-import`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `업로드 실패 (${res.status})`);
+        const msg = `${data.message}\n신규: ${data.created} / 갱신: ${data.updated} / 오류: ${data.error_count}` +
+          (data.total_scopes != null ? `\n총 Scope: ${data.total_scopes}` : "");
+        ok.textContent = msg;
+        // alert만 띄우지 않고 즉시 재조회
+        await refreshProfileTab();
+        alert(msg);
+      } catch (ex) {
+        err.textContent = ex.message;
+      } finally {
+        e.target.value = "";
+      }
+    });
+
+    document.getElementById("reload-scopes").addEventListener("click", () => refreshProfileTab());
+
+    // ----- 보유 표준 · MD단가 -----
+    let _mdRateCache = [];
+
+    function renderMdRates(rows) {
+      const tbody = document.getElementById("md-rate-tbody");
+      _mdRateCache = Array.isArray(rows) ? rows : [];
+      const held = _mdRateCache.filter(
+        (r) => r.is_active || r.ab_code || r.registration_no || r.expiry_date || r.md_rate != null,
+      );
+      if (!held.length) {
+        tbody.innerHTML = `<tr><td colspan="4">보유 표준이 없습니다. (어드민에서 보유 표준을 먼저 등록하세요)</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = held
+        .map((r) => {
+          const exp = r.expiry_date ? String(r.expiry_date).slice(0, 10) : "";
+          const md = r.md_rate != null && r.md_rate !== "" ? String(Math.round(Number(r.md_rate))) : "";
+          const warn = r.expiry_warning
+            ? `<div style="font-size:.75rem;margin-top:2px;color:${
+                r.expiry_status === "locked" ? "#b91c1c" : "#64748b"
+              };">${escapeHtml(r.expiry_warning)}</div>`
+            : "";
+          return `<tr data-std="${escapeHtml(r.standard_code || "")}"
+            data-ab="${escapeHtml(r.ab_code || "")}"
+            data-reg="${escapeHtml(r.registration_no || "")}"
+            data-exp="${escapeHtml(exp)}"
+            data-active="${r.is_active ? "1" : "0"}">
+            <td><strong>${escapeHtml(r.standard_code || "")}</strong>${
+              r.standard_name ? `<div style="font-size:.8rem;color:#64748b;">${escapeHtml(r.standard_name)}</div>` : ""
+            }</td>
+            <td>${escapeHtml(r.registration_no || "—")}</td>
+            <td>${escapeHtml(exp || "—")}${warn}</td>
+            <td><input type="number" min="0" step="1000" data-md-rate value="${escapeHtml(md)}" placeholder="예: 500000" style="min-width:120px;" /></td>
+          </tr>`;
+        })
+        .join("");
+    }
+
+    async function loadMdRates() {
+      const tbody = document.getElementById("md-rate-tbody");
+      const err = document.getElementById("md-rate-error");
+      const ok = document.getElementById("md-rate-success");
+      if (err) err.textContent = "";
+      if (ok) ok.textContent = "";
+      if (!canManage) {
+        tbody.innerHTML = `<tr><td colspan="4">조회 권한이 없습니다.</td></tr>`;
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/cb/standard-accreditations`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => []);
+        if (!res.ok) {
+          throw new Error(typeof data.detail === "string" ? data.detail : `조회 실패 (${res.status})`);
+        }
+        renderMdRates(data);
+      } catch (e) {
+        if (err) err.textContent = e.message;
+        tbody.innerHTML = `<tr><td colspan="4">불러오기 실패</td></tr>`;
+      }
+    }
+
+    async function saveMdRates() {
+      const err = document.getElementById("md-rate-error");
+      const ok = document.getElementById("md-rate-success");
+      if (err) err.textContent = "";
+      if (ok) ok.textContent = "";
+      if (!canManage) {
+        if (err) err.textContent = "저장 권한이 없습니다.";
+        return;
+      }
+      const rows = [...document.querySelectorAll("#md-rate-tbody tr[data-std]")];
+      if (!rows.length) {
+        if (err) err.textContent = "저장할 표준이 없습니다.";
+        return;
+      }
+      const items = rows.map((tr) => {
+        const raw = (tr.querySelector("[data-md-rate]")?.value || "").trim();
+        const md = raw === "" ? null : Number(raw.replace(/,/g, ""));
+        if (raw !== "" && (!Number.isFinite(md) || md < 0)) {
+          throw new Error(`잘못된 MD단가: ${tr.getAttribute("data-std")}`);
+        }
+        return {
+          standard_code: tr.getAttribute("data-std"),
+          ab_code: (tr.getAttribute("data-ab") || "").trim() || null,
+          registration_no: (tr.getAttribute("data-reg") || "").trim() || null,
+          expiry_date: (tr.getAttribute("data-exp") || "").trim() || null,
+          md_rate: md,
+          is_active: tr.getAttribute("data-active") === "1" || md != null,
+        };
+      });
+      try {
+        const res = await fetch(`${API}/cb/standard-accreditations`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ items, replace_all: false }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(typeof data.detail === "string" ? data.detail : `저장 실패 (${res.status})`);
+        }
+        if (ok) ok.textContent = "MD단가가 저장되었습니다.";
+        renderMdRates(Array.isArray(data) ? data : items);
+      } catch (e) {
+        if (err) err.textContent = e.message;
+      }
+    }
+
+    document.getElementById("reload-md-rates")?.addEventListener("click", () => loadMdRates());
+    document.getElementById("save-md-rates")?.addEventListener("click", () => {
+      saveMdRates().catch((e) => {
+        const err = document.getElementById("md-rate-error");
+        if (err) err.textContent = e.message;
+      });
+    });
+
+    // ----- Members (기존) -----
+    async function loadList(status) {
+      const target = document.getElementById(status === "pending" ? "pending-list" : "approved-list");
+      const err = document.getElementById("members-error");
+      if (!canManage) {
+        target.innerHTML = "<p class='lead'>조회/승인 권한이 없습니다. (cb_admin / cb_manager)</p>";
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/cb/auditors?status=${encodeURIComponent(status)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => []);
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `조회 실패 (${res.status})`);
+        if (!data.length) {
+          target.innerHTML = "<p class='lead'>해당 상태의 심사원이 없습니다.</p>";
+          return;
+        }
+        target.innerHTML = data.map((row) => {
+          const m = row.membership || {};
+          const actions = status === "pending" ? `
+            <div class="item-actions">
+              <button type="button" class="btn primary" onclick="decide(${m.id}, 'approved')">승인</button>
+              <button type="button" class="btn danger" onclick="decide(${m.id}, 'rejected')">거절</button>
+            </div>` : `
+            <div class="item-actions">
+              <button type="button" class="btn ghost" onclick="viewDetail(${row.auditor_id})">상세</button>
+            </div>`;
+          return `
+            <div class="item">
+              <div>
+                <strong>${escapeHtml(row.name)}</strong>
+                <small>${escapeHtml(row.email || "-")} · ${escapeHtml(row.phone || "-")}</small>
+                <small>신청등급: ${escapeHtml(m.apply_grade || "-")} · 승인등급: ${escapeHtml(m.approved_grade || "-")}</small>
+              </div>
+              ${actions}
+            </div>`;
+        }).join("");
+      } catch (e) {
+        err.textContent = e.message;
+        target.textContent = "";
+      }
+    }
+
+    async function decide(membershipId, decision) {
+      if (!canManage) return alert("접근 권한이 없습니다.");
+      const note = decision === "rejected" ? prompt("거절 사유 (선택)") : null;
+      try {
+        const res = await fetch(`${API}/cb/memberships/${membershipId}/approve`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ decision, note }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `처리 실패 (${res.status})`);
+        alert(data.message || "처리되었습니다.");
+        loadList("pending");
+        loadList("approved");
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function viewDetail(auditorId) {
+      try {
+        const res = await fetch(`${API}/cb/auditors/${auditorId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `상세 조회 실패 (${res.status})`);
+        const m = data.membership || {};
+        alert([
+          `${data.name} (${data.email || "-"})`,
+          `본 CB 소속 status: ${m.status}`,
+          `승인등급: ${m.approved_grade || "-"}`,
+        ].join("\n"));
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    document.getElementById("reload-pending").addEventListener("click", () => loadList("pending"));
+    document.getElementById("reload-approved").addEventListener("click", () => loadList("approved"));
+    window.decide = decide;
+    window.viewDetail = viewDetail;
+
+    document.getElementById("download-sample").addEventListener("click", () => {
+      const sample =
+        "성명,이메일,연락처,생년월일,KAR등록번호,등급,승인표준,IAF코드\n" +
+        "홍길동,hong@example.com,010-1234-5678,1980-01-01,KAR-001,선임심사원,ISO9001,14\n";
+      const blob = new Blob([sample], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "cb_auditor_bulk_sample.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    document.getElementById("upload-btn").addEventListener("click", async () => {
+      const errorEl = document.getElementById("upload-error");
+      const successEl = document.getElementById("upload-success");
+      errorEl.textContent = "";
+      successEl.textContent = "";
+      if (!canManage) {
+        errorEl.textContent = "접근 권한이 없습니다.";
+        return;
+      }
+      const file = document.getElementById("csv-file").files?.[0];
+      if (!file) {
+        errorEl.textContent = "CSV 파일을 선택해 주세요.";
+        return;
+      }
+      const form = new FormData();
+      form.append("csv_file", file);
+      try {
+        const res = await fetch(`${API}/cb/qualifications/bulk-import`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const detail = data.detail;
+          throw new Error(typeof detail === "string" ? detail : detail?.message || `업로드 실패 (${res.status})`);
+        }
+        const msg = [
+          data.message,
+          `신규: ${data.created ?? 0} / 갱신: ${data.updated ?? 0} / 오류: ${data.error_count ?? 0}`,
+        ].join("\n");
+        alert(msg);
+        successEl.textContent = msg;
+        // 심사원 업로드 후에도 멤버/프로필 최신화
+        if (document.getElementById("panel-members")?.classList.contains("show")) {
+          loadList("pending");
+          loadList("approved");
+        }
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    });
+
+    // 페이지 진입 시 최신 프로필/Scope 바인딩
+    function bootPortal() {
+      const initial = new URLSearchParams(window.location.search).get("tab") || "home";
+      const tab = ["home", "profile", "members", "import"].includes(initial) ? initial : "home";
+      switchTab(tab);
+      // home이어도 백그라운드로 프로필 프리로드 (탭 전환 시 즉시 표시)
+      if (tab !== "profile" && canManage) {
+        loadCbProfile();
+      }
+    }
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", bootPortal);
+    } else {
+      bootPortal();
+    }
+  </script>
+</body>
+</html>

@@ -169,6 +169,9 @@ def complexity_key_from_label(v: Optional[str]) -> str:
     return COMPLEXITY_LABEL_TO_KEY.get(str(v).strip(), "med")
 
 
+_CX_RANK = {"high": 4, "med": 3, "low": 2, "restrict": 1, "special": 1}
+
+
 def resolve_ksic(ksic_code: str, cfg: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """onKsicChange 매칭 — ksic_iaf_map exact match."""
     cfg = cfg or load_md_calc_config()
@@ -187,9 +190,73 @@ def resolve_ksic(ksic_code: str, cfg: Optional[Dict[str, Any]] = None) -> Option
     return None
 
 
+def _normalize_iaf_token(iaf_code: str) -> str:
+    raw = str(iaf_code or "").strip()
+    if not raw:
+        return ""
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if not digits:
+        return raw.upper()
+    # "01" / "1" / "1A" → comparable main code without leading zeros for match
+    return digits.lstrip("0") or "0"
+
+
+def resolve_iaf(iaf_code: str, cfg: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    """IAF main → complexity (qms/ems/ohsms). Prefer iaf39_summary, else ksic_iaf_map.
+
+    When an IAF maps to multiple complexity labels (rare), pick the highest.
+    """
+    cfg = cfg or load_md_calc_config()
+    token = _normalize_iaf_token(iaf_code)
+    if not token:
+        return None
+
+    best: Optional[Dict[str, Any]] = None
+    best_rank = -1
+
+    def _consider(qms: Any, ems: Any, ohsms: Any, src: str) -> None:
+        nonlocal best, best_rank
+        cx = complexity_key_from_label(qms)
+        rank = _CX_RANK.get(cx, 0)
+        if rank > best_rank:
+            best_rank = rank
+            best = {
+                "iaf_main": token,
+                "qms": qms,
+                "ems": ems,
+                "ohsms": ohsms,
+                "source": src,
+                "complexity": cx,
+            }
+
+    for row in cfg.get("iaf39_summary") or []:
+        iaf = row.get("iaf")
+        row_tok = _normalize_iaf_token(str(iaf) if iaf is not None else "")
+        if row_tok == token:
+            _consider(row.get("qms"), row.get("ems"), row.get("ohsms"), "iaf39_summary")
+
+    for row in cfg.get("ksic_iaf_map") or []:
+        row_tok = _normalize_iaf_token(str(row.get("iaf_main") or ""))
+        if row_tok == token:
+            _consider(row.get("qms"), row.get("ems"), row.get("ohsms"), "ksic_iaf_map")
+
+    return best
+
+
 def apply_ksic_to_input(inp: CalcInput, cfg: Optional[Dict[str, Any]] = None) -> CalcInput:
     """KSIC → complexity/risk14/risk45 자동 주입 (onKsicChange)."""
     match = resolve_ksic(inp.ksic_code, cfg)
+    if not match:
+        return inp
+    inp.complexity = complexity_key_from_label(match.get("qms"))
+    inp.risk14 = complexity_key_from_label(match.get("ems"))
+    inp.risk45 = complexity_key_from_label(match.get("ohsms"))
+    return inp
+
+
+def apply_iaf_to_input(inp: CalcInput, iaf_code: str, cfg: Optional[Dict[str, Any]] = None) -> CalcInput:
+    """IAF → complexity/risk14/risk45 주입 (multi-IAF max-MD 평가용)."""
+    match = resolve_iaf(iaf_code, cfg)
     if not match:
         return inp
     inp.complexity = complexity_key_from_label(match.get("qms"))

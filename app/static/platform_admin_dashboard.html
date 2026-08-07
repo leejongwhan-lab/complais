@@ -19,9 +19,11 @@
       });
     </script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <link rel="stylesheet" href="/static/css/main.css?v=20260806f">
-    <link rel="stylesheet" href="/static/css/portal.css?v=20260806f">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260806f">
+    <link rel="stylesheet" href="/static/css/main.css?v=20260807hs">
+    <link rel="stylesheet" href="/static/css/portal.css?v=20260807hs">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260807hs">
+    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+    <script src="/static/js/daum_postcode.js?v=20260807hs"></script>
 </head>
 <body class="portal-page admin-page">
 
@@ -52,6 +54,60 @@
                 <div class="stat-metric"><div class="card-title">등록 기업</div><div class="card-value" id="stat-companies">-</div></div>
                 <div class="stat-metric"><div class="card-title">등록 심사원</div><div class="card-value" id="stat-auditors">-</div></div>
                 <div class="stat-metric"><div class="card-title">인정범위 검토대기</div><div class="card-value" id="stat-pending" style="color: var(--sec-red);">-</div></div>
+            </div>
+
+            <div class="dashboard-section" id="monitoring-section">
+                <div class="panel-header">
+                    <h3 style="font: var(--font-h3); margin: 0;">실시간 모니터링</h3>
+                    <span class="panel-count">심사 현황</span>
+                </div>
+                <div class="grid-cards monitoring-cards">
+                    <button type="button" class="stat-metric is-clickable" id="monitor-ongoing-audits-btn" data-monitor-panel="audits" aria-haspopup="dialog">
+                        <div class="card-title">진행중인 심사</div>
+                        <div class="card-value" id="monitor-ongoing-audits-count">-</div>
+                        <div class="card-hint">클릭하여 상세 보기</div>
+                    </button>
+                    <button type="button" class="stat-metric is-clickable" id="monitor-active-auditors-btn" data-monitor-panel="auditors" aria-haspopup="dialog">
+                        <div class="card-title">활동중인 심사원</div>
+                        <div class="card-value" id="monitor-active-auditors-count">-</div>
+                        <div class="card-hint">클릭하여 상세 보기</div>
+                    </button>
+                </div>
+            </div>
+
+            <div class="dashboard-section">
+                <div class="panel-header">
+                    <h3 style="font: var(--font-h3); margin: 0;">플랫폼 매출</h3>
+                    <span class="panel-count" id="rev-currency-label">KRW · 연간</span>
+                </div>
+                <div class="grid-cards revenue-total-row">
+                    <div class="stat-metric revenue-total">
+                        <div class="card-title">합계</div>
+                        <div class="card-value" id="rev-total">-</div>
+                    </div>
+                </div>
+                <div class="grid-cards">
+                    <div class="stat-metric">
+                        <div class="card-title">인증기관 구독료</div>
+                        <div class="card-value" id="rev-cb-sub">-</div>
+                        <div class="card-hint">연간 기본료 합계</div>
+                    </div>
+                    <div class="stat-metric is-pending">
+                        <div class="card-title">컨설팅 구독료</div>
+                        <div class="card-value" id="rev-consulting">₩0</div>
+                        <div class="card-hint">준비중</div>
+                    </div>
+                    <div class="stat-metric is-pending">
+                        <div class="card-title">교육매칭 광고비</div>
+                        <div class="card-value" id="rev-education">₩0</div>
+                        <div class="card-hint">준비중</div>
+                    </div>
+                    <div class="stat-metric is-pending">
+                        <div class="card-title">기업홍보 공고비</div>
+                        <div class="card-value" id="rev-promotion">₩0</div>
+                        <div class="card-hint">준비중</div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -91,12 +147,11 @@
                               <th class="col-held-std">보유 표준</th>
                               <th style="width:9%;">인정기관</th>
                               <th style="width:8%;">기본료</th>
-                              <th style="width:8%;">MD단가</th>
                               <th style="width:8%;">관리</th>
                           </tr>
                       </thead>
                       <tbody id="cb-contracts-tbody">
-                          <tr><td colspan="9" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td></tr>
+                          <tr><td colspan="8" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td></tr>
                       </tbody>
                   </table>
               </div>
@@ -135,13 +190,14 @@
                               <th style="width:12%;">사업자등록번호</th>
                               <th style="width:8%;">법인(개인)</th>
                               <th style="width:9%;">대표자명</th>
+                              <th style="width:18%;">보유 표준 (인정/인증)</th>
                               <th>주소</th>
                               <th style="width:8%;">홈페이지</th>
                               <th style="width:8%;">관리</th>
                           </tr>
                       </thead>
                       <tbody id="company-table-body">
-                          <tr><td colspan="8" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td></tr>
+                          <tr><td colspan="9" style="text-align: center; color: var(--font-tertiary);">불러오는 중...</td></tr>
                       </tbody>
                   </table>
               </div>
@@ -219,44 +275,114 @@
         </section>
     </main>
 
-    <div class="modal-backdrop" id="cbDetailModal" aria-hidden="true">
-      <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cb-detail-modal-title">
+    <div class="modal-backdrop" id="monitoringDetailModal" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="monitoring-modal-title">
         <div class="modal-header">
           <div>
-            <h5 class="modal-title fw-bold" id="cb-detail-modal-title">인증기관 상세정보</h5>
+            <h5 class="modal-title fw-bold" id="monitoring-modal-title">실시간 모니터링</h5>
+            <div class="muted" id="monitoring-modal-sub" style="color: var(--font-secondary); font: var(--font-caption); margin-top: 4px;"></div>
+          </div>
+          <button type="button" class="btn-close" data-monitoring-modal-close aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="table-responsive" style="max-height: 60vh; overflow: auto;">
+            <table class="data-table admin-data-table" id="monitoring-detail-table">
+              <thead id="monitoring-detail-thead"></thead>
+              <tbody id="monitoring-detail-tbody">
+                <tr><td style="text-align:center;color:var(--font-tertiary);">불러오는 중…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" data-monitoring-modal-close>닫기</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="cbDetailModal" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="cb-detail-modal-title">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title fw-bold" id="cb-detail-modal-title">상세정보</h5>
             <div class="muted" id="cb-detail-modal-sub" style="color: var(--font-secondary); font: var(--font-caption); margin-top: 4px;"></div>
           </div>
           <button type="button" class="btn-close" data-cb-detail-close aria-label="Close">×</button>
         </div>
         <div class="modal-body">
           <p style="margin:0 0 12px;color:var(--font-secondary);font:var(--font-body-small);">
-            목록에 없는 연락·계좌·소개 정보입니다. (코드·기관명·상태·보유표준·인정기관·요금은 목록 참고)
+            목록에 없는 기본·연락·계약/정산·소개 정보입니다. (표준별 인정번호·만료일·IAF는 목록의 보유 표준 클릭)
           </p>
-          <div class="cb-field-grid">
-            <div class="cb-field"><label>영문명</label><input id="cb-f-name-en" /></div>
-            <div class="cb-field"><label>이니셜</label><input id="cb-f-initial" /></div>
-            <div class="cb-field"><label>사업자번호</label><input id="cb-f-biz" placeholder="000-00-00000" data-validate="biz" inputmode="numeric" maxlength="12" autocomplete="off" /></div>
-            <div class="cb-field"><label>법인번호</label><input id="cb-f-corp" /></div>
-            <div class="cb-field"><label>대표자</label><input id="cb-f-ceo" /></div>
-            <div class="cb-field"><label>전화번호</label><input id="cb-f-tel" placeholder="02-1234-5678" data-validate="phone" inputmode="tel" maxlength="13" /></div>
-            <div class="cb-field"><label>팩스</label><input id="cb-f-fax" /></div>
-            <div class="cb-field"><label>이메일</label><input id="cb-f-email" data-validate="email" autocomplete="email" /></div>
-            <div class="cb-field"><label>세금계산서 이메일</label><input id="cb-f-tax-email" /></div>
-            <div class="cb-field"><label>웹사이트</label><input id="cb-f-web" /></div>
-            <div class="cb-field" style="grid-column:1/-1;"><label>주소</label><input id="cb-f-address" /></div>
-            <div class="cb-field"><label>은행</label><input id="cb-f-bank" /></div>
-            <div class="cb-field"><label>계좌번호</label><input id="cb-f-account" /></div>
-            <div class="cb-field"><label>예금주</label><input id="cb-f-holder" /></div>
-            <div class="cb-field"><label>인정 만료일</label><input id="cb-f-expire" placeholder="YYYY-MM-DD" /></div>
-            <div class="cb-field"><label>과금 티어</label>
-              <select id="cb-f-tier">
-                <option value="SMALL">SMALL</option>
-                <option value="MEDIUM">MEDIUM</option>
-                <option value="LARGE">LARGE</option>
-              </select>
+
+          <div class="org-section cb-detail-box">
+            <h3 class="org-section-title">기본</h3>
+            <div class="cb-field-grid">
+              <div class="cb-field"><label for="cb-f-name-en">회사명 영문</label><input id="cb-f-name-en" placeholder="—" /></div>
+              <div class="cb-field"><label for="cb-f-initial">이니셜/약칭</label><input id="cb-f-initial" placeholder="—" /></div>
+              <div class="cb-field"><label for="cb-f-biz">사업자번호</label><input id="cb-f-biz" placeholder="000-00-00000" data-validate="biz" inputmode="numeric" maxlength="12" autocomplete="off" /></div>
+              <div class="cb-field"><label for="cb-f-corp">법인번호</label><input id="cb-f-corp" placeholder="—" /></div>
+              <div class="cb-field"><label for="cb-f-personal">개인사업자번호</label><input id="cb-f-personal" placeholder="—" /></div>
+              <div class="cb-field"><label for="cb-f-ceo">대표자</label><input id="cb-f-ceo" placeholder="—" /></div>
+              <div class="cb-field"><label for="cb-f-acc-region">인정 지역</label><input id="cb-f-acc-region" placeholder="—" /></div>
+              <div class="cb-field"><label for="cb-f-acc-country">인정 국가</label><input id="cb-f-acc-country" placeholder="—" /></div>
+              <div class="cb-field"><label>개설일</label><div class="cb-readonly" id="cb-f-activated" aria-live="polite">—</div></div>
+              <div class="cb-field"><label>평가점수</label><div class="cb-readonly" id="cb-f-eval-score" aria-live="polite">—</div></div>
             </div>
-            <div class="cb-field" style="grid-column:1/-1;"><label>기관 소개</label><textarea id="cb-f-intro" rows="3" style="width:100%;padding:8px;border:1px solid var(--gray-line-2);border-radius:8px;"></textarea></div>
           </div>
+
+          <div class="org-section cb-detail-box">
+            <h3 class="org-section-title">연락</h3>
+            <div class="cb-field-grid">
+              <div class="cb-field"><label for="cb-f-tel">전화</label><input id="cb-f-tel" placeholder="—" data-validate="phone" inputmode="tel" maxlength="13" /></div>
+              <div class="cb-field"><label for="cb-f-fax">팩스</label><input id="cb-f-fax" placeholder="—" /></div>
+              <div class="cb-field"><label for="cb-f-email">이메일</label><input id="cb-f-email" placeholder="—" data-validate="email" autocomplete="email" /></div>
+              <div class="cb-field"><label for="cb-f-tax-email">세금계산서 메일</label><input id="cb-f-tax-email" placeholder="—" data-validate="email" autocomplete="email" /></div>
+              <div class="cb-field" style="grid-column:1/-1;"><label for="cb-f-web">웹사이트</label><input id="cb-f-web" placeholder="—" /></div>
+              <div class="cb-field" style="grid-column:1/-1;">
+                <label for="cb-f-address">주소</label>
+                <div class="addr-row">
+                  <input id="cb-f-zip" class="addr-zip" readonly placeholder="우편번호" />
+                  <input id="cb-f-address" class="addr-main" readonly placeholder="도로명/지번 주소" />
+                  <button type="button" class="btn-postcode"
+                    data-postcode-zip="cb-f-zip"
+                    data-postcode-addr="cb-f-address"
+                    data-postcode-detail="cb-f-address-detail">주소 검색</button>
+                </div>
+                <input id="cb-f-address-detail" placeholder="상세주소" style="margin-top:8px;width:100%;" />
+              </div>
+            </div>
+          </div>
+
+          <div class="org-section cb-detail-box">
+            <h3 class="org-section-title">계약 / 정산</h3>
+            <div class="cb-field-grid">
+              <div class="cb-field"><label for="cb-f-bank">은행</label><input id="cb-f-bank" placeholder="—" /></div>
+              <div class="cb-field"><label for="cb-f-account">계좌번호</label><input id="cb-f-account" placeholder="—" /></div>
+              <div class="cb-field"><label for="cb-f-holder">예금주</label><input id="cb-f-holder" placeholder="—" /></div>
+              <div class="cb-field"><label for="cb-f-tier">과금 티어</label>
+                <select id="cb-f-tier">
+                  <option value="SMALL">SMALL</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="LARGE">LARGE</option>
+                  <option value="ENTERPRISE">ENTERPRISE</option>
+                </select>
+              </div>
+              <div class="cb-field"><label for="cb-f-base-fee">연간 기본료</label><input id="cb-f-base-fee" type="number" min="0" step="1" placeholder="—" inputmode="numeric" /></div>
+              <div class="cb-field"><label>계약 연도</label><div class="cb-readonly" id="cb-f-contract-year">—</div></div>
+              <div class="cb-field"><label>계약 기간</label><div class="cb-readonly" id="cb-f-contract-period">—</div></div>
+            </div>
+          </div>
+
+          <div class="org-section cb-detail-box">
+            <h3 class="org-section-title">소개 / 기타</h3>
+            <div class="cb-field-grid">
+              <div class="cb-field" style="grid-column:1/-1;">
+                <label for="cb-f-intro">기관 소개</label>
+                <textarea id="cb-f-intro" rows="3" placeholder="—"></textarea>
+              </div>
+            </div>
+          </div>
+
           <div class="cb-modal-error" id="cb-detail-modal-error"></div>
         </div>
         <div class="modal-footer">
@@ -267,115 +393,185 @@
     </div>
 
     <div class="modal-backdrop" id="cbHeldStandardsModal" aria-hidden="true">
-      <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cb-held-modal-title">
+      <div class="modal-dialog cb-held-standards-modal" role="dialog" aria-modal="true" aria-labelledby="cb-held-modal-title">
         <div class="modal-header">
           <div>
-            <h5 class="modal-title fw-bold" id="cb-held-modal-title">표준 · 인증수행범위</h5>
+            <h5 class="modal-title fw-bold" id="cb-held-modal-title">표준 · 인정·인증수행범위</h5>
             <div class="muted" id="cb-held-modal-sub" style="color: var(--font-secondary); font: var(--font-caption); margin-top: 4px;"></div>
           </div>
           <button type="button" class="btn-close" data-cb-held-close aria-label="Close">×</button>
         </div>
         <div class="modal-body">
           <p style="margin:0 0 12px; color: var(--font-secondary); font: var(--font-body-small);">
-            선택한 표준의 인증수행범위(IAF 코드)입니다. (읽기 전용)
+            표준별 인정번호·인정만료일을 편집하고, MD단가·인증수행범위(IAF)를 확인합니다. (MD단가는 CB 포털에서만 수정)
           </p>
           <div class="table-responsive" style="max-height: 60vh; overflow: auto;">
             <table class="data-table admin-data-table" id="cb-held-table">
               <thead>
                 <tr>
-                  <th style="width:18%;">이니셜</th>
-                  <th style="width:28%;">표준</th>
+                  <th style="width:8%;">이니셜</th>
+                  <th style="width:18%;">표준</th>
+                  <th style="width:16%;">인정번호</th>
+                  <th style="width:14%;">인정만료일</th>
+                  <th style="width:14%;">MD단가</th>
                   <th>IAF / 수행범위 코드</th>
                 </tr>
               </thead>
               <tbody id="cb-held-tbody">
-                <tr><td colspan="3" style="text-align:center;color:var(--font-tertiary);">불러오는 중…</td></tr>
+                <tr><td colspan="6" style="text-align:center;color:var(--font-tertiary);">불러오는 중…</td></tr>
               </tbody>
             </table>
           </div>
+          <div class="cb-modal-error" id="cb-held-modal-error"></div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn-secondary" data-cb-held-close>닫기</button>
+          <button type="button" class="btn-primary" id="cb-held-save">저장</button>
         </div>
       </div>
     </div>
 
     <div class="modal-backdrop" id="auditorDetailModal" aria-hidden="true">
-      <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-auditor-title">
+      <div class="modal-dialog modal-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="auditor-detail-modal-title">
         <div class="modal-header">
-          <h5 class="modal-title fw-bold" id="modal-auditor-title">심사원 상세 정보</h5>
+          <div>
+            <h5 class="modal-title fw-bold" id="auditor-detail-modal-title">심사원 상세정보</h5>
+            <div class="muted" id="auditor-detail-modal-sub" style="color: var(--font-secondary); font: var(--font-caption); margin-top: 4px;"></div>
+          </div>
           <button type="button" class="btn-close" data-auditor-modal-close aria-label="Close">×</button>
         </div>
         <div class="modal-body">
-          <ul class="nav-tabs" id="auditorDetailTab" role="tablist">
-            <li role="presentation">
-              <button class="nav-link active fw-semibold" type="button" data-auditor-detail-tab="aud-basic-info">기본 정보</button>
-            </li>
-            <li role="presentation">
-              <button class="nav-link fw-semibold" type="button" data-auditor-detail-tab="aud-qual-info">자격 &amp; 소속 CB</button>
-            </li>
-            <li role="presentation">
-              <button class="nav-link fw-semibold" type="button" data-auditor-detail-tab="aud-history-info">학력 &amp; 실무경력</button>
-            </li>
-          </ul>
+          <p style="margin:0 0 12px;color:var(--font-secondary);font:var(--font-body-small);">
+            개인정보·자격·이력은 조회 전용입니다. 관리자는 <strong>상태</strong>(활성/휴직/정지)만 변경할 수 있습니다. 자격 승인/거절은 인증기관(CB)에서 처리합니다.
+          </p>
 
-          <div id="auditorDetailTabContent">
-            <!-- 1. 기본 정보 -->
-            <div class="detail-tab-pane active" id="aud-basic-info" role="tabpanel">
-              <table class="detail-table">
-                <tbody>
-                  <tr>
-                    <th style="width: 20%;">ID</th>
-                    <td id="a-id"></td>
-                    <th style="width: 20%;">상태</th>
-                    <td id="a-status"></td>
-                  </tr>
-                  <tr>
-                    <th>성명</th>
-                    <td id="a-name"></td>
-                    <th>이메일</th>
-                    <td id="a-email"></td>
-                  </tr>
-                  <tr>
-                    <th>연락처</th>
-                    <td id="a-phone"></td>
-                    <th>생년월일 / 성별</th>
-                    <td id="a-birth-gender"></td>
-                  </tr>
-                  <tr>
-                    <th>근무형태</th>
-                    <td id="a-emp-type"></td>
-                    <th>프리랜서 여부</th>
-                    <td id="a-freelance"></td>
-                  </tr>
-                  <tr>
-                    <th>주소</th>
-                    <td colspan="3" id="a-address"></td>
-                  </tr>
-                  <tr>
-                    <th>정산 계좌</th>
-                    <td colspan="3" id="a-bank-account"></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- 2. 자격 & 소속 CB -->
-            <div class="detail-tab-pane" id="aud-qual-info" role="tabpanel">
-              <div id="cb-membership-list">
-                <div class="placeholder-box">소속 CB 정보를 불러오는 중...</div>
+          <div class="org-section cb-detail-box">
+            <h3 class="org-section-title">기본</h3>
+            <div class="cb-field-grid">
+              <div class="cb-field"><label>ID</label><div class="cb-readonly" id="aud-f-id">—</div></div>
+              <div class="cb-field"><label for="aud-f-complais-no">ComplAIs 번호</label><input id="aud-f-complais-no" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-name">성명</label><input id="aud-f-name" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-name-en">영문명</label><input id="aud-f-name-en" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-birth">생년월일</label><input id="aud-f-birth" type="date" readonly /></div>
+              <div class="cb-field"><label for="aud-f-gender">성별</label>
+                <select id="aud-f-gender" disabled>
+                  <option value="">—</option>
+                  <option value="M">남성</option>
+                  <option value="F">여성</option>
+                </select>
               </div>
+              <div class="cb-field"><label for="aud-f-reg-no">등록번호</label><input id="aud-f-reg-no" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-status">상태</label>
+                <select id="aud-f-status">
+                  <option value="">—</option>
+                  <option value="active">활성</option>
+                  <option value="leave">휴직</option>
+                  <option value="suspended">정지</option>
+                </select>
+              </div>
+              <div class="cb-field"><label>프로필 상태</label><div class="cb-readonly" id="aud-f-profile-status">—</div></div>
+              <div class="cb-field"><label>활성 여부</label><div class="cb-readonly" id="aud-f-is-active">—</div></div>
+              <div class="cb-field"><label>등록일</label><div class="cb-readonly" id="aud-f-created">—</div></div>
+              <div class="cb-field"><label>수정일</label><div class="cb-readonly" id="aud-f-updated">—</div></div>
             </div>
+            <div class="org-actions" style="margin-top:12px;">
+              <button type="button" class="btn-primary-admin" id="auditor-status-save">상태 저장</button>
+            </div>
+            <div class="org-msg" id="auditor-action-msg"></div>
+          </div>
 
-            <!-- 3. 학력 & 실무경력 -->
-            <div class="detail-tab-pane" id="aud-history-info" role="tabpanel">
-              <h6 class="fw-bold text-primary" style="margin: 0 0 8px;">학력 사항</h6>
-              <div id="aud-edu-list" style="margin-bottom: 16px;"></div>
-
-              <h6 class="fw-bold text-primary" style="margin: 0 0 8px;">실무 경력</h6>
-              <div id="aud-career-list"></div>
+          <div class="org-section cb-detail-box">
+            <h3 class="org-section-title">연락</h3>
+            <div class="cb-field-grid">
+              <div class="cb-field"><label for="aud-f-email">이메일</label><input id="aud-f-email" placeholder="—" readonly autocomplete="email" /></div>
+              <div class="cb-field"><label for="aud-f-phone">연락처</label><input id="aud-f-phone" placeholder="—" readonly inputmode="tel" maxlength="13" /></div>
+              <div class="cb-field" style="grid-column:1/-1;"><label for="aud-f-address">주소</label><input id="aud-f-address" placeholder="—" readonly /></div>
+              <div class="cb-field" style="grid-column:1/-1;"><label for="aud-f-address-detail">상세주소</label><input id="aud-f-address-detail" placeholder="—" readonly /></div>
             </div>
           </div>
+
+          <div class="org-section cb-detail-box">
+            <h3 class="org-section-title">자격 / 등급</h3>
+            <div class="cb-field-grid">
+              <div class="cb-field"><label for="aud-f-grade">현재 등급</label>
+                <select id="aud-f-grade" disabled>
+                  <option value="">—</option>
+                  <option value="trainee">심사원보</option>
+                  <option value="auditor">심사원</option>
+                  <option value="lead_auditor">선임심사원</option>
+                  <option value="verified_auditor">검증심사원</option>
+                  <option value="senior">선임심사원(레거시)</option>
+                </select>
+              </div>
+              <div class="cb-field"><label for="aud-f-iaf">보유 IAF 코드</label><input id="aud-f-iaf" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-edu-level">학력</label><input id="aud-f-edu-level" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-school">학교</label><input id="aud-f-school" placeholder="—" readonly /></div>
+              <div class="cb-field" style="grid-column:1/-1;"><label for="aud-f-major">전공</label><input id="aud-f-major" placeholder="—" readonly /></div>
+            </div>
+            <div style="margin-top:12px;">
+              <div style="font:var(--font-body-small);color:var(--font-secondary);margin-bottom:6px;">외부 자격</div>
+              <div id="aud-external-certs" class="muted">—</div>
+            </div>
+            <div style="margin-top:12px;">
+              <div style="font:var(--font-body-small);color:var(--font-secondary);margin-bottom:6px;">소속 CB 자격</div>
+              <div id="aud-membership-list" class="muted">—</div>
+            </div>
+          </div>
+
+          <div class="org-section cb-detail-box">
+            <h3 class="org-section-title">근무</h3>
+            <div class="cb-field-grid">
+              <div class="cb-field"><label for="aud-f-emp-type">근무형태</label>
+                <select id="aud-f-emp-type" disabled>
+                  <option value="">—</option>
+                  <option value="fulltime">정규직</option>
+                  <option value="parttime">파트타임</option>
+                </select>
+              </div>
+              <div class="cb-field"><label for="aud-f-freelance">프리랜서</label>
+                <select id="aud-f-freelance" disabled>
+                  <option value="">—</option>
+                  <option value="true">예</option>
+                  <option value="false">아니오</option>
+                </select>
+              </div>
+              <div class="cb-field"><label for="aud-f-contract-type">계약형태</label><input id="aud-f-contract-type" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-cb-affiliation">소속 표기</label><input id="aud-f-cb-affiliation" placeholder="—" readonly /></div>
+              <div class="cb-field"><label>주 소속 CB</label><div class="cb-readonly" id="aud-f-primary-cb">—</div></div>
+              <div class="cb-field"><label for="aud-f-income-type">소득유형</label><input id="aud-f-income-type" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-commission-type">수수료 유형</label><input id="aud-f-commission-type" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-daily-rate">일당</label><input id="aud-f-daily-rate" type="number" min="0" step="1" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-fee-ratio">수수료 비율</label><input id="aud-f-fee-ratio" type="number" min="0" step="0.01" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-monthly-fee">월 보수</label><input id="aud-f-monthly-fee" type="number" min="0" step="1" placeholder="—" readonly /></div>
+            </div>
+          </div>
+
+          <div class="org-section cb-detail-box">
+            <h3 class="org-section-title">정산 / 기타</h3>
+            <div class="cb-field-grid">
+              <div class="cb-field"><label for="aud-f-bank">은행</label><input id="aud-f-bank" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-account">계좌번호</label><input id="aud-f-account" placeholder="—" readonly /></div>
+              <div class="cb-field"><label for="aud-f-holder">예금주</label><input id="aud-f-holder" placeholder="—" readonly /></div>
+              <div class="cb-field" style="grid-column:1/-1;">
+                <label for="aud-f-career-summary">경력 요약</label>
+                <textarea id="aud-f-career-summary" rows="2" placeholder="—" readonly></textarea>
+              </div>
+              <div class="cb-field" style="grid-column:1/-1;">
+                <label for="aud-f-intro">소개 / 메모</label>
+                <textarea id="aud-f-intro" rows="3" placeholder="—" readonly></textarea>
+              </div>
+            </div>
+            <div style="margin-top:12px;">
+              <div style="font:var(--font-body-small);color:var(--font-secondary);margin-bottom:6px;">학력 이력</div>
+              <div id="aud-edu-list" class="muted">—</div>
+            </div>
+            <div style="margin-top:12px;">
+              <div style="font:var(--font-body-small);color:var(--font-secondary);margin-bottom:6px;">실무 경력</div>
+              <div id="aud-career-list" class="muted">—</div>
+            </div>
+          </div>
+
+          <div class="cb-modal-error" id="auditor-detail-modal-error"></div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn-secondary" data-auditor-modal-close>닫기</button>
@@ -405,7 +601,7 @@
             </li>
             <li role="presentation">
               <button class="nav-link" type="button" data-detail-tab="cert-info">
-                인증 정보 <span class="panel-count">(연동 예정)</span>
+                인증 정보 <span class="panel-count" id="ac-cert-count"></span>
               </button>
             </li>
             <li role="presentation">
@@ -421,6 +617,9 @@
                 <input type="hidden" id="ac-id" name="id" />
                 <div class="org-section">
                   <h3 class="org-section-title">기본 정보</h3>
+                  <p style="margin:0 0 10px;color:var(--font-secondary);font:var(--font-body-small);">
+                    기업 마스터는 조회 전용입니다. 관리자는 <strong>상태</strong>(정상/휴업/폐업/인증취소)만 변경할 수 있습니다.
+                  </p>
                   <div class="org-grid">
                     <div class="org-field"><label>ID</label><input id="ac-id-display" disabled /></div>
                     <div class="org-field">
@@ -432,34 +631,34 @@
                         <option value="인증취소">인증취소</option>
                       </select>
                     </div>
-                    <div class="org-field"><label for="ac-name">기업명(국문)</label><input id="ac-name" name="name" required /></div>
-                    <div class="org-field"><label for="ac-name_en">기업명(영문)</label><input id="ac-name_en" name="name_en" /></div>
-                    <div class="org-field"><label for="ac-biz_no">사업자등록번호</label><input id="ac-biz_no" name="biz_no" placeholder="000-00-00000" /></div>
+                    <div class="org-field"><label for="ac-name">기업명(국문)</label><input id="ac-name" name="name" readonly /></div>
+                    <div class="org-field"><label for="ac-name_en">기업명(영문)</label><input id="ac-name_en" name="name_en" readonly /></div>
+                    <div class="org-field"><label for="ac-biz_no">사업자등록번호</label><input id="ac-biz_no" name="biz_no" placeholder="000-00-00000" readonly /></div>
                     <div class="org-field">
                       <label for="ac-entity_type">법인/개인</label>
-                      <select id="ac-entity_type" name="entity_type">
+                      <select id="ac-entity_type" name="entity_type" disabled>
                         <option value="">선택</option>
                         <option value="개인">개인</option>
                         <option value="법인">법인</option>
                       </select>
                     </div>
-                    <div class="org-field"><label for="ac-corp_no">법인등록번호</label><input id="ac-corp_no" name="corp_no" /></div>
-                    <div class="org-field"><label for="ac-ceo_name">대표자명</label><input id="ac-ceo_name" name="ceo_name" /></div>
-                    <div class="org-field"><label for="ac-biz_type">업태</label><input id="ac-biz_type" name="biz_type" /></div>
-                    <div class="org-field"><label for="ac-biz_class">업종</label><input id="ac-biz_class" name="biz_class" /></div>
-                    <div class="org-field"><label for="ac-ksic_code">KSIC 코드</label><input id="ac-ksic_code" name="ksic_code" /></div>
-                    <div class="org-field"><label for="ac-iaf_code">IAF 코드</label><input id="ac-iaf_code" name="iaf_code" /></div>
-                    <div class="org-field"><label for="ac-tel">대표 전화</label><input id="ac-tel" name="tel" /></div>
-                    <div class="org-field"><label for="ac-email">대표 이메일</label><input id="ac-email" name="email" type="email" /></div>
-                    <div class="org-field full"><label for="ac-website">홈페이지</label><input id="ac-website" name="website" /></div>
-                    <div class="org-field full"><label for="ac-address">주소</label><input id="ac-address" name="address" /></div>
-                    <div class="org-field full"><label for="ac-detail_address">상세주소</label><input id="ac-detail_address" name="detail_address" /></div>
-                    <div class="org-field full"><label for="ac-address_en">영문 주소</label><input id="ac-address_en" name="address_en" /></div>
-                    <div class="org-field full"><label for="ac-scope_kr">인증 수행 범위(국문)</label><textarea id="ac-scope_kr" name="scope_kr" rows="2"></textarea></div>
-                    <div class="org-field full"><label for="ac-scope_en">인증 수행 범위(영문)</label><textarea id="ac-scope_en" name="scope_en" rows="2"></textarea></div>
+                    <div class="org-field"><label for="ac-corp_no">법인등록번호</label><input id="ac-corp_no" name="corp_no" readonly /></div>
+                    <div class="org-field"><label for="ac-ceo_name">대표자명</label><input id="ac-ceo_name" name="ceo_name" readonly /></div>
+                    <div class="org-field"><label for="ac-biz_type">업태</label><input id="ac-biz_type" name="biz_type" readonly /></div>
+                    <div class="org-field"><label for="ac-biz_class">업종</label><input id="ac-biz_class" name="biz_class" readonly /></div>
+                    <div class="org-field"><label for="ac-ksic_code">KSIC 코드</label><input id="ac-ksic_code" name="ksic_code" readonly /></div>
+                    <div class="org-field"><label for="ac-iaf_code">IAF 코드</label><input id="ac-iaf_code" name="iaf_code" readonly /></div>
+                    <div class="org-field"><label for="ac-tel">대표 전화</label><input id="ac-tel" name="tel" readonly /></div>
+                    <div class="org-field"><label for="ac-email">대표 이메일</label><input id="ac-email" name="email" type="email" readonly /></div>
+                    <div class="org-field full"><label for="ac-website">홈페이지</label><input id="ac-website" name="website" readonly /></div>
+                    <div class="org-field full"><label for="ac-address">주소</label><input id="ac-address" name="address" readonly /></div>
+                    <div class="org-field full"><label for="ac-detail_address">상세주소</label><input id="ac-detail_address" name="detail_address" readonly /></div>
+                    <div class="org-field full"><label for="ac-address_en">영문 주소</label><input id="ac-address_en" name="address_en" readonly /></div>
+                    <div class="org-field full"><label for="ac-scope_kr">인증 수행 범위(국문)</label><textarea id="ac-scope_kr" name="scope_kr" rows="2" readonly></textarea></div>
+                    <div class="org-field full"><label for="ac-scope_en">인증 수행 범위(영문)</label><textarea id="ac-scope_en" name="scope_en" rows="2" readonly></textarea></div>
                   </div>
                   <div class="org-actions">
-                    <button type="submit" class="btn-primary-admin" id="ac-basic-save">기본정보 저장</button>
+                    <button type="submit" class="btn-primary-admin" id="ac-status-save">상태 저장</button>
                   </div>
                   <div class="org-msg" id="ac-basic-msg"></div>
                 </div>
@@ -470,18 +669,16 @@
               <form id="admin-company-headcount-form" autocomplete="off">
                 <div class="org-section">
                   <h3 class="org-section-title">인원 현황</h3>
+                  <p style="margin:0 0 10px;color:var(--font-secondary);font:var(--font-body-small);">조회 전용입니다. 연도만 바꿔 확인할 수 있습니다.</p>
                   <div class="org-grid-3">
                     <div class="org-field">
                       <label for="ac-headcount_year">기준 연도</label>
                       <select id="ac-headcount_year" name="headcount_year"></select>
                     </div>
-                    <div class="org-field"><label for="ac-employee_count">총 인원</label><input id="ac-employee_count" name="employee_count" type="number" min="0" /></div>
-                    <div class="org-field"><label for="ac-headcount_outsourced">외주</label><input id="ac-headcount_outsourced" name="headcount_outsourced" type="number" min="0" /></div>
-                    <div class="org-field"><label for="ac-headcount_regular">정규직</label><input id="ac-headcount_regular" name="headcount_regular" type="number" min="0" /></div>
-                    <div class="org-field"><label for="ac-headcount_non_regular">비정규직</label><input id="ac-headcount_non_regular" name="headcount_non_regular" type="number" min="0" /></div>
-                  </div>
-                  <div class="org-actions">
-                    <button type="submit" class="btn-primary-admin" id="ac-headcount-save">인원 저장</button>
+                    <div class="org-field"><label for="ac-employee_count">총 인원</label><input id="ac-employee_count" name="employee_count" type="number" min="0" readonly /></div>
+                    <div class="org-field"><label for="ac-headcount_outsourced">외주</label><input id="ac-headcount_outsourced" name="headcount_outsourced" type="number" min="0" readonly /></div>
+                    <div class="org-field"><label for="ac-headcount_regular">정규직</label><input id="ac-headcount_regular" name="headcount_regular" type="number" min="0" readonly /></div>
+                    <div class="org-field"><label for="ac-headcount_non_regular">비정규직</label><input id="ac-headcount_non_regular" name="headcount_non_regular" type="number" min="0" readonly /></div>
                   </div>
                   <div class="org-msg" id="ac-headcount-msg"></div>
                 </div>
@@ -491,11 +688,8 @@
             <div class="detail-tab-pane" id="sites-info" role="tabpanel">
               <div class="org-section">
                 <h3 class="org-section-title">추가사업장</h3>
+                <p style="margin:0 0 10px;color:var(--font-secondary);font:var(--font-body-small);">조회 전용입니다.</p>
                 <div id="ac-site-list" class="org-empty">불러오는 중...</div>
-                <div class="org-actions">
-                  <button type="button" class="btn-secondary" id="ac-site-add">사업장 추가</button>
-                  <button type="button" class="btn-primary-admin" id="ac-site-save">사업장 저장</button>
-                </div>
                 <div class="org-msg" id="ac-site-msg"></div>
               </div>
             </div>
@@ -503,11 +697,7 @@
             <div class="detail-tab-pane" id="org-info" role="tabpanel">
               <div class="org-section">
                 <h3 class="org-section-title">부서</h3>
-                <div class="org-inline-row">
-                  <input id="ac-dept-input" placeholder="부서명 입력" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--gray-line-2);border-radius:8px;font:var(--font-body-small);" />
-                  <button type="button" class="btn-secondary" id="ac-dept-add">등록</button>
-                  <button type="button" class="btn-primary-admin" id="ac-dept-save">부서 저장</button>
-                </div>
+                <p style="margin:0 0 10px;color:var(--font-secondary);font:var(--font-body-small);">조회 전용입니다.</p>
                 <div class="dept-tags" id="ac-dept-tags"></div>
                 <div class="org-msg" id="ac-dept-msg"></div>
               </div>
@@ -524,23 +714,37 @@
                         <th>전화</th>
                         <th>휴대전화</th>
                         <th>이메일</th>
-                        <th></th>
                       </tr>
                     </thead>
                     <tbody id="ac-staff-body"></tbody>
                   </table>
-                </div>
-                <div class="org-actions">
-                  <button type="button" class="btn-secondary" id="ac-staff-add">담당자 추가</button>
-                  <button type="button" class="btn-primary-admin" id="ac-staff-save">담당자 저장</button>
                 </div>
                 <div class="org-msg" id="ac-staff-msg"></div>
               </div>
             </div>
 
             <div class="detail-tab-pane" id="cert-info" role="tabpanel">
-              <div class="placeholder-box">
-                <p style="margin: 0;">ISO 9001 / 14001 / 45001 등 ISO 인증 수집 데이터 연동 예정 영역입니다.</p>
+              <div class="org-section">
+                <h3 class="org-section-title">보유 표준 · 인정기관 / 인증기관</h3>
+                <p style="margin:0 0 10px;color:var(--font-secondary);font:var(--font-body-small);">
+                  플랫폼 관리자 조회용 — 기업의 전체 보유 표준(모든 CB)을 표시합니다. (읽기 전용)
+                </p>
+                <div class="table-responsive">
+                  <table class="org-table" id="ac-held-std-table">
+                    <thead>
+                      <tr>
+                        <th>표준</th>
+                        <th>인정기관 (AB)</th>
+                        <th>인증기관 (CB)</th>
+                        <th>인증번호</th>
+                        <th>상태</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ac-held-std-body">
+                      <tr><td colspan="5" class="muted">불러오는 중…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
@@ -557,7 +761,7 @@
       </div>
     </div>
 
-    <script src="/static/js/validation.js?v=20260806f"></script>
-    <script src="/static/admin.js?v=20260806f"></script>
+    <script src="/static/js/validation.js?v=20260807hs"></script>
+    <script src="/static/admin.js?v=20260807hs"></script>
 </body>
 </html>

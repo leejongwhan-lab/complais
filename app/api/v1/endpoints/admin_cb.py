@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import logging
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -49,6 +50,9 @@ from app.models.certification_body import (
 from app.models.master import AccreditationBodies
 from app.models.standard import StandardMaster
 from app.services.cb_billing import ensure_default_cb_contract
+from app.services.scope_expiry import expiry_api_fields
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin/certification-bodies", tags=["Admin Certification Bodies"])
 
@@ -120,16 +124,23 @@ class ScopeItem(BaseModel):
 
 
 class StandardAccreditationItem(BaseModel):
-    """CB × ISO 표준별 인정기관(AB) + 인정번호 + 인증수행범위.
+    """CB × ISO 표준별 인정기관(AB) + 인정번호 + 인정만료일 + MD단가 + 인증수행범위.
 
     수행범위 택소노미는 표준별로 다름 (IAF39 / MDQMS / FSMS / NQMS / BCMS / none).
+    인정번호·인정만료일·MD단가는 표준별로 다름 (CB 단일값 아님).
+    md_rate: 플랫폼 어드민 PUT에서는 무시(읽기 전용). CB 포털만 쓰기 허용.
     """
 
     standard_code: str
     standard_name: Optional[str] = None
     ab_code: Optional[str] = None
     ab_name_en: Optional[str] = None
-    registration_no: Optional[str] = None  # 인정번호
+    registration_no: Optional[str] = None  # 표준별 인정번호
+    expiry_date: Optional[date] = None  # 표준별 인정만료일
+    md_rate: Optional[Decimal] = None  # 표준별 MD 단가(KRW)
+    days_remaining: Optional[int] = None  # 만료까지 잔여일 (음수=경과)
+    expiry_warning: Optional[str] = None  # D-30/만료 경고 문구
+    expiry_status: Optional[str] = None  # ok | warn | locked
     scope_taxonomy: Optional[str] = None
     scope_taxonomy_label: Optional[str] = None
     has_scope_codes: bool = True
@@ -191,6 +202,18 @@ class CbUpsertBody(BaseModel):
     website: Optional[str] = None
     logo_path: Optional[str] = None
     status: str = "active"
+    # 상세정보 확장 (certification_bodies 컬럼 — 목록에 없는 항목)
+    fax: Optional[str] = None
+    tax_email: Optional[str] = None
+    corp_no: Optional[str] = None
+    personal_no: Optional[str] = None
+    bank_name: Optional[str] = None
+    account_no: Optional[str] = None
+    account_holder: Optional[str] = None
+    intro: Optional[str] = None
+    expire_date: Optional[str] = None
+    accreditation_region: Optional[str] = None
+    accreditation_country: Optional[str] = None
     scopes: Optional[List[ScopeItem]] = None
     standard_accreditations: Optional[List[StandardAccreditationItem]] = None
     contract: Optional[ContractPayload] = None
@@ -254,6 +277,11 @@ class HeldStandardScopeRow(BaseModel):
     standard_name: Optional[str] = None
     ab_code: Optional[str] = None
     registration_no: Optional[str] = None
+    expiry_date: Optional[date] = None
+    md_rate: Optional[Decimal] = None  # 표준별 MD 단가(어드민 읽기전용)
+    days_remaining: Optional[int] = None
+    expiry_warning: Optional[str] = None
+    expiry_status: Optional[str] = None  # ok | warn | locked
     iaf_codes: List[str] = Field(default_factory=list)
 
 
@@ -269,9 +297,14 @@ class CbFullDetailResponse(CbDetailResponse):
     account_no: Optional[str] = None
     account_holder: Optional[str] = None
     corp_no: Optional[str] = None
+    personal_no: Optional[str] = None
     intro: Optional[str] = None
     tax_email: Optional[str] = None
     expire_date: Optional[str] = None
+    accreditation_region: Optional[str] = None
+    accreditation_country: Optional[str] = None
+    evaluation_score: Optional[Decimal] = None
+    activated_at: Optional[datetime] = None
     # 보유 표준 이니셜 + IAF (관계 테이블 매핑)
     held_scope_rows: List[HeldStandardScopeRow] = Field(default_factory=list)
 
@@ -631,7 +664,7 @@ def _iaf_by_standard(db: Session, cb_id: int) -> Dict[str, List[str]]:
 
 
 def _list_standard_accreditations(db: Session, cb_id: int) -> List[StandardAccreditationItem]:
-    """운용 14개 표준 골격 + 저장된 인정기관/인정번호 + 표준별 IAF 수행범위."""
+    """운용 14개 표준 골격 + 저장된 인정기관/인정번호/만료일 + 표준별 IAF 수행범위."""
     masters = (
         db.query(StandardMaster)
         .filter(
@@ -644,29 +677,61 @@ def _list_standard_accreditations(db: Session, cb_id: int) -> List[StandardAccre
     name_map = {r.standard_code: r.standard_name for r in masters}
     codes = [r.standard_code for r in masters] or list(DEFAULT_STANDARDS)
 
-    saved = {
-        r.standard_code: r
-        for r in db.query(CbStandardAccreditation)
+    saved_rows = (
+        db.query(CbStandardAccreditation)
         .filter(CbStandardAccreditation.cb_id == cb_id)
         .all()
-    }
-    ab_name = {
-        (r.code or "").strip(): r.name_en
-        for r in db.query(AccreditationBodies).all()
-        if r.code
-    }
+    )
+    saved_by_code = {r.standard_code: r for r in saved_rows}
+    # 레거시 코드(ISO 9001) ↔ 마스터(ISO 9001:2015) 가족 매칭
+    saved_by_fam: Dict[str, Any] = {}
+    for r in saved_rows:
+        fam = to_family_initial(r.standard_code)
+        if not fam:
+            continue
+        prev = saved_by_fam.get(fam)
+        if prev is None or (r.is_active and not prev.is_active):
+            saved_by_fam[fam] = r
+    ab_name: Dict[str, Optional[str]] = {}
+    try:
+        for r in db.query(AccreditationBodies).all():
+            code = (getattr(r, "code", None) or getattr(r, "name", None) or "").strip()
+            if code:
+                ab_name[code] = getattr(r, "name_en", None)
+    except Exception:
+        # 레거시 스키마(코드 컬럼 부재 등)에서도 상세조회가 깨지지 않도록
+        db.rollback()
+        ab_name = {}
     iaf_map = _iaf_by_standard(db, cb_id)
+    claimed_fams: Set[str] = set()
 
     items: List[StandardAccreditationItem] = []
     for code in codes:
-        row = saved.get(code)
+        row = saved_by_code.get(code)
+        fam = to_family_initial(code)
+        if row is None and fam and fam not in claimed_fams:
+            row = saved_by_fam.get(fam)
+        if row is not None and fam:
+            claimed_fams.add(fam)
         ab = (row.ab_code if row else None) or None
         reg = (row.registration_no if row else None) or None
+        exp = getattr(row, "expiry_date", None) if row else None
+        md = getattr(row, "md_rate", None) if row else None
+        if md is not None:
+            md = Decimal(str(md))
         active = bool(row.is_active) if row else False
-        if not active and (ab or reg or iaf_map.get(code)):
+        if not active and (ab or reg or exp or md is not None or iaf_map.get(code)):
             active = True
         scopes = iaf_map.get(code, [])
+        # 가족 단위로 저장된 scope 키(ISO 9001)도 합치기
+        if fam and not scopes:
+            for k, v in iaf_map.items():
+                if to_family_initial(k) == fam:
+                    for c in v:
+                        if c not in scopes:
+                            scopes.append(c)
         tax = taxonomy_for_standard(code)
+        exp_fields = expiry_api_fields(exp)
         items.append(
             StandardAccreditationItem(
                 standard_code=code,
@@ -674,6 +739,11 @@ def _list_standard_accreditations(db: Session, cb_id: int) -> List[StandardAccre
                 ab_code=ab,
                 ab_name_en=ab_name.get(ab or ""),
                 registration_no=reg,
+                expiry_date=exp,
+                md_rate=md,
+                days_remaining=exp_fields["days_remaining"],
+                expiry_warning=exp_fields["expiry_warning"],
+                expiry_status=exp_fields["expiry_status"],
                 scope_taxonomy=tax,
                 scope_taxonomy_label=TAXONOMY_LABELS.get(tax, tax),
                 has_scope_codes=tax != "none",
@@ -716,13 +786,33 @@ def _held_standards_summary(db: Session, cb_ids: List[int]) -> Dict[int, Tuple[i
     return out
 
 
+def _parse_md_rate(value: Any) -> Optional[Decimal]:
+    if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    try:
+        d = Decimal(str(value).replace(",", "").strip())
+    except Exception:
+        return None
+    if d < 0:
+        raise HTTPException(status_code=400, detail="MD단가는 0 이상이어야 합니다.")
+    return d.quantize(Decimal("1"))
+
+
 def _upsert_standard_accreditations(
     db: Session,
     cb_id: int,
     items: List[StandardAccreditationItem],
     *,
     replace_all: bool = True,
+    allow_md_rate: bool = False,
 ) -> int:
+    """Upsert 표준별 인정정보.
+
+    allow_md_rate=False (플랫폼 어드민): md_rate 필드를 무시 — 읽기 전용.
+    allow_md_rate=True (CB 포털): md_rate 저장 허용.
+    """
     now = datetime.utcnow()
     touched = 0
     seen: Set[str] = set()
@@ -733,7 +823,12 @@ def _upsert_standard_accreditations(
         seen.add(std)
         ab = (item.ab_code or "").strip() or None
         reg = (item.registration_no or "").strip() or None
-        active = bool(item.is_active) and bool(ab or reg)
+        exp = _parse_date(item.expiry_date)
+        md = _parse_md_rate(item.md_rate) if allow_md_rate else None
+        # 인정번호·만료일·AB·(허용 시) MD단가 중 하나라도 있으면 보유로 인정
+        active = bool(item.is_active) and bool(
+            ab or reg or exp or (allow_md_rate and md is not None)
+        )
         row = (
             db.query(CbStandardAccreditation)
             .filter(
@@ -742,13 +837,40 @@ def _upsert_standard_accreditations(
             )
             .first()
         )
+        if row is None:
+            # 레거시 표준코드(ISO 9001) → 마스터(ISO 9001:2015) 가족 매칭
+            fam = to_family_initial(std)
+            if fam:
+                for cand in (
+                    db.query(CbStandardAccreditation)
+                    .filter(CbStandardAccreditation.cb_id == cb_id)
+                    .all()
+                ):
+                    if to_family_initial(cand.standard_code) == fam:
+                        row = cand
+                        break
         if row:
+            # 가능하면 마스터 표준코드로 정규화 (충돌 없을 때만)
+            if row.standard_code != std:
+                clash = (
+                    db.query(CbStandardAccreditation)
+                    .filter(
+                        CbStandardAccreditation.cb_id == cb_id,
+                        CbStandardAccreditation.standard_code == std,
+                    )
+                    .first()
+                )
+                if clash is None:
+                    row.standard_code = std
             row.ab_code = ab
             row.registration_no = reg
+            row.expiry_date = exp
+            if allow_md_rate and "md_rate" in item.model_fields_set:
+                row.md_rate = md
             row.is_active = active
             row.updated_at = now
         else:
-            if not active:
+            if not active and not (allow_md_rate and md is not None):
                 continue
             db.add(
                 CbStandardAccreditation(
@@ -756,6 +878,8 @@ def _upsert_standard_accreditations(
                     standard_code=std,
                     ab_code=ab,
                     registration_no=reg,
+                    expiry_date=exp,
+                    md_rate=md if allow_md_rate else None,
                     is_active=True,
                     created_at=now,
                     updated_at=now,
@@ -789,6 +913,7 @@ def _sanitize_cb_contact(payload: CbUpsertBody) -> dict:
         biz_reg_no=payload.biz_reg_no,
         tel=payload.tel,
         email=payload.email,
+        tax_email=payload.tax_email,
         website=payload.website,
     )
     data = payload.model_dump(exclude={"scopes", "contract", "standard_accreditations"})
@@ -798,6 +923,8 @@ def _sanitize_cb_contact(payload: CbUpsertBody) -> dict:
         data["tel"] = cleaned["tel"]
     if "email" in cleaned:
         data["email"] = cleaned["email"]
+    if "tax_email" in cleaned:
+        data["tax_email"] = cleaned["tax_email"]
     if "website" in cleaned:
         data["website"] = cleaned["website"]
     return data
@@ -840,14 +967,19 @@ def _contract_info(contract: Optional[CBContract], year: Optional[int] = None) -
 
 
 def _list_auditors(db: Session, cb_id: int) -> List[AuditorMemberItem]:
-    rows = (
-        db.query(AuditorCbMemberships, Auditor)
-        .outerjoin(Auditor, Auditor.id == AuditorCbMemberships.auditor_id)
-        .filter(AuditorCbMemberships.cb_id == cb_id)
-        .order_by(AuditorCbMemberships.id.desc())
-        .limit(200)
-        .all()
-    )
+    try:
+        rows = (
+            db.query(AuditorCbMemberships, Auditor)
+            .outerjoin(Auditor, Auditor.id == AuditorCbMemberships.auditor_id)
+            .filter(AuditorCbMemberships.cb_id == cb_id)
+            .order_by(AuditorCbMemberships.id.desc())
+            .limit(200)
+            .all()
+        )
+    except Exception:
+        # membership 스키마 드리프트 시 상세정보(기본/연락/계약) 조회는 유지
+        db.rollback()
+        return []
     items: List[AuditorMemberItem] = []
     for m, a in rows:
         items.append(
@@ -876,7 +1008,15 @@ def _build_held_scope_rows(db: Session, cb_id: int) -> List[HeldStandardScopeRow
     by_fam: Dict[str, HeldStandardScopeRow] = {}
     order = {f: i for i, f in enumerate(FAMILY_DISPLAY_ORDER)}
 
-    def _merge(std: str, *, ab: Optional[str] = None, reg: Optional[str] = None, name: Optional[str] = None) -> None:
+    def _merge(
+        std: str,
+        *,
+        ab: Optional[str] = None,
+        reg: Optional[str] = None,
+        exp: Optional[date] = None,
+        md: Optional[Decimal] = None,
+        name: Optional[str] = None,
+    ) -> None:
         fam = to_family_initial(std)
         if not fam:
             return
@@ -890,12 +1030,18 @@ def _build_held_scope_rows(db: Session, cb_id: int) -> List[HeldStandardScopeRow
                             codes.append(c)
         row = by_fam.get(fam)
         if not row:
+            exp_fields = expiry_api_fields(exp)
             by_fam[fam] = HeldStandardScopeRow(
                 family_initial=fam,
                 standard_code=std,
                 standard_name=name,
                 ab_code=ab,
                 registration_no=reg,
+                expiry_date=exp,
+                md_rate=md,
+                days_remaining=exp_fields["days_remaining"],
+                expiry_warning=exp_fields["expiry_warning"],
+                expiry_status=exp_fields["expiry_status"],
                 iaf_codes=sorted(codes, key=lambda x: (len(x), x)),
             )
             return
@@ -903,6 +1049,14 @@ def _build_held_scope_rows(db: Session, cb_id: int) -> List[HeldStandardScopeRow
             row.ab_code = ab
         if reg and not row.registration_no:
             row.registration_no = reg
+        if exp and not row.expiry_date:
+            row.expiry_date = exp
+            exp_fields = expiry_api_fields(exp)
+            row.days_remaining = exp_fields["days_remaining"]
+            row.expiry_warning = exp_fields["expiry_warning"]
+            row.expiry_status = exp_fields["expiry_status"]
+        if md is not None and row.md_rate is None:
+            row.md_rate = md
         if name and not row.standard_name:
             row.standard_name = name
         for c in codes:
@@ -911,9 +1065,24 @@ def _build_held_scope_rows(db: Session, cb_id: int) -> List[HeldStandardScopeRow
         row.iaf_codes = sorted(row.iaf_codes, key=lambda x: (len(x), x))
 
     for acc in acc_rows:
-        if not (acc.is_active or acc.ab_code or acc.registration_no or acc.scope_codes or acc.iaf_codes):
+        if not (
+            acc.is_active
+            or acc.ab_code
+            or acc.registration_no
+            or acc.expiry_date
+            or acc.md_rate is not None
+            or acc.scope_codes
+            or acc.iaf_codes
+        ):
             continue
-        _merge(acc.standard_code, ab=acc.ab_code, reg=acc.registration_no, name=acc.standard_name)
+        _merge(
+            acc.standard_code,
+            ab=acc.ab_code,
+            reg=acc.registration_no,
+            exp=acc.expiry_date,
+            md=acc.md_rate,
+            name=acc.standard_name,
+        )
 
     # scope matrix only (no accreditation row) still counts as held
     for std, codes in iaf_map.items():
@@ -929,20 +1098,32 @@ def _build_held_scope_rows(db: Session, cb_id: int) -> List[HeldStandardScopeRow
 def _full_detail(db: Session, cb: CertificationBodies, *, year: Optional[int] = None) -> CbFullDetailResponse:
     base = _detail(db, cb)
     contract = _get_or_create_contract(db, cb, year=year)
-    auditors = _list_auditors(db, cb.id)
+    # 심사원 membership 스키마 드리프트가 있어도 상세정보(기본/연락/계약)는 반환
+    auditors: List[AuditorMemberItem] = []
+    try:
+        auditors = _list_auditors(db, cb.id)
+    except Exception:
+        db.rollback()
+        auditors = []
+    score = getattr(cb, "evaluation_score", None)
     return CbFullDetailResponse(
         **base.model_dump(),
         contract=_contract_info(contract, year=year),
         auditor_count=len(auditors),
         auditors=auditors,
-        fax=getattr(cb, "fax", None),
-        bank_name=getattr(cb, "bank_name", None),
-        account_no=getattr(cb, "account_no", None),
-        account_holder=getattr(cb, "account_holder", None),
-        corp_no=getattr(cb, "corp_no", None),
-        intro=getattr(cb, "intro", None),
-        tax_email=getattr(cb, "tax_email", None),
-        expire_date=getattr(cb, "expire_date", None),
+        fax=getattr(cb, "fax", None) or None,
+        bank_name=getattr(cb, "bank_name", None) or None,
+        account_no=getattr(cb, "account_no", None) or None,
+        account_holder=getattr(cb, "account_holder", None) or None,
+        corp_no=(getattr(cb, "corp_no", None) or None) or None,
+        personal_no=(getattr(cb, "personal_no", None) or None) or None,
+        intro=getattr(cb, "intro", None) or None,
+        tax_email=getattr(cb, "tax_email", None) or None,
+        expire_date=getattr(cb, "expire_date", None) or None,
+        accreditation_region=getattr(cb, "accreditation_region", None) or None,
+        accreditation_country=getattr(cb, "accreditation_country", None) or None,
+        evaluation_score=Decimal(str(score)) if score is not None else None,
+        activated_at=getattr(cb, "activated_at", None),
         held_scope_rows=_build_held_scope_rows(db, cb.id),
     )
 
@@ -1234,19 +1415,34 @@ def update_certification_body(
     if dup:
         raise HTTPException(status_code=400, detail="이미 존재하는 기관 코드입니다.")
 
-    cleaned = _sanitize_cb_contact(payload)
-    apply_spec_fields(cb, cleaned)
-    cb.updated_at = datetime.utcnow()
-    if payload.scopes is not None:
-        _upsert_scopes(db, cb.id, payload.scopes, replace_all=True)
-        _sync_legacy_accreditation_scopes(db, cb.id, payload.scopes)
-    if payload.standard_accreditations is not None:
-        _upsert_standard_accreditations(db, cb.id, payload.standard_accreditations, replace_all=True)
-    if payload.contract is not None:
-        _apply_contract(db, cb, payload.contract)
-    db.commit()
-    db.refresh(cb)
-    return _full_detail(db, cb)
+    try:
+        cleaned = _sanitize_cb_contact(payload)
+        apply_spec_fields(cb, cleaned)
+        cb.updated_at = datetime.utcnow()
+        if payload.scopes is not None:
+            _upsert_scopes(db, cb.id, payload.scopes, replace_all=True)
+            _sync_legacy_accreditation_scopes(db, cb.id, payload.scopes)
+        if payload.standard_accreditations is not None:
+            _upsert_standard_accreditations(
+                db, cb.id, payload.standard_accreditations, replace_all=True
+            )
+        if payload.contract is not None:
+            _apply_contract(db, cb, payload.contract)
+        db.commit()
+        db.refresh(cb)
+        return _full_detail(db, cb)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("CB PUT failed for cb_id=%s", cb_id)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"인증기관 저장에 실패했습니다: {exc.__class__.__name__}",
+        ) from exc
 
 
 @router.put("/{cb_id}/scopes", response_model=CbDetailResponse)
@@ -1260,12 +1456,25 @@ def update_cb_scopes(
     cb = db.get(CertificationBodies, cb_id)
     if not cb:
         raise HTTPException(status_code=404, detail="인증기관을 찾을 수 없습니다.")
-    _upsert_scopes(db, cb.id, payload.scopes, replace_all=payload.replace_all)
-    _sync_legacy_accreditation_scopes(db, cb.id, payload.scopes)
-    cb.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(cb)
-    return _detail(db, cb)
+    try:
+        _upsert_scopes(db, cb.id, payload.scopes, replace_all=payload.replace_all)
+        _sync_legacy_accreditation_scopes(db, cb.id, payload.scopes)
+        cb.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(cb)
+        return _detail(db, cb)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("CB scopes PUT failed for cb_id=%s", cb_id)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Scope 저장에 실패했습니다: {exc.__class__.__name__}",
+        ) from exc
 
 
 class StandardAccreditationUpdate(BaseModel):
@@ -1282,7 +1491,16 @@ def get_cb_standard_accreditations(
     cb = db.get(CertificationBodies, cb_id)
     if not cb:
         raise HTTPException(status_code=404, detail="인증기관을 찾을 수 없습니다.")
-    return _list_standard_accreditations(db, cb_id)
+    try:
+        return _list_standard_accreditations(db, cb_id)
+    except Exception:
+        # 스키마 드리프트 시 빈 목록 — 상세 모달이 연결 실패로 죽지 않게
+        logger.exception("standard-accreditations list failed for cb_id=%s", cb_id)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return []
 
 
 @router.put("/{cb_id}/standard-accreditations", response_model=List[StandardAccreditationItem])
@@ -1292,13 +1510,33 @@ def put_cb_standard_accreditations(
     db: Session = Depends(get_db),
     _: CurrentUser = Depends(get_current_admin_user),
 ):
+    """플랫폼 어드민: 인정번호·만료일 등 저장. md_rate는 무시(읽기 전용)."""
     cb = db.get(CertificationBodies, cb_id)
     if not cb:
         raise HTTPException(status_code=404, detail="인증기관을 찾을 수 없습니다.")
-    _upsert_standard_accreditations(db, cb.id, payload.items, replace_all=payload.replace_all)
-    cb.updated_at = datetime.utcnow()
-    db.commit()
-    return _list_standard_accreditations(db, cb_id)
+    try:
+        _upsert_standard_accreditations(
+            db,
+            cb.id,
+            payload.items,
+            replace_all=payload.replace_all,
+            allow_md_rate=False,  # admin cannot write scope MD rates
+        )
+        cb.updated_at = datetime.utcnow()
+        db.commit()
+        return _list_standard_accreditations(db, cb_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("standard-accreditations PUT failed for cb_id=%s", cb_id)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"표준별 인정정보 저장에 실패했습니다: {exc.__class__.__name__}",
+        ) from exc
 
 
 def _cell(row: Any, *keys: str, default: Any = None) -> Any:

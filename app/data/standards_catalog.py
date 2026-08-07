@@ -210,6 +210,115 @@ def held_standards_as_initials(codes: List[str]) -> List[str]:
     return out
 
 
+# Bare numeric / short codes used by cert questionnaires & legacy storage
+_CODE_FALLBACKS: Dict[str, Dict[str, str]] = {
+    "9001": {"initial": "QMS", "iso_code": "ISO 9001:2015", "name_kr": "품질경영시스템"},
+    "14001": {"initial": "EMS", "iso_code": "ISO 14001:2015", "name_kr": "환경경영시스템"},
+    "45001": {"initial": "OHSMS", "iso_code": "ISO 45001:2018", "name_kr": "안전보건경영시스템"},
+    "27001": {"initial": "ISMS", "iso_code": "ISO/IEC 27001:2022", "name_kr": "정보보안경영시스템"},
+    "27701": {"initial": "PIMS", "iso_code": "ISO/IEC 27701:2019", "name_kr": "개인정보보호경영시스템"},
+    "22000": {"initial": "FSMS", "iso_code": "ISO 22000:2018", "name_kr": "식품안전경영시스템"},
+    "50001": {"initial": "EnMS", "iso_code": "ISO 50001:2018", "name_kr": "에너지경영시스템"},
+    "13485": {"initial": "MDQMS", "iso_code": "ISO 13485:2016", "name_kr": "의료기기품질경영시스템"},
+    "19443": {"initial": "NSMS", "iso_code": "ISO 19443:2018", "name_kr": "원자력공급망품질경영시스템"},
+    "37001": {"initial": "ABMS", "iso_code": "ISO 37001:2016", "name_kr": "부패방지경영시스템"},
+    "37301": {"initial": "CMS", "iso_code": "ISO 37301:2021", "name_kr": "준법경영시스템"},
+    "42001": {"initial": "AIMS", "iso_code": "ISO/IEC 42001:2023", "name_kr": "인공지능경영시스템"},
+    "22301": {"initial": "BCMS", "iso_code": "ISO 22301:2019", "name_kr": "사업연속성경영시스템"},
+}
+
+
+def _prefer_edition(defs: List[StandardDefinition]) -> Optional[StandardDefinition]:
+    """Prefer READY edition; for QMS/EMS prefer 2015 over PENDING 2026."""
+    if not defs:
+        return None
+    ready = [d for d in defs if d.clauses_status == "READY"]
+    pool = ready or defs
+    pool = sorted(pool, key=lambda d: d.edition_year or 0)
+    return pool[0]
+
+
+def standard_display_parts(raw: Optional[str]) -> Dict[str, str]:
+    """UI 표기 전용 — {initial, iso_code, name_kr}.
+
+    규칙: 이니셜 · ISO ####:#### · ○○경영시스템 만 사용.
+    DB/API 내부 코드(9001 등)는 그대로 두고 화면에서만 변환한다.
+    """
+    import re
+
+    text = str(raw or "").strip()
+    if not text:
+        return {"initial": "", "iso_code": "", "name_kr": ""}
+
+    # bare numeric code
+    digits = re.sub(r"[^0-9]", "", text)
+    if digits in _CODE_FALLBACKS and (
+        text == digits or re.fullmatch(r"(?i)iso(?:/iec)?\s*" + digits, text.replace(" ", ""))
+        or text.lower() in {digits, f"iso{digits}", f"iso/iec{digits}"}
+    ):
+        return dict(_CODE_FALLBACKS[digits])
+
+    fam = to_family_initial(text)
+    if fam:
+        defs = [s for s in OPERATING_STANDARDS if s.family_code == fam]
+        chosen = _prefer_edition(defs)
+        if chosen:
+            return {
+                "initial": chosen.family_code,
+                "iso_code": chosen.display_code,
+                "name_kr": chosen.name_ko.replace(" ", ""),
+            }
+        fb = next((v for v in _CODE_FALLBACKS.values() if v["initial"] == fam), None)
+        if fb:
+            return dict(fb)
+
+    m = re.search(
+        r"(9001|14001|45001|27001|37001|37301|50001|22000|13485|19443|27701|42001|22301)",
+        text,
+        re.I,
+    )
+    if m and m.group(1) in _CODE_FALLBACKS:
+        return dict(_CODE_FALLBACKS[m.group(1)])
+
+    # last resort — do not invent junk English; surface cleaned tokens
+    return {
+        "initial": fam or text.upper()[:12],
+        "iso_code": text if text.upper().startswith("ISO") else "",
+        "name_kr": "",
+    }
+
+
+def format_standard_label(raw: Optional[str]) -> str:
+    """`QMS · ISO 9001:2015 · 품질경영시스템` 형태."""
+    p = standard_display_parts(raw)
+    parts = [p.get("initial") or "", p.get("iso_code") or "", p.get("name_kr") or ""]
+    parts = [x for x in parts if x]
+    return " · ".join(parts) if parts else str(raw or "")
+
+
+def standard_display_payload(raw: Optional[str], *, code: Optional[str] = None) -> Dict[str, str]:
+    """API/UI payload: internal code + three-part display fields + label."""
+    internal = (code if code is not None else raw) or ""
+    # normalize bare codes like 9001
+    import re
+
+    m = re.search(
+        r"(9001|14001|45001|27001|37001|37301|50001|22000|13485|19443|27701|42001|22301)",
+        str(internal),
+        re.I,
+    )
+    code_out = m.group(1) if m else str(internal).strip()
+    parts = standard_display_parts(internal or raw)
+    return {
+        "code": code_out,
+        "initial": parts["initial"],
+        "iso_code": parts["iso_code"],
+        "name_kr": parts["name_kr"],
+        "label": format_standard_label(internal or raw),
+        "name": format_standard_label(internal or raw),  # legacy alias for forms
+    }
+
+
 assert len(OPERATING_STANDARDS) == 14, f"운영 규격은 14개여야 함: {len(OPERATING_STANDARDS)}"
 
 OPERATING_FAMILY_INITIALS = ALLOWED_FAMILY_INITIALS

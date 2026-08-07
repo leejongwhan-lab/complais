@@ -18,6 +18,7 @@ from app.services.proposal_approval import (
     process_proposal_approval,
     save_proposal,
 )
+from app.services.scope_expiry import enforce_scope_not_expired
 
 router = APIRouter(prefix="/proposals", tags=["Proposals"])
 
@@ -83,6 +84,27 @@ def get_approval_flow(
     return flow_to_dto(get_proposal_by_id(db, proposal_id))
 
 
+def _standards_from_proposal_payload(payload: UpsertProposalFlowRequest) -> list[str]:
+    out: list[str] = []
+    for a in payload.assigned_auditors or []:
+        code = getattr(a, "standard_code", None) or ""
+        if code:
+            out.append(str(code))
+    return out
+
+
+def _standards_from_proposal_row(row: ProposalFlow) -> list[str]:
+    out: list[str] = []
+    raw = row.assigned_auditors_json or []
+    if isinstance(raw, list):
+        for a in raw:
+            if isinstance(a, dict):
+                code = a.get("standardCode") or a.get("standard_code") or ""
+                if code:
+                    out.append(str(code))
+    return out
+
+
 @router.put("/{proposal_id}/approval-flow", response_model=ProposalApprovalFlow)
 def upsert_approval_flow(
     proposal_id: str,
@@ -92,6 +114,13 @@ def upsert_approval_flow(
 ):
     """결재 플로우 스냅샷 저장/갱신 (산정·배정 완료 후)."""
     _ensure_schema(db)
+    cb_id = payload.cb_id
+    if cb_id is None:
+        cb_id = getattr(current_user, "cb_id", None)
+    standards = _standards_from_proposal_payload(payload)
+    if cb_id and standards:
+        enforce_scope_not_expired(db, int(cb_id), standards)
+
     row = db.get(ProposalFlow, proposal_id)
     if row is None:
         row = ProposalFlow(
@@ -128,6 +157,14 @@ def post_process_approval(
 ):
     """결재 승인/반려 — processProposalApproval."""
     _ensure_schema(db)
+    # Domain 3: 최종 승인(송부 전) 시 인정만료 잠금
+    if payload.action == "APPROVE":
+        row = db.get(ProposalFlow, proposal_id)
+        if row is not None:
+            cb_id = row.cb_id or getattr(current_user, "cb_id", None)
+            standards = _standards_from_proposal_row(row)
+            if cb_id and standards:
+                enforce_scope_not_expired(db, int(cb_id), standards)
     user_id = payload.user_id or str(getattr(current_user, "id", "") or "")
     return process_proposal_approval(
         db=db,

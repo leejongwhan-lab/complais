@@ -2,6 +2,7 @@
 
 프로필 소스는 certification_bodies (명세의 cb_profiles 역할).
 승인 Scope는 cb_accredited_scopes 를 LEFT JOIN 형태로 함께 반환한다.
+표준별 인정/MD단가는 cb_standard_accreditations (CB만 md_rate 쓰기).
 """
 from datetime import datetime
 from typing import List, Optional
@@ -11,6 +12,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_db
+from app.api.v1.endpoints.admin_cb import (
+    StandardAccreditationItem,
+    StandardAccreditationUpdate,
+    _list_standard_accreditations,
+    _upsert_standard_accreditations,
+)
 from app.core.security import CurrentUser, require_cb_scope
 from app.models.cb import CertificationBodies
 from app.models.enums import UsersRole
@@ -200,6 +207,52 @@ def _to_profile_out(cb: CertificationBodies, scopes: List[CbProfileScopeItem]) -
         if has_basic
         else "등록된 인증기관 정보가 없습니다. 정보를 입력하거나 CSV를 업로드해 주세요.",
     )
+
+
+@router.get(
+    "/standard-accreditations",
+    response_model=List[StandardAccreditationItem],
+)
+def get_my_standard_accreditations(
+    cb_id: Optional[int] = Query(None, description="platform_admin 전용"),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_cb_scope),
+):
+    """소속 CB의 보유 표준·인정번호·만료일·MD단가 조회."""
+    _require_cb_manager(current_user)
+    scope_cb_id = _resolve_cb_id(current_user, cb_id)
+    cb = db.get(CertificationBodies, scope_cb_id)
+    if not cb:
+        raise HTTPException(status_code=404, detail="인증기관을 찾을 수 없습니다.")
+    return _list_standard_accreditations(db, scope_cb_id)
+
+
+@router.put(
+    "/standard-accreditations",
+    response_model=List[StandardAccreditationItem],
+)
+def put_my_standard_accreditations(
+    payload: StandardAccreditationUpdate,
+    cb_id: Optional[int] = Query(None, description="platform_admin 전용"),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_cb_scope),
+):
+    """소속 CB 보유 표준 저장 — md_rate(표준별 MD단가) 쓰기 허용."""
+    _require_cb_manager(current_user)
+    scope_cb_id = _resolve_cb_id(current_user, cb_id)
+    cb = db.get(CertificationBodies, scope_cb_id)
+    if not cb:
+        raise HTTPException(status_code=404, detail="인증기관을 찾을 수 없습니다.")
+    _upsert_standard_accreditations(
+        db,
+        cb.id,
+        payload.items,
+        replace_all=payload.replace_all,
+        allow_md_rate=True,
+    )
+    cb.updated_at = datetime.utcnow()
+    db.commit()
+    return _list_standard_accreditations(db, scope_cb_id)
 
 
 @router.get("/profile", response_model=CbProfileOut)

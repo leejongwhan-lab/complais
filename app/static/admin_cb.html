@@ -67,7 +67,9 @@
     .cb-contracts-table td.col-cb-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px; }
     .cb-contracts-table td.col-held-std { white-space:normal; word-break:break-word; }
   </style>
-  <script src="/static/js/validation.js"></script>
+  <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  <script src="/static/js/daum_postcode.js?v=20260807pc"></script>
+  <script src="/static/js/validation.js?v=20260807pc"></script>
 </head>
 <body class="portal-page">
   <div class="page">
@@ -165,7 +167,7 @@
       <div class="modal-b">
         <div class="tabs">
           <button type="button" class="active" data-panel="basic">탭1. 법인 기본 정보</button>
-          <button type="button" data-panel="stdacc">탭2. 보유 표준 (15) · 인정기관/인정번호</button>
+          <button type="button" data-panel="stdacc">탭2. 보유 표준 · 인정기관/인정번호/만료일</button>
           <button type="button" data-panel="scopes">탭3. 인증수행범위</button>
         </div>
 
@@ -178,7 +180,18 @@
             <div class="field"><label>기본 인정기관(레거시)</label><input id="f-acc-body" placeholder="KAB" /></div>
             <div class="field"><label>사업자번호</label><input id="f-biz" placeholder="000-00-00000" data-validate="biz" inputmode="numeric" maxlength="12" autocomplete="off" /></div>
             <div class="field"><label>대표자</label><input id="f-ceo" /></div>
-            <div class="field" style="grid-column:1/-1;"><label>주소</label><input id="f-address" /></div>
+            <div class="field" style="grid-column:1/-1;">
+              <label>주소</label>
+              <div class="addr-row">
+                <input id="f-zip" class="addr-zip" readonly placeholder="우편번호" />
+                <input id="f-address" class="addr-main" readonly placeholder="도로명/지번 주소" />
+                <button type="button" class="btn-postcode"
+                  data-postcode-zip="f-zip"
+                  data-postcode-addr="f-address"
+                  data-postcode-detail="f-address-detail">주소 검색</button>
+              </div>
+              <input id="f-address-detail" placeholder="상세주소" style="margin-top:8px;width:100%;" />
+            </div>
             <div class="field"><label>전화번호</label><input id="f-tel" placeholder="02-1234-5678" data-validate="phone" inputmode="tel" maxlength="13" /></div>
             <div class="field"><label>이메일</label><input id="f-email" data-validate="email" autocomplete="email" /></div>
             <div class="field"><label>웹사이트</label><input id="f-web" /></div>
@@ -197,21 +210,22 @@
               </select>
             </div>
             <div class="field"><label>기본료</label><input id="f-base-fee" type="number" /></div>
-            <div class="field"><label>MD단가</label><input id="f-md" type="number" /></div>
             <div class="field"><label>계약연도</label><input id="f-year" type="number" /></div>
           </div>
         </div>
 
         <div id="panel-stdacc" style="display:none;">
-          <p class="hint">플랫폼 운용 14개 ISO 표준별로 보유 여부 · 인정기관(AB) · 인정번호를 DB에 저장합니다. 인증수행범위는 표준별 택소노미(IAF39 / MDQMS / FSMS / NQMS / BCMS / 없음)이며 탭3에서 편집합니다. (기업 포털에는 AB/인정번호 미표시)</p>
+          <p class="hint">플랫폼 운용 ISO 표준별로 보유 여부 · 인정기관(AB) · 인정번호 · 인정만료일을 DB에 저장합니다. MD단가는 CB 포털 전용(읽기 전용). 인증수행범위는 탭3에서 편집합니다.</p>
           <div style="overflow:auto;max-height:420px;">
             <table class="std-acc-table">
               <thead>
                 <tr>
-                  <th style="width:7%;">보유</th>
-                  <th style="width:26%;">ISO 표준</th>
-                  <th style="width:28%;">인정기관</th>
-                  <th style="width:22%;">인정번호</th>
+                  <th style="width:5%;">보유</th>
+                  <th style="width:18%;">ISO 표준</th>
+                  <th style="width:16%;">인정기관</th>
+                  <th style="width:14%;">인정번호</th>
+                  <th style="width:12%;">인정만료일</th>
+                  <th style="width:12%;">MD단가</th>
                   <th>인증수행범위</th>
                 </tr>
               </thead>
@@ -362,7 +376,17 @@
         let scopeSummary = "없음";
         if (!meta.has_scope_codes) scopeSummary = "코드 불필요";
         else if (scopes.length) scopeSummary = `${scopes.length}개 (${scopes.slice(0, 6).join(", ")}${scopes.length > 6 ? "…" : ""})`;
-        const held = row.is_active || row.ab_code || row.registration_no || scopes.length;
+        const held = row.is_active || row.ab_code || row.registration_no || row.expiry_date || row.md_rate != null || scopes.length;
+        const exp = row.expiry_date ? String(row.expiry_date).slice(0, 10) : "";
+        const md =
+          row.md_rate != null && row.md_rate !== ""
+            ? Number(row.md_rate).toLocaleString("ko-KR")
+            : "—";
+        const warn = row.expiry_warning
+          ? `<div class="muted" style="font-size:.72rem;margin-top:2px;color:${
+              row.expiry_status === "locked" ? "#b91c1c" : "inherit"
+            };">${esc(row.expiry_warning)}</div>`
+          : "";
         const editBtn = meta.has_scope_codes
           ? `<button type="button" class="ghost" data-edit-scope="${esc(code)}" style="padding:4px 8px;font-size:.75rem;">범위 편집</button>`
           : `<span class="muted">—</span>`;
@@ -372,6 +396,8 @@
             <div class="muted" style="font-size:.72rem;">${esc(meta.taxonomy_label || "")}</div></td>
           <td><select data-ab>${abOptionsHtml(row.ab_code || "")}</select></td>
           <td><input data-reg type="text" value="${esc(row.registration_no || "")}" placeholder="인정번호" /></td>
+          <td><input data-exp type="date" value="${esc(exp)}" />${warn}</td>
+          <td><span class="muted" title="CB 포털에서만 수정">${esc(md)}</span></td>
           <td>
             <div class="muted" style="margin-bottom:4px;">${esc(scopeSummary)}</div>
             ${editBtn}
@@ -393,6 +419,7 @@
         standard_code: tr.dataset.std,
         ab_code: tr.querySelector("[data-ab]").value || null,
         registration_no: tr.querySelector("[data-reg]").value.trim() || null,
+        expiry_date: tr.querySelector("[data-exp]").value.trim() || null,
         is_active: tr.querySelector("[data-held]").checked,
       }));
     }
@@ -464,7 +491,9 @@
       state.legacyRegNo = d.reg_no || null;
       document.getElementById("f-biz").value = d.biz_reg_no || "";
       document.getElementById("f-ceo").value = d.ceo_name || "";
+      document.getElementById("f-zip").value = "";
       document.getElementById("f-address").value = d.address || "";
+      document.getElementById("f-address-detail").value = "";
       document.getElementById("f-tel").value = d.tel || "";
       document.getElementById("f-email").value = d.email || "";
       document.getElementById("f-web").value = d.website || "";
@@ -473,7 +502,6 @@
       document.getElementById("f-year").value = contract.contract_year || new Date().getFullYear();
       document.getElementById("f-tier").value = contract.tier || d.billing_tier || "MEDIUM";
       document.getElementById("f-base-fee").value = contract.annual_base_fee ?? "";
-      document.getElementById("f-md").value = contract.price_per_md ?? "";
       state.activeScopes = new Set(
         (d.scopes || []).filter((s) => s.is_active !== false).map((s) => {
           let code = String(s.scope_code || s.iaf_code || "").trim();
@@ -563,7 +591,12 @@
         reg_no: state.legacyRegNo,
         biz_reg_no: document.getElementById("f-biz").value.trim() || null,
         ceo_name: document.getElementById("f-ceo").value.trim() || null,
-        address: document.getElementById("f-address").value.trim() || null,
+        address: (() => {
+          const base = document.getElementById("f-address").value.trim();
+          const detail = (document.getElementById("f-address-detail")?.value || "").trim();
+          if (!base && !detail) return null;
+          return detail ? `${base} ${detail}`.trim() : base;
+        })(),
         tel: document.getElementById("f-tel").value.trim() || null,
         email: document.getElementById("f-email").value.trim() || null,
         website: document.getElementById("f-web").value.trim() || null,
@@ -575,9 +608,6 @@
           tier: document.getElementById("f-tier").value,
           annual_base_fee: document.getElementById("f-base-fee").value
             ? Number(document.getElementById("f-base-fee").value)
-            : undefined,
-          price_per_md: document.getElementById("f-md").value
-            ? Number(document.getElementById("f-md").value)
             : undefined,
         },
       };

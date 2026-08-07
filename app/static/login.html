@@ -63,13 +63,14 @@
       <img src="/static/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
     </div>
     <h1>로그인</h1>
-    <p>계정으로 로그인하면 역할에 맞는 포털로 이동합니다.</p>
+    <p id="login-lead">계정으로 로그인하면 역할에 맞는 포털로 이동합니다.</p>
     <label for="email">이메일</label>
     <input id="email" type="email" value="admin@complais.com" required />
     <label for="password">비밀번호</label>
     <input id="password" type="password" value="password123!" required />
     <button type="submit">로그인</button>
     <div class="error" id="error"></div>
+    <div class="error" id="login-msg" style="color:#0f766e;"></div>
     <p style="margin-top: 16px; text-align: center; font-size: 0.9rem;">
       계정이 없으신가요? <a href="/signup.html" style="color: #2563eb; text-decoration: none;">회원가입</a>
     </p>
@@ -77,25 +78,53 @@
   <script>
     const TOKEN_KEY = "access_token";
 
-    function redirectByRole(role, fallback) {
-      const params = new URLSearchParams(window.location.search);
-      const next = params.get("next");
-      if (next && next.startsWith("/")) return next;
+    const CB_ROLES = ["cb_admin", "cb_manager", "cb_staff", "cb_reviewer"];
+    const ADMIN_ROLES = ["platform_admin", "admin"];
 
-      if (role === "platform_admin" || role === "admin") {
-        return "/admin";
-      }
-      if (["cb_admin", "cb_manager", "cb_staff", "cb_reviewer"].includes(role)) {
-        return "/cb-portal";
-      }
+    function homeForRole(role, fallback) {
+      if (ADMIN_ROLES.includes(role)) return "/admin";
+      if (CB_ROLES.includes(role)) return "/cb-portal";
       if (["client_admin", "client_staff", "enterprise_admin", "enterprise_user"].includes(role)) {
         return "/enterprise";
       }
-      if (role === "auditor") {
-        return "/auditor-portal";
-      }
+      if (role === "auditor") return "/auditor-portal";
       return fallback || "/admin";
     }
+
+    function redirectByRole(role, fallback) {
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next");
+      const home = homeForRole(role, fallback);
+
+      // next는 역할과 맞을 때만 존중 — admin ↔ CB 포털 혼용 방지
+      if (next && next.startsWith("/")) {
+        if (next.startsWith("/cb-portal") && !CB_ROLES.includes(role)) return home;
+        if (next.startsWith("/admin") && !ADMIN_ROLES.includes(role)) return home;
+        return next;
+      }
+      return home;
+    }
+
+    (function applyNextHints() {
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next") || "";
+      const msg = params.get("msg") || "";
+      const msgEl = document.getElementById("login-msg");
+      const emailEl = document.getElementById("email");
+      const lead = document.getElementById("login-lead");
+      if (msg && msgEl) msgEl.textContent = msg;
+      if (next.startsWith("/cb-portal")) {
+        if (emailEl && (!emailEl.value || emailEl.value === "admin@complais.com")) {
+          emailEl.value = "cb@complais.com";
+        }
+        if (lead) {
+          lead.textContent = "CB 포털 진입 — 인증원(CB) 계정으로 로그인해 주세요. (관리자 계정 사용 불가)";
+        }
+        if (msgEl && !msg) {
+          msgEl.textContent = "플랫폼 관리자와 CB 포털 세션은 분리됩니다.";
+        }
+      }
+    })();
 
     document.getElementById("login-form").addEventListener("submit", async (e) => {
       e.preventDefault();
