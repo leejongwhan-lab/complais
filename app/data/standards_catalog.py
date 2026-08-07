@@ -17,7 +17,16 @@ QMS/EMS 2026 은 조항 미확정(PENDING) — 확정 후 clause 시드.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
+
+# Role-specific display modes (display only — internal codes unchanged)
+StandardDisplayMode = Literal[
+    "enterprise",
+    "cb",
+    "auditor",
+    "admin_company",
+    "admin_cb",
+]
 
 
 @dataclass(frozen=True)
@@ -239,9 +248,9 @@ def _prefer_edition(defs: List[StandardDefinition]) -> Optional[StandardDefiniti
 
 
 def standard_display_parts(raw: Optional[str]) -> Dict[str, str]:
-    """UI 표기 전용 — {initial, iso_code, name_kr}.
+    """UI 표기 부품 — {initial, iso_code, name_kr}.
 
-    규칙: 이니셜 · ISO ####:#### · ○○경영시스템 만 사용.
+    역할별 조합은 ``format_standard_label(..., mode=)`` 를 사용한다.
     DB/API 내부 코드(9001 등)는 그대로 두고 화면에서만 변환한다.
     """
     import re
@@ -288,16 +297,40 @@ def standard_display_parts(raw: Optional[str]) -> Dict[str, str]:
     }
 
 
-def format_standard_label(raw: Optional[str]) -> str:
-    """`QMS · ISO 9001:2015 · 품질경영시스템` 형태."""
+def format_standard_label(
+    raw: Optional[str],
+    mode: StandardDisplayMode = "enterprise",
+) -> str:
+    """Role-specific standard label (never all three parts at once).
+
+    Modes
+    -----
+    enterprise / admin_company : ``ISO 9001:2015 품질경영시스템``
+    cb / admin_cb              : ``QMS``
+    auditor                    : ``ISO 9001:2015``
+    """
     p = standard_display_parts(raw)
-    parts = [p.get("initial") or "", p.get("iso_code") or "", p.get("name_kr") or ""]
-    parts = [x for x in parts if x]
-    return " · ".join(parts) if parts else str(raw or "")
+    initial = (p.get("initial") or "").strip()
+    iso = (p.get("iso_code") or "").strip()
+    name = (p.get("name_kr") or "").strip()
+
+    if mode in ("cb", "admin_cb"):
+        return initial or iso or name or str(raw or "")
+    if mode == "auditor":
+        return iso or initial or str(raw or "")
+    # enterprise | admin_company — ISO code + Korean name
+    if iso and name:
+        return f"{iso} {name}"
+    return iso or name or initial or str(raw or "")
 
 
-def standard_display_payload(raw: Optional[str], *, code: Optional[str] = None) -> Dict[str, str]:
-    """API/UI payload: internal code + three-part display fields + label."""
+def standard_display_payload(
+    raw: Optional[str],
+    *,
+    code: Optional[str] = None,
+    mode: StandardDisplayMode = "enterprise",
+) -> Dict[str, str]:
+    """API/UI payload: internal code + part fields + role-specific label."""
     internal = (code if code is not None else raw) or ""
     # normalize bare codes like 9001
     import re
@@ -309,13 +342,15 @@ def standard_display_payload(raw: Optional[str], *, code: Optional[str] = None) 
     )
     code_out = m.group(1) if m else str(internal).strip()
     parts = standard_display_parts(internal or raw)
+    label = format_standard_label(internal or raw, mode=mode)
     return {
         "code": code_out,
         "initial": parts["initial"],
         "iso_code": parts["iso_code"],
         "name_kr": parts["name_kr"],
-        "label": format_standard_label(internal or raw),
-        "name": format_standard_label(internal or raw),  # legacy alias for forms
+        "label": label,
+        "name": label,  # legacy alias for forms
+        "mode": mode,
     }
 
 

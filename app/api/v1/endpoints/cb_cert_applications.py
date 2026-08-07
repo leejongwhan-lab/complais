@@ -255,7 +255,7 @@ def _build_detail(db: Session, app: CertificationApplications) -> EnterpriseCert
         contract_id=app.contract_id,
         application_type=app.application_type,
         status=app.status,
-        standards=[standard_display_payload(s) for s in raw_stds],
+        standards=[standard_display_payload(s, mode="cb") for s in raw_stds],
         standard_audit_types=_safe_json(app.standard_audit_types_json, {}) or {},
         iaf_codes=_safe_json(app.iaf_codes_json, []) or [],
         audit_mode=app.audit_mode,
@@ -274,7 +274,9 @@ def _build_detail(db: Session, app: CertificationApplications) -> EnterpriseCert
         answers=[
             {
                 "standard_code": a.standard_code,
-                "standard_label": standard_display_payload(a.standard_code).get("label"),
+                "standard_label": standard_display_payload(
+                    a.standard_code, mode="cb"
+                ).get("label"),
                 "question_key": a.question_key,
                 "answer_value": a.answer_value,
                 "answer_text": a.answer_text,
@@ -347,7 +349,8 @@ def list_applications(
             company_name=name,
             cb_id=a.cb_id,
             standards=[
-                standard_display_payload(s) for s in parse_standards_json(a.standards_json)
+                standard_display_payload(s, mode="cb")
+                for s in parse_standards_json(a.standards_json)
             ],
             audit_mode=a.audit_mode,
             application_type=a.application_type,

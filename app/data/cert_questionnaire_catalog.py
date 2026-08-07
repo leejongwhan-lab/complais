@@ -255,7 +255,7 @@ _STANDARD_CODES = [
 ]
 
 STANDARD_OPTIONS: List[Dict[str, str]] = [
-    standard_display_payload(code) for code in _STANDARD_CODES
+    standard_display_payload(code, mode="enterprise") for code in _STANDARD_CODES
 ]
 
 
@@ -268,8 +268,8 @@ def catalog_for_standards(codes: List[str]) -> Dict[str, Dict[str, Any]]:
         lookup = digits if digits in QUESTIONNAIRE_CATALOG else key
         if lookup in QUESTIONNAIRE_CATALOG:
             block = dict(QUESTIONNAIRE_CATALOG[lookup])
-            block["title"] = format_standard_label(lookup)
-            block["display"] = standard_display_payload(lookup)
+            block["title"] = format_standard_label(lookup, mode="enterprise")
+            block["display"] = standard_display_payload(lookup, mode="enterprise")
             out[lookup] = block
     return out
 

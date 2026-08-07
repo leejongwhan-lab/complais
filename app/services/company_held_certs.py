@@ -19,7 +19,12 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
-from app.data.standards_catalog import standard_display_payload, to_family_initial
+from app.data.standards_catalog import (
+    StandardDisplayMode,
+    format_standard_label,
+    standard_display_payload,
+    to_family_initial,
+)
 from app.models.cb import CertificationBodies
 from app.models.certification import Certificates, CertificationApplications
 from app.models.certification_body import CbStandardAccreditation
@@ -174,12 +179,14 @@ def list_company_held_standards(
     db: Session,
     company_id: int,
     cb_id: Optional[int] = None,
+    display_mode: StandardDisplayMode = "enterprise",
 ) -> List[Dict[str, Any]]:
     """Return list of held standards with AB/CB for display.
 
     When ``cb_id`` is set, only include standards linked to that CB via
     company_certificates / contracts / certification_applications.
     Soft-fails to ``[]`` on per-source errors (never raises for empty data).
+    ``display_mode`` controls the ``label`` field only (role-specific).
     """
     by_key: Dict[str, Dict[str, Any]] = {}
     pending_ab: Set[Tuple[int, str]] = set()
@@ -339,26 +346,36 @@ def list_company_held_standards(
         ini = item.get("initial") or ""
         return (rank.get(ini, 99), item.get("label") or "", int(item.get("cb_id") or 0))
 
-    return sorted(by_key.values(), key=_sort_key)
+    rows = sorted(by_key.values(), key=_sort_key)
+    for item in rows:
+        src = item.get("initial") or item.get("standard_code") or item.get("iso_code")
+        item["label"] = format_standard_label(src, mode=display_mode)
+    return rows
 
 
 def company_held_standards(
     db: Session,
     company_id: int,
     cb_id: Optional[int] = None,
+    display_mode: StandardDisplayMode = "enterprise",
 ) -> List[Dict[str, Any]]:
     """Alias for ``list_company_held_standards`` (backward compatible)."""
-    return list_company_held_standards(db, company_id, cb_id=cb_id)
+    return list_company_held_standards(
+        db, company_id, cb_id=cb_id, display_mode=display_mode
+    )
 
 
 def company_held_standard_labels(
     db: Session,
     company_id: int,
     cb_id: Optional[int] = None,
+    display_mode: StandardDisplayMode = "enterprise",
 ) -> List[str]:
-    """Compact label list: 이니셜 · ISO ####:#### · ○○경영시스템."""
+    """Compact role-specific label list for held standards."""
     try:
-        rows = list_company_held_standards(db, company_id, cb_id=cb_id)
+        rows = list_company_held_standards(
+            db, company_id, cb_id=cb_id, display_mode=display_mode
+        )
     except Exception:
         logger.exception("held labels soft-fail company_id=%s", company_id)
         return []
@@ -377,7 +394,11 @@ def company_held_standards_map(
     db: Session,
     company_ids: List[int],
     cb_id: Optional[int] = None,
+    display_mode: StandardDisplayMode = "enterprise",
 ) -> Dict[int, List[Dict[str, Any]]]:
     return {
-        cid: list_company_held_standards(db, cid, cb_id=cb_id) for cid in company_ids
+        cid: list_company_held_standards(
+            db, cid, cb_id=cb_id, display_mode=display_mode
+        )
+        for cid in company_ids
     }

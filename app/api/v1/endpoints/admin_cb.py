@@ -24,6 +24,7 @@ from app.data.accreditation_bodies_seed import (
 from app.data.standards_catalog import (
     FAMILY_DISPLAY_ORDER,
     held_standards_as_initials,
+    standard_display_payload,
     to_family_initial,
 )
 from app.data.scope_taxonomies import (
@@ -133,6 +134,10 @@ class StandardAccreditationItem(BaseModel):
 
     standard_code: str
     standard_name: Optional[str] = None
+    initial: Optional[str] = None  # QMS 등 — CB/admin_cb 표시
+    iso_code: Optional[str] = None
+    name_kr: Optional[str] = None
+    label: Optional[str] = None  # role display (admin_cb → initial)
     ab_code: Optional[str] = None
     ab_name_en: Optional[str] = None
     registration_no: Optional[str] = None  # 표준별 인정번호
@@ -732,10 +737,15 @@ def _list_standard_accreditations(db: Session, cb_id: int) -> List[StandardAccre
                             scopes.append(c)
         tax = taxonomy_for_standard(code)
         exp_fields = expiry_api_fields(exp)
+        disp = standard_display_payload(code, mode="admin_cb")
         items.append(
             StandardAccreditationItem(
                 standard_code=code,
                 standard_name=name_map.get(code),
+                initial=disp.get("initial") or fam,
+                iso_code=disp.get("iso_code") or None,
+                name_kr=disp.get("name_kr") or None,
+                label=disp.get("label") or fam or code,
                 ab_code=ab,
                 ab_name_en=ab_name.get(ab or ""),
                 registration_no=reg,

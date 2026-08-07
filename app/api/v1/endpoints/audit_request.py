@@ -151,7 +151,9 @@ def _collect_company_cert_badges(db: Session, company: Companies) -> Tuple[List[
     from app.services.company_held_certs import company_held_standard_labels
 
     try:
-        held = company_held_standard_labels(db, int(company.id), cb_id=None)
+        held = company_held_standard_labels(
+            db, int(company.id), cb_id=None, display_mode="enterprise"
+        )
     except Exception:
         held = []
 

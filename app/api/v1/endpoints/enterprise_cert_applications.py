@@ -425,7 +425,9 @@ def list_my_applications(
                 company_id=a.company_id,
                 company_name=company.name if company else None,
                 cb_id=a.cb_id,
-                standards=[standard_display_payload(s) for s in stds],
+                standards=[
+                    standard_display_payload(s, mode="enterprise") for s in stds
+                ],
                 audit_mode=a.audit_mode,
                 application_type=a.application_type,
                 employee_count=a.employee_count,

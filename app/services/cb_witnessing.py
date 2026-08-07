@@ -23,14 +23,16 @@ DUE_SOON_DAYS = 90
 
 
 def scheme_label(scheme: WitnessingScheme) -> str:
-    """이니셜 · ISO ####:#### · ○○경영시스템"""
+    """CB 포털: 이니셜만 (예: QMS)."""
     raw = scheme.iso_ref or scheme.code
     try:
-        return format_standard_label(raw) or format_standard_label(scheme.code) or (
-            f"{scheme.code} · {scheme.iso_ref or ''} · {scheme.name_kr}".strip(" ·")
+        return (
+            format_standard_label(raw, mode="cb")
+            or format_standard_label(scheme.code, mode="cb")
+            or (scheme.code or "")
         )
     except Exception:
-        return f"{scheme.code} · {scheme.iso_ref or ''} · {scheme.name_kr}".strip(" ·")
+        return scheme.code or ""
 
 
 def compute_status(

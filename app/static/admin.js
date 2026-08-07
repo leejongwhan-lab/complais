@@ -263,7 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         (typeof h === "string"
                           ? h
                           : h.label ||
-                            [h.initial, h.iso_code, h.name_kr].filter(Boolean).join(" · ") ||
+                            [h.iso_code, h.name_kr].filter(Boolean).join(" ") ||
                             h.initial ||
                             h.standard_code) || "";
                       const ab = (typeof h === "object" && h && h.ab_code) || "—";
@@ -326,7 +326,8 @@ document.addEventListener("DOMContentLoaded", () => {
           (typeof r === "string"
             ? r
             : r.label ||
-              [r.initial, r.iso_code, r.name_kr].filter(Boolean).join(" · ") ||
+              [r.iso_code, r.name_kr].filter(Boolean).join(" ") ||
+              r.initial ||
               r.standard_code) || "—";
         const ab = (typeof r === "object" && r && r.ab_code) || "—";
         const cb =

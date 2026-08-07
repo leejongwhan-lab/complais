@@ -129,9 +129,9 @@
     <div class="card" id="aspects-card" style="display:none">
       <div class="chd">A-2. 표준별 특성 정보 (EMS / OHS / EnMS)</div>
       <div class="cb">
-        <div id="ems-section" style="display:none"><div class="q-title">EMS · ISO 14001:2015 · 환경경영시스템</div><div id="ems-box"></div></div>
-        <div id="ohs-section" style="display:none"><div class="q-title">OHSMS · ISO 45001:2018 · 안전보건경영시스템</div><div id="ohs-box"></div></div>
-        <div id="enms-section" style="display:none"><div class="q-title">EnMS · ISO 50001:2018 · 에너지경영시스템</div><div id="enms-box"></div></div>
+        <div id="ems-section" style="display:none"><div class="q-title">ISO 14001:2015 환경경영시스템</div><div id="ems-box"></div></div>
+        <div id="ohs-section" style="display:none"><div class="q-title">ISO 45001:2018 안전보건경영시스템</div><div id="ohs-box"></div></div>
+        <div id="enms-section" style="display:none"><div class="q-title">ISO 50001:2018 에너지경영시스템</div><div id="enms-box"></div></div>
       </div>
     </div>
 
@@ -277,8 +277,9 @@
   }
   function stdLabel(s) {
     if (s.label) return s.label;
-    if (s.initial && s.iso_code && s.name_kr) return `${s.initial} · ${s.iso_code} · ${s.name_kr}`;
-    return s.name || s.code;
+    // Enterprise: ISO + Korean name
+    if (s.iso_code && s.name_kr) return `${s.iso_code} ${s.name_kr}`;
+    return s.name || s.iso_code || s.code;
   }
   function hasStd(code) {
     return selectedStandards().some((c) => String(c).includes(code));

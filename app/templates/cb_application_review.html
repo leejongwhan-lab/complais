@@ -275,7 +275,7 @@
     document.getElementById("co-emp").textContent = (data.employee_count ?? "—") + "명";
     document.getElementById("co-addr").textContent = data.address || "—";
     document.getElementById("stds").textContent = (data.standards || []).map((s) => {
-      if (s && typeof s === "object") return s.label || [s.initial, s.iso_code, s.name_kr].filter(Boolean).join(" · ") || s.code;
+      if (s && typeof s === "object") return s.label || s.initial || s.code;
       return s;
     }).join("; ") || "—";
     document.getElementById("audit-mode").textContent = data.audit_mode === "integrated" ? "통합" : "단일";
@@ -309,9 +309,9 @@
         if (!obj) return;
         blocks.push(`<div class="aspect-sub">${esc(title)}</div><pre class="aspect-pre">${esc(JSON.stringify(obj, null, 2))}</pre>`);
       }
-      blk("EMS · ISO 14001:2015 · 환경경영시스템", asp.ems);
-      blk("OHSMS · ISO 45001:2018 · 안전보건경영시스템", asp.ohs);
-      blk("EnMS · ISO 50001:2018 · 에너지경영시스템", asp.enms);
+      blk("EMS", asp.ems);
+      blk("OHSMS", asp.ohs);
+      blk("EnMS", asp.enms);
       aspectsEl.innerHTML = blocks.join("") || '<p class="hint">특성 정보 없음</p>';
     }
 

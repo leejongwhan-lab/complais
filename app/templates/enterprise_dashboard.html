@@ -5,12 +5,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>기업 포털 - complAIs</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=20260807hs">
-  <link rel="stylesheet" href="/static/css/portal.css?v=20260807hs">
-  <link rel="stylesheet" href="/static/css/pages/enterprise.css?v=20260807hs">
-  <link rel="stylesheet" href="/static/css/style.css?v=20260807hs">
+  <link rel="stylesheet" href="/static/css/main.css?v=20260807rd">
+  <link rel="stylesheet" href="/static/css/portal.css?v=20260807rd">
+  <link rel="stylesheet" href="/static/css/pages/enterprise.css?v=20260807rd">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260807rd">
   <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-  <script src="/static/js/daum_postcode.js?v=20260807hs"></script>
+  <script src="/static/js/daum_postcode.js?v=20260807rd"></script>
 </head>
 <body class="portal-page admin-page enterprise-portal-page">
   <aside class="admin-sidebar">
@@ -567,9 +567,10 @@
     function heldDisplayLabel(item) {
       if (item == null) return "";
       if (typeof item === "string") return item;
+      // Enterprise: ISO code + Korean name
       return (
         item.label ||
-        [item.initial, item.iso_code, item.name_kr].filter(Boolean).join(" · ") ||
+        [item.iso_code, item.name_kr].filter(Boolean).join(" ") ||
         item.initial ||
         item.standard_code ||
         ""

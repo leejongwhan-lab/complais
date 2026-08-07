@@ -30,7 +30,9 @@ logger = logging.getLogger(__name__)
 def _held_standards_safe(db: Session, company_id: int) -> List[Dict[str, Any]]:
     """Platform admin: full held standards (all CBs). Soft-fail → []."""
     try:
-        return list_company_held_standards(db, int(company_id), cb_id=None)
+        return list_company_held_standards(
+            db, int(company_id), cb_id=None, display_mode="admin_company"
+        )
     except Exception:
         logger.exception("admin held_standards soft-fail company_id=%s", company_id)
         return []

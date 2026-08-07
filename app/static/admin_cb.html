@@ -368,7 +368,12 @@
         : state.standards.map((c) => ({ standard_code: c, standard_name: "" }));
       tbody.innerHTML = list.map((s) => {
         const code = s.standard_code || s;
-        const name = s.standard_name || "";
+        // admin_cb: initial only (ops familiarity)
+        const disp =
+          s.label ||
+          s.initial ||
+          (state.stdAccMap[code] && (state.stdAccMap[code].label || state.stdAccMap[code].initial)) ||
+          code;
         const row = state.stdAccMap[code] || {};
         const meta = scopeMetaFor(code);
         const scopes = Array.isArray(row.scope_codes) ? row.scope_codes
@@ -392,7 +397,7 @@
           : `<span class="muted">—</span>`;
         return `<tr data-std="${esc(code)}">
           <td style="text-align:center;"><input type="checkbox" data-held ${held ? "checked" : ""} /></td>
-          <td><strong>${esc(code)}</strong>${name ? `<div class="muted">${esc(name)}</div>` : ""}
+          <td><strong>${esc(disp)}</strong>
             <div class="muted" style="font-size:.72rem;">${esc(meta.taxonomy_label || "")}</div></td>
           <td><select data-ab>${abOptionsHtml(row.ab_code || "")}</select></td>
           <td><input data-reg type="text" value="${esc(row.registration_no || "")}" placeholder="인정번호" /></td>
@@ -436,23 +441,24 @@
         const thead = `<tr><th class="std">표준 \\ IAF</th>${state.iafCodes.map((c)=>`<th>${c}</th>`).join("")}</tr>`;
         const body = iafStds.map((s) => {
           const std = s.standard_code || s;
+          const disp = s.label || s.initial || std;
           const cells = state.iafCodes.map((iaf) => {
             const key = `${std}|${iaf}`;
             return `<td><input type="checkbox" data-key="${key}" ${state.activeScopes.has(key) ? "checked" : ""} /></td>`;
           }).join("");
-          return `<tr data-scope-std="${esc(std)}"><th class="std">${esc(std)}</th>${cells}</tr>`;
+          return `<tr data-scope-std="${esc(std)}"><th class="std">${esc(disp)}</th>${cells}</tr>`;
         }).join("");
         sections.push(`<div style="margin-bottom:16px;"><h4 style="margin:0 0 8px;font-size:.9rem;">IAF 01–39 — ISO 9001 / 14001 / 45001 전용</h4>
           <div class="matrix-wrap"><table class="matrix"><thead>${thead}</thead><tbody>${body}</tbody></table></div></div>`);
       }
       list.forEach((s) => {
         const std = s.standard_code || s;
-        const name = s.standard_name || "";
+        const disp = s.label || s.initial || std;
         const meta = scopeMetaFor(std);
         if (meta.taxonomy === "iaf39") return;
         if (!meta.has_scope_codes) {
           sections.push(`<div data-scope-std="${esc(std)}" style="margin-bottom:12px;padding:10px;border:1px solid #e2e8f0;border-radius:8px;">
-            <strong>${esc(std)}</strong>${name ? ` · ${esc(name)}` : ""}
+            <strong>${esc(disp)}</strong>
             <div class="muted" style="margin-top:4px;">인증수행범위 코드 없음 — 보유·인정기관·인정번호만 관리</div></div>`);
           return;
         }
@@ -466,7 +472,7 @@
             <span>${esc(label)}</span></label>`;
         }).join("");
         sections.push(`<div data-scope-std="${esc(std)}" style="margin-bottom:14px;">
-          <h4 style="margin:0 0 6px;font-size:.9rem;">${esc(std)}${name ? ` · ${esc(name)}` : ""}</h4>
+          <h4 style="margin:0 0 6px;font-size:.9rem;">${esc(disp)}</h4>
           <div class="muted" style="margin-bottom:6px;">${esc(meta.taxonomy_label || "")}</div>
           <div style="max-height:200px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px;">${checks}</div></div>`);
       });

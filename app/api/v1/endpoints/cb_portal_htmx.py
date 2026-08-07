@@ -583,7 +583,9 @@ def htmx_cb_companies(
             )
             addr = getattr(c, "address", None) or ""
             try:
-                held = list_company_held_standards(db, int(cid), cb_id=cb_id)
+                held = list_company_held_standards(
+                    db, int(cid), cb_id=cb_id, display_mode="cb"
+                )
             except Exception:
                 held = []
             held_bits = []

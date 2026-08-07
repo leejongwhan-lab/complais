@@ -778,7 +778,7 @@ def list_cb_companies(
             try:
                 # CB portal: only standards this CB audits/certifies for the company
                 item.held_standards = list_company_held_standards(
-                    db, int(c.id), cb_id=cb_id
+                    db, int(c.id), cb_id=cb_id, display_mode="cb"
                 )
             except Exception:
                 logger.exception("held_standards list soft-fail company_id=%s", c.id)
@@ -815,7 +815,7 @@ def get_cb_company_detail(
         detail = org.build_company_org_detail(db, company_id, headcount_year)
         try:
             detail["held_standards"] = list_company_held_standards(
-                db, company_id, cb_id=cb_id
+                db, company_id, cb_id=cb_id, display_mode="cb"
             )
         except Exception:
             logger.exception("held_standards detail soft-fail company_id=%s", company_id)

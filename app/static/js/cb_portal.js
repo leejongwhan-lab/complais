@@ -239,7 +239,8 @@
           const stds = (r.standards || [])
             .map((s) => {
               if (s && typeof s === "object") {
-                return s.label || [s.initial, s.iso_code, s.name_kr].filter(Boolean).join(" · ") || s.code;
+                // CB: initial only
+                return s.label || s.initial || s.code || "";
               }
               return s;
             })
@@ -641,7 +642,6 @@
                   .map((h) => {
                     const label =
                       h.label ||
-                      [h.initial, h.iso_code, h.name_kr].filter(Boolean).join(" · ") ||
                       h.initial ||
                       h.standard_code ||
                       "";
@@ -921,7 +921,7 @@
       .map((r) => {
         const label =
           r.label ||
-          [r.initial, r.iso_code, r.name_kr].filter(Boolean).join(" · ") ||
+          r.initial ||
           r.standard_code ||
           "—";
         const cb =
@@ -1585,9 +1585,7 @@
         .map((r) => {
           const label =
             r.label ||
-            [r.initial, r.iso_code || r.standard_code, r.name_kr || r.standard_name]
-              .filter(Boolean)
-              .join(" · ") ||
+            r.initial ||
             r.standard_code;
           const exp = r.expiry_date ? String(r.expiry_date).slice(0, 10) : "";
           const md =
