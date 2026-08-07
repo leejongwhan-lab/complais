@@ -74,9 +74,15 @@ class AuditDocData(Base):
     __tablename__ = "audit_doc_data"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     application_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    contract_id: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, comment="contracts.id"
+    )
     doc_type: Mapped[str] = mapped_column(String(50), nullable=False)
     doc_data: Mapped[str] = mapped_column(Text, nullable=False)
     saved_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_demo: Mapped[Optional[int]] = mapped_column(
+        SmallInteger, nullable=False, default=0, comment="1=demo/sample row"
+    )
     saved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 

@@ -73,6 +73,10 @@ class AuditNoteClauseItem(BaseModel):
     hls_code: Optional[str] = None
     source: Optional[str] = None  # process_group | iso_clauses
     sort_order: int = 0
+    # Multi-note per clause (process mode extras); 1 = primary plan/master row
+    note_seq: int = 1
+    clause_row_id: Optional[int] = None  # audit_note_clauses.id when persisted
+    is_extra: bool = False  # True when note_seq > 1 (추가 심사노트)
     # plan autofill hints (audit_plan_items)
     plan_dept: Optional[str] = None
     plan_process: Optional[str] = None
@@ -150,9 +154,12 @@ class AuditNoteSessionOut(BaseModel):
     contract_id: Optional[int] = None
     company_id: Optional[int] = None
     company_name: Optional[str] = None
+    cb_id: Optional[int] = None
+    cb_name: Optional[str] = None  # 해당인증원명
     standard_key: str
     process_standard_code: Optional[str] = None  # = standard_code (ISO9001)
     standards: List[AuditNoteStandardItem] = Field(default_factory=list)
+    standards_label: Optional[str] = None  # 표준정보 display join
     status: str = "draft"
     clauses: List[AuditNoteClauseItem] = Field(default_factory=list)
     preview: bool = False
@@ -164,6 +171,10 @@ class AuditNoteSessionOut(BaseModel):
     audit_mode: Optional[str] = None  # single | integrated
     audit_mode_label: Optional[str] = None  # 단일심사 | 통합심사
     audit_type: Optional[str] = None  # initial / surveillance… (contracts.audit_type)
+    audit_type_label: Optional[str] = None  # 최초심사 / 사후심사…
+    audit_stage_label: Optional[str] = None  # 1단계 준비성 검토 / 2단계 심사
+    audit_date: Optional[str] = None  # YYYY-MM-DD (period start)
+    audit_period_end: Optional[str] = None
     # 계획서 스코프 / 팀장 회의
     auditor_name: Optional[str] = None
     is_lead: bool = False
@@ -255,6 +266,8 @@ class AuditNoteClauseSaveIn(BaseModel):
     clause_title: Optional[str] = None  # compat
     process_group_id: Optional[str] = None
     hls_code: Optional[str] = None
+    note_seq: int = Field(default=1, ge=1, description="1=기본, 2+=추가 심사노트")
+    clause_row_id: Optional[int] = None  # prefer update by PK when known
     note_text: Optional[str] = None
     verdict: str = "적합"
     ncr_grade: Optional[str] = None

@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>심사계획서 — 1단계 / 2단계 — ISO/IEC 17021-1</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="/static/css/main.css?v=20260807docs1">
+<link rel="stylesheet" href="/static/css/portal.css?v=20260807theme1">
+<link rel="stylesheet" href="/static/css/style.css?v=20260807cal1">
+<link rel="stylesheet" href="/static/css/admin_doc_theme.css?v=20260807theme1">
+<style>
+:root{
+  --blue:#1a5fa8;--blue2:#e8f0fb;--blue3:#c5d8f5;
+  --green:#1e7a4a;--green2:#e6f5ec;--green3:#b8e2c8;
+  --amber:#8a5c00;--amber2:#fff8e1;--amber3:#fde68a;
+  --red:#b71c1c;--red2:#fce8e8;--red3:#fca5a5;
+  --purple:#4527a0;--purple2:#ede7f6;
+  --teal:#00695c;--teal2:#e0f2f1;
+  --text1:#1a1a2e;--text2:#5a6072;--text3:#9098aa;
+  --border:#dde1e7;--bg:#fff;--bg2:#f7f8fa;--card:#fff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
+     background:var(--bg2);color:var(--text1);font-size:12px}
+
+/* ── 헤더 ── */
+#hdr{background:var(--blue);color:#fff;padding:10px 20px;
+     display:flex;align-items:center;justify-content:space-between;gap:10px;
+     position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.logo{font-size:14px;font-weight:800}
+.logo small{font-size:10px;font-weight:400;opacity:.7;margin-left:5px}
+.hdr-r{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.hbtn{padding:5px 13px;font-size:10px;font-weight:600;border:1px solid rgba(255,255,255,.4);
+      border-radius:6px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;transition:.15s}
+.hbtn:hover{background:rgba(255,255,255,.28)}
+.hbtn.pri{background:#fff;color:var(--blue)}
+.hbtn.s1{background:rgba(0,105,92,.6);border-color:rgba(255,255,255,.5)}
+.hbtn.s2{background:rgba(26,95,168,.7);border-color:rgba(255,255,255,.5)}
+
+/* ── 탭 ── */
+#tab-bar{background:var(--card);border-bottom:2px solid var(--border);
+         padding:0 20px;display:flex;gap:0;overflow-x:auto}
+.tab{padding:12px 22px;font-size:12px;font-weight:700;cursor:pointer;
+     border-bottom:3px solid transparent;color:var(--text2);white-space:nowrap;
+     transition:.15s;background:none;border-top:none;border-left:none;border-right:none;
+     display:flex;align-items:center;gap:7px}
+.tab:hover{color:var(--blue);background:var(--blue2)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tab.s1-tab.active{color:var(--teal);border-bottom-color:var(--teal)}
+.tab.s2-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tab-badge{font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700}
+.badge-s1{background:var(--teal2);color:var(--teal)}
+.badge-s2{background:var(--blue2);color:var(--blue)}
+
+/* ── 저장 알림 ── */
+#save-notice{background:var(--green2);color:var(--green);font-size:10px;font-weight:700;
+             text-align:center;padding:5px;display:none}
+
+/* ── 페이지 ── */
+#pg{max-width:900px;margin:0 auto;padding:20px 14px 60px}
+.doc-page{display:none}
+.doc-page.active{display:block}
+
+/* ── 문서 카드 ── */
+.doc-wrap{background:var(--card);border-radius:10px;border:1px solid var(--border);
+          padding:30px 36px}
+
+/* ── 문서 헤더 ── */
+.doc-hd{padding-bottom:18px;margin-bottom:22px}
+.doc-hd.s1{border-bottom:3px solid var(--teal)}
+.doc-hd.s2{border-bottom:3px solid var(--blue)}
+.doc-tag{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
+.doc-tag.s1{color:var(--teal)}
+.doc-tag.s2{color:var(--blue)}
+.doc-title{font-size:20px;font-weight:800;margin-bottom:3px;line-height:1.2}
+.doc-sub{font-size:11px;color:var(--text2);margin-bottom:14px}
+.doc-meta{display:inline-grid;grid-template-columns:auto auto;gap:3px 18px;
+          font-size:10px;background:var(--bg2);padding:9px 16px;
+          border-radius:7px;border:1px solid var(--border)}
+.dm-lbl{color:var(--text3);font-weight:600}
+
+/* ── 섹션 ── */
+.sec{margin-bottom:22px}
+.sec-h{font-size:12px;font-weight:800;border-bottom:2px solid;padding-bottom:5px;
+       margin-bottom:12px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.sec-h.s1{color:var(--teal);border-bottom-color:var(--teal2)}
+.sec-h.s2{color:var(--blue);border-bottom-color:var(--blue3)}
+.sec-no{font-size:9px;color:#fff;padding:2px 7px;border-radius:10px;font-weight:700}
+.sec-no.s1{background:var(--teal)}
+.sec-no.s2{background:var(--blue)}
+.badge-ref{font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;
+           background:var(--purple2);color:var(--purple)}
+
+/* ── 공통 입력 ── */
+.inp{width:100%;border:none;background:transparent;font-size:11px;font-family:inherit;
+     color:var(--text1);outline:none;padding:0;min-height:20px}
+.inp:focus{background:var(--blue2);border-radius:2px;padding:1px 3px}
+.ta{width:100%;border:none;background:transparent;font-size:11px;font-family:inherit;
+    color:var(--text1);outline:none;padding:0;resize:vertical;min-height:40px;line-height:1.5}
+.ta:focus{background:var(--blue2);border-radius:2px;padding:2px 4px}
+.field-inp{padding:6px 9px;border:1px solid var(--border);border-radius:6px;font-size:11px;
+           background:var(--bg);color:var(--text1);font-family:inherit;outline:none;width:100%}
+.field-inp:focus{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue2)}
+.field-ta{width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;
+          font-size:11px;resize:vertical;background:var(--bg);color:var(--text1);
+          font-family:inherit;outline:none;min-height:60px;line-height:1.5}
+.field-ta:focus{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue2)}
+.field-lbl{font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase;
+           letter-spacing:.3px;margin-bottom:3px}
+.field-group{display:flex;flex-direction:column;gap:3px}
+
+/* ── 폼 테이블 ── */
+.form-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.form-tbl td{padding:7px 10px;border:1px solid var(--border);vertical-align:top}
+.form-tbl td.lbl{background:var(--bg2);font-weight:600;width:130px;color:var(--text2);
+                 white-space:nowrap}
+.form-tbl td.lbl2{background:var(--bg2);font-weight:600;width:90px;color:var(--text2)}
+
+/* ── 심사 일정 (타임테이블) ── */
+.timetable{width:100%;border-collapse:collapse;font-size:10px}
+.timetable th{padding:6px 8px;border:1px solid var(--border);font-size:9px;font-weight:700;
+              text-align:center;white-space:nowrap}
+.timetable td{padding:6px 8px;border:1px solid var(--border);vertical-align:top}
+.tt-hd-s1{background:var(--teal2);color:var(--teal)}
+.tt-hd-s2{background:var(--blue2);color:var(--blue)}
+.tt-add-btn{padding:4px 12px;border-radius:5px;border:1px dashed var(--border);
+            background:var(--bg2);color:var(--text3);font-size:10px;cursor:pointer;
+            margin-top:5px;transition:.15s}
+.tt-add-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--blue2)}
+.tt-del-btn{padding:2px 6px;border-radius:4px;border:1px solid var(--red3);
+            background:var(--red2);color:var(--red);font-size:9px;cursor:pointer;float:right}
+
+/* ── 표준 선택 그리드 ── */
+.std-grid{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px}
+.std-chip{padding:4px 10px;border-radius:20px;border:1px solid var(--border);
+          background:var(--bg2);font-size:10px;cursor:pointer;font-weight:600;
+          color:var(--text2);transition:.15s;user-select:none}
+.std-chip:hover{border-color:var(--border2);background:var(--hover)}
+.std-chip.on-q{background:var(--blue2);border-color:var(--blue3);color:var(--blue)}
+.std-chip.on-e{background:var(--green2);border-color:var(--green3);color:var(--green)}
+.std-chip.on-e26{background:#e6f9f0;border-color:#86efac;color:#0d7449}
+.std-chip.on-s{background:var(--amber2);border-color:var(--amber3);color:var(--amber)}
+.std-chip.on-m{background:#fce4ec;border-color:#f9a8d4;color:#880e4f}
+.std-chip.on-f{background:#e8f5e9;border-color:#a7f3d0;color:#1b5e20}
+.std-chip.on-fs{background:#f1f8e9;border-color:#bbf7d0;color:#33691e}
+.std-chip.on-i{background:#e3f2fd;border-color:#93c5fd;color:#0d47a1}
+.std-chip.on-en{background:#fff8e1;border-color:#fde68a;color:#f57f17}
+.std-chip.on-sa{background:#fbe9e7;border-color:#fca5a5;color:#bf360c}
+.std-chip.on-ac{background:#f3e5f5;border-color:#d8b4fe;color:#6a1b9a}
+.std-chip.on-co{background:#e0f2f1;border-color:#6ee7b7;color:#00695c}
+.std-chip.on-ai{background:#ede7f6;border-color:#c4b5fd;color:#4527a0}
+.std-chip.on-nu{background:#eceff1;border-color:#cbd5e1;color:#37474f}
+.std-chip.on-sd{background:#e8eaf6;border-color:#a5b4fc;color:#283593}
+.std-chip.on-bc{background:#ede7f6;border-color:#a78bfa;color:#311b92}
+.std-chip.on-pr{background:#fce4ec;border-color:#fda4af;color:#880e4f}
+
+/* ── 심사원 배정 테이블 ── */
+.assign-tbl{width:100%;border-collapse:collapse;font-size:10px}
+.assign-tbl th{background:var(--bg2);padding:6px 8px;border:1px solid var(--border);
+               font-size:9px;font-weight:700;text-align:left}
+.assign-tbl td{padding:6px 8px;border:1px solid var(--border);vertical-align:top}
+.assign-tbl tr:nth-child(even) td{background:#fafbfc}
+
+/* ── IAF MD5 인일 계산기 ── */
+.md5-box{background:var(--bg2);border-radius:8px;padding:12px 16px;border:1px solid var(--border);
+         margin-bottom:10px}
+.md5-title{font-size:11px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.md5-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.md5-field{display:flex;flex-direction:column;gap:3px}
+.md5-result{padding:8px 12px;background:var(--card);border-radius:6px;border:1px solid var(--border);
+            display:flex;justify-content:space-between;align-items:center;font-size:11px}
+.md5-days{font-size:18px;font-weight:800;color:var(--blue)}
+
+/* ── 서명란 ── */
+.sig-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.sig-box{padding:8px 0}
+.sig-role{font-size:9px;color:var(--text3);font-weight:600;margin-bottom:4px}
+.sig-line{border-bottom:1px solid var(--text1);min-height:28px;padding:3px 0;font-size:12px;font-weight:700}
+.sig-date{font-size:10px;color:var(--text3);margin-top:4px}
+
+/* ── 알림 박스 ── */
+.notice{padding:9px 12px;border-radius:6px;font-size:10px;line-height:1.6;margin-bottom:12px}
+.notice.blue{background:var(--blue2);color:var(--blue)}
+.notice.green{background:var(--green2);color:var(--green)}
+.notice.amber{background:var(--amber2);color:var(--amber)}
+.notice.teal{background:var(--teal2);color:var(--teal)}
+
+/* ── 유틸 ── */
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.row-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px}
+
+/* ── 인쇄 ── */
+@media print{
+  #hdr .hdr-r,#tab-bar,#save-notice{display:none!important}
+  #hdr{position:static}
+  #pg{padding:4px 0;max-width:100%}
+  .doc-page{display:block!important}
+  .doc-wrap{border:none;border-radius:0;padding:18px 0}
+  .page-break{page-break-before:always;margin-top:24px}
+  .no-print{display:none!important}
+}
+@page{margin:15mm 13mm}
+
+/* ── 심사팀 동적 테이블 ── */
+.team-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.team-tbl th{background:var(--bg2);padding:6px 9px;border:1px solid var(--border);
+  font-size:9px;font-weight:700;text-align:left;white-space:nowrap}
+.team-tbl td{padding:5px 7px;border:1px solid var(--border);vertical-align:middle}
+.team-tbl tr:nth-child(even) td{background:#fafbfc}
+.team-sel{width:100%;padding:4px 6px;border:1px solid var(--border);border-radius:4px;
+  font-size:11px;background:var(--bg);color:var(--text1);font-family:inherit;cursor:pointer}
+.team-sel:focus{outline:none;border-color:var(--blue)}
+.role-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;
+  border-radius:10px;white-space:nowrap}
+.rb-leader{background:#dbeafe;color:#1d4ed8}
+.rb-auditor{background:#dcfce7;color:#15803d}
+.rb-te{background:#f3e8ff;color:#7e22ce}
+.rb-observer{background:#fef3c7;color:#92400e}
+.rb-guide{background:#f1f5f9;color:#475569}
+.team-add-btn{padding:5px 14px;border-radius:6px;border:1px dashed var(--teal);
+  background:var(--teal2);color:var(--teal);font-size:10px;font-weight:600;
+  cursor:pointer;margin-top:6px;transition:.15s}
+.team-add-btn:hover{background:var(--teal);color:#fff}
+.team-del-btn{padding:2px 7px;border-radius:4px;border:1px solid var(--red3);
+  background:var(--red2);color:var(--red);font-size:9px;cursor:pointer;white-space:nowrap}
+
+/* ── 시간 드롭다운 셀 ── */
+.time-cell{display:flex;align-items:center;gap:3px;white-space:nowrap}
+.time-sel{padding:3px 4px;border:1px solid var(--border);border-radius:4px;
+  font-size:10px;background:var(--bg);color:var(--text1);cursor:pointer;width:70px}
+.time-sel:focus{outline:none;border-color:var(--blue)}
+.time-day-sel{padding:3px 4px;border:1px solid var(--border);border-radius:4px;
+  font-size:10px;background:var(--bg);color:var(--text1);cursor:pointer;width:58px}
+.time-sep{font-size:10px;color:var(--text3);flex-shrink:0}
+
+/* ── 활동 셀 ── */
+.act-cell{display:flex;flex-direction:column;gap:3px}
+.act-main{width:100%;border:1px solid var(--border);border-radius:4px;padding:4px 7px;
+  font-size:11px;font-family:inherit;background:var(--bg);color:var(--text1);outline:none}
+.act-main:focus{border-color:var(--blue)}
+.act-note{width:100%;border:1px solid var(--border);border-radius:4px;padding:3px 7px;
+  font-size:10px;font-family:inherit;background:var(--bg2);color:var(--text2);
+  outline:none;resize:none;min-height:36px;line-height:1.4}
+.act-note:focus{border-color:var(--blue);background:var(--bg)}
+.act-note::placeholder{color:var(--text3)}
+
+/* ── 담당자 드롭다운 ── */
+.aud-sel{width:100%;padding:3px 5px;border:1px solid var(--border);border-radius:4px;
+  font-size:10px;background:var(--bg);color:var(--text1);cursor:pointer}
+.aud-sel:focus{outline:none;border-color:var(--blue)}
+</style>
+<style id="admin-doc-theme-overrides">
+/* Modern admin tokens win over page :root aliases */
+:root {
+  --admin-primary: #0F172A;
+  --admin-primary-light: #1E293B;
+  --admin-accent: #2563EB;
+  --admin-accent-bg: #EFF6FF;
+  --admin-bg: #F8FAFC;
+  --admin-card: #FFFFFF;
+  --admin-border: #E2E8F0;
+  --admin-text: #1E293B;
+  --admin-text-muted: #64748B;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --bg: var(--admin-card);
+  --bg2: var(--admin-bg);
+  --card: var(--admin-card);
+  --border: var(--admin-border);
+  --text1: var(--admin-text);
+  --text2: var(--admin-text-muted);
+  --text3: #94A3B8;
+  --blue: var(--admin-accent);
+  --blue2: var(--admin-accent-bg);
+  --indigo: var(--admin-primary);
+  --indigo2: #E2E8F0;
+  --green: var(--success);
+  --green2: #ECFDF5;
+  --red: var(--danger);
+  --red2: #FEF2F2;
+  --amber: #B45309;
+  --amber2: #FFFBEB;
+  --purple: #3730A3;
+  --purple2: #EEF2FF;
+  --teal: #0F766E;
+  --teal2: #F0FDFA;
+}
+</style>
+
+</head>
+<body class="portal-page admin-page">
+
+<div id="hdr">
+  <div class="logo">ComplAIs <small>심사계획서 — 1단계 / 2단계 — ISO/IEC 17021-1 §9.2.3</small></div>
+  <div class="hdr-r">
+    <button class="hbtn" onclick="saveAll()">💾 자동저장</button>
+    <button class="hbtn pri no-print" onclick="window.print()">🖨️ 인쇄 / PDF</button>
+  </div>
+</div>
+
+<div id="tab-bar">
+  <button class="tab s1-tab active" onclick="showTab(0)">
+    <span class="tab-badge badge-s1">1단계</span> 심사계획서
+  </button>
+  <button class="tab s2-tab" onclick="showTab(1)">
+    <span class="tab-badge badge-s2">2단계</span> 심사계획서
+  </button>
+</div>
+
+<div id="save-notice">✅ 저장 완료 — 새로고침 후에도 데이터 유지</div>
+
+<div id="pg">
+
+<!-- ══════════════════════════════════════════════
+     1단계 심사계획서
+══════════════════════════════════════════════ -->
+<div class="doc-page active" id="page-0">
+<div class="doc-wrap">
+
+  <div class="doc-hd s1">
+    <div class="doc-tag s1">ISO/IEC 17021-1 §9.2.3 · §9.3.1.2 · 1단계 심사</div>
+    <div class="doc-title">1단계 심사계획서</div>
+    <div class="doc-sub">Stage 1 Audit Plan — 문서 검토 및 준비성 평가</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">계획서 번호</span>
+      <span><input class="inp" id="s1-rno" placeholder="예) AP1-2025-001"
+        style="border-bottom:1px solid var(--border);width:160px"></span>
+      <span class="dm-lbl">작성일</span>
+      <span><input class="inp" type="date" id="s1-created"
+        style="border-bottom:1px solid var(--border);width:130px"></span>
+      <span class="dm-lbl">개정 번호</span>
+      <span><input class="inp" id="s1-rev" placeholder="Rev. 0"
+        style="border-bottom:1px solid var(--border);width:80px"></span>
+    </div>
+  </div>
+
+  <!-- §1 기본 정보 -->
+  <div class="sec">
+    <div class="sec-h s1"><span class="sec-no s1">1</span> 심사 기본 정보
+      <span class="badge-ref">§9.2.3.2 a)b)c)</span></div>
+    <table class="form-tbl">
+      <tr>
+        <td class="lbl">피심사 조직</td>
+        <td><input class="inp" id="s1-org" placeholder="법인명"></td>
+        <td class="lbl">사업장 주소</td>
+        <td><input class="inp" id="s1-addr" placeholder="주소"></td>
+      </tr>
+      <tr>
+        <td class="lbl">심사 유형</td>
+        <td colspan="3">
+          <strong>최초인증 1단계 심사 (Initial Certification — Stage 1)</strong>
+          <span style="font-size:10px;color:var(--text3);margin-left:8px">ISO/IEC 17021-1 §9.3.1.2</span>
+        </td>
+      </tr>
+      <tr>
+        <td class="lbl">심사 목적</td>
+        <td colspan="3" style="font-size:10px;line-height:1.8;color:var(--text2)">
+          a) 경영시스템 문서화된 정보 검토<br>
+          b) 2단계 심사를 위한 조직의 준비 상태 평가<br>
+          c) 표준 요구사항에 대한 조직의 이해 수준 확인<br>
+          d) 인증 범위 정보 파악 (사이트, 프로세스, 장비, 법적 요건)<br>
+          e) 2단계 심사 자원 배분 및 일정 검토<br>
+          f) 2단계 심사 집중 영역 결정<br>
+          g) 내부심사 및 경영검토의 계획·이행 여부 확인
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- §2 심사 기준 및 범위 -->
+  <div class="sec">
+    <div class="sec-h s1"><span class="sec-no s1">2</span> 심사 기준 및 인증 범위
+      <span class="badge-ref">§9.2.1.2, §9.2.1.3, §9.2.1.4</span></div>
+    <div class="field-lbl" style="margin-bottom:6px">심사 대상 표준 (해당 표준 클릭 선택)</div>
+    <div class="std-grid" id="s1-std-grid"></div>
+    <table class="form-tbl" style="margin-top:10px">
+      <tr>
+        <td class="lbl">심사 기준</td>
+        <td><input class="inp" id="s1-criteria"
+          placeholder="선택한 표준이 자동 입력 — 추가 기준 있으면 기재"></td>
+      </tr>
+      <tr>
+        <td class="lbl">인증 범위 (Scope)</td>
+        <td><textarea class="ta" id="s1-scope" rows="2"
+          placeholder="인증 범위 기재 — 제품/서비스, 사이트, 적용 제외 사항 포함"></textarea></td>
+      </tr>
+      <tr>
+        <td class="lbl">적용 제외 조항</td>
+        <td><input class="inp" id="s1-exclusions"
+          placeholder="적용 제외 조항이 있는 경우 기재 (없으면 '없음')"></td>
+      </tr>
+      <tr>
+        <td class="lbl">외주 프로세스</td>
+        <td><input class="inp" id="s1-outsource"
+          placeholder="인증 범위에 영향을 미치는 외주 프로세스 (없으면 '없음')"></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- §3 심사팀 구성 -->
+  <div class="sec">
+    <div class="sec-h s1"><span class="sec-no s1">3</span> 심사팀 구성
+      <span class="badge-ref">§9.2.2</span></div>
+    <div class="notice teal">
+      ℹ️ 심사팀 구성원 명단을 사전에 피심사 조직에 통보하고, 조직이 이의를 제기할 수 있도록 충분한 시간을 제공해야 합니다. (§9.2.3.5)
+    </div>
+    <table class="team-tbl" id="s1-team-tbl">
+      <thead>
+        <tr>
+          <th style="width:110px">역할 <span style="font-weight:400;color:var(--text3)">(§9.2.2)</span></th>
+          <th>성명</th>
+          <th style="width:90px">자격 / 소속</th>
+          <th>담당 표준 / 전문분야</th>
+          <th style="min-width:160px">역할 설명</th>
+          <th class="no-print" style="width:40px"></th>
+        </tr>
+      </thead>
+      <tbody id="s1-team-tbody"></tbody>
+    </table>
+    <button class="team-add-btn no-print" onclick="addTeamMember('s1')">+ 팀원 추가</button>
+  </div>
+
+  <!-- §4 심사 일정 -->
+  <div class="sec">
+    <div class="sec-h s1"><span class="sec-no s1">4</span> 심사 일정
+      <span class="badge-ref">§9.2.3.2 d)e)</span></div>
+    <div class="row-3" style="margin-bottom:12px">
+      <div class="field-group">
+        <div class="field-lbl">심사 일자</div>
+        <input class="field-inp" type="date" id="s1-date">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">심사 방법</div>
+        <select class="field-inp" id="s1-method">
+          <option>원격 문서 검토 (Off-site)</option>
+          <option>현장 방문 (On-site)</option>
+          <option>원격+현장 혼합</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">총 심사 시간</div>
+        <input class="field-inp" id="s1-duration" placeholder="예) 1일 (8시간)">
+      </div>
+    </div>
+    <table class="timetable" id="s1-timetable">
+      <thead>
+        <tr>
+          <th class="tt-hd-s1" style="width:160px">시간대</th>
+          <th class="tt-hd-s1" style="min-width:180px">활동 내용</th>
+          <th class="tt-hd-s1" style="min-width:130px">세부 활동 / 확인 항목</th>
+          <th class="tt-hd-s1" style="width:110px">담당 심사원</th>
+          <th class="tt-hd-s1" style="width:80px">방법</th>
+          <th class="tt-hd-s1 no-print" style="width:36px"></th>
+        </tr>
+      </thead>
+      <tbody id="s1-tbody">
+        <!-- JS로 동적 생성 -->
+      </tbody>
+    </table>
+    <button class="tt-add-btn no-print" onclick="addRow('s1')">+ 행 추가</button>
+  </div>
+
+  <!-- §5 1단계 심사 확인 항목 -->
+  <div class="sec">
+    <div class="sec-h s1"><span class="sec-no s1">5</span> 1단계 심사 확인 항목
+      <span class="badge-ref">§9.3.1.2 a)~g)</span></div>
+    <table class="form-tbl" style="font-size:10px">
+      <tr style="background:var(--teal2)">
+        <td style="font-weight:700;color:var(--teal);width:30px">구분</td>
+        <td style="font-weight:700;color:var(--teal)">확인 내용</td>
+        <td style="font-weight:700;color:var(--teal);width:100px">방법 / 비고</td>
+      </tr>
+      <tr><td style="background:var(--bg2);font-weight:600">a)</td>
+          <td>경영시스템 문서화된 정보 (매뉴얼, 절차서, 방침 등) 구비 여부</td>
+          <td><input class="inp" id="s1-chk-a" placeholder="검토 방법"></td></tr>
+      <tr><td style="background:var(--bg2);font-weight:600">b)</td>
+          <td>2단계 심사를 위한 조직 준비 상태 평가</td>
+          <td><input class="inp" id="s1-chk-b" placeholder="평가 방법"></td></tr>
+      <tr><td style="background:var(--bg2);font-weight:600">c)</td>
+          <td>표준 요구사항 이해 수준 — 조항별 문서 매핑 확인</td>
+          <td><input class="inp" id="s1-chk-c"></td></tr>
+      <tr><td style="background:var(--bg2);font-weight:600">d)</td>
+          <td>적용 범위 내 사이트·프로세스·장비·법적 요건 파악</td>
+          <td><input class="inp" id="s1-chk-d"></td></tr>
+      <tr><td style="background:var(--bg2);font-weight:600">e)</td>
+          <td>2단계 심사 자원 배분 — IAF MD5 심사일수 산정 검토</td>
+          <td><input class="inp" id="s1-chk-e"></td></tr>
+      <tr><td style="background:var(--bg2);font-weight:600">f)</td>
+          <td>2단계 심사 집중 영역 결정 (리스크 기반)</td>
+          <td><input class="inp" id="s1-chk-f"></td></tr>
+      <tr><td style="background:var(--bg2);font-weight:600">g)</td>
+          <td>내부심사 및 경영검토 계획·이행 여부 확인</td>
+          <td><input class="inp" id="s1-chk-g"></td></tr>
+    </table>
+  </div>
+
+  <!-- §6 검토 요청 문서 목록 -->
+  <div class="sec">
+    <div class="sec-h s1"><span class="sec-no s1">6</span> 피심사 조직 제출 자료 요청 목록
+      <span class="badge-ref">§9.3.1.2 a)</span></div>
+    <div class="notice teal">
+      ℹ️ 1단계 심사 전 피심사 조직이 제출해야 할 문서 목록입니다. 심사 일자 최소 2주 전 제출을 요청하세요.
+    </div>
+    <table class="form-tbl" style="font-size:10px">
+      <tr style="background:var(--teal2)">
+        <td style="font-weight:700;color:var(--teal);width:30px">No.</td>
+        <td style="font-weight:700;color:var(--teal)">요청 문서</td>
+        <td style="font-weight:700;color:var(--teal);width:110px">해당 조항</td>
+        <td style="font-weight:700;color:var(--teal);width:80px">필수/선택</td>
+      </tr>
+      <tr><td>1</td><td>경영시스템 매뉴얼 (또는 이에 상응하는 문서)</td><td>4.3, 5.2</td><td>필수</td></tr>
+      <tr><td>2</td><td>경영시스템 방침 (서명된 최신본)</td><td>5.2</td><td>필수</td></tr>
+      <tr><td>3</td><td>내외부 이슈 분석 기록 (SWOT, PEST 등)</td><td>4.1</td><td>필수</td></tr>
+      <tr><td>4</td><td>이해관계자 요구사항 파악 기록</td><td>4.2</td><td>필수</td></tr>
+      <tr><td>5</td><td>리스크·기회 파악 및 조치 계획</td><td>6.1</td><td>필수</td></tr>
+      <tr><td>6</td><td>경영시스템 목표 및 달성 계획</td><td>6.2</td><td>필수</td></tr>
+      <tr><td>7</td><td>법규 및 기타 요건 목록 (준수의무 등록부)</td><td>6.1.3 등</td><td>필수</td></tr>
+      <tr><td>8</td><td>내부심사 계획 및 실시 기록</td><td>9.2</td><td>필수</td></tr>
+      <tr><td>9</td><td>경영검토 회의록 (최근 1회)</td><td>9.3</td><td>필수</td></tr>
+      <tr><td>10</td><td>조직도 (역할·책임·권한 포함)</td><td>5.3</td><td>필수</td></tr>
+      <tr><td>11</td><td>절차서·지침서 목록 (주요 절차서 샘플 포함)</td><td>7.5</td><td>필수</td></tr>
+      <tr><td>12</td><td>표준별 고유 요구사항 관련 문서 (아래 기재)</td><td>-</td><td>해당 시</td></tr>
+      <tr>
+        <td colspan="4">
+          <textarea class="ta" id="s1-doc-add" rows="3"
+            placeholder="선택 표준별 추가 요청 문서를 기재하세요&#10;예) ISO 14001: 환경측면 목록, 환경법규 목록 / ISO 45001: 위험성평가 결과, 사고 이력"></textarea>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- §7 2단계 심사 계획 연계 -->
+  <div class="sec">
+    <div class="sec-h s1"><span class="sec-no s1">7</span> 2단계 심사 연계 계획
+      <span class="badge-ref">§9.3.1.2 e)f) / §9.3.1.2.3</span></div>
+    <div class="notice blue">
+      📋 1단계 심사 완료 후 2단계 진행 여부 결정 — 통상 1단계~2단계 간격은 인증기관 절차에 따르며, 너무 오래 지나면 1단계를 재실시할 수 있습니다.
+    </div>
+    <div class="row-3">
+      <div class="field-group">
+        <div class="field-lbl">2단계 예정일 (잠정)</div>
+        <input class="field-inp" type="date" id="s1-s2-date">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">1단계 → 2단계 간격</div>
+        <input class="field-inp" id="s1-s2-gap" placeholder="예) 4주">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">2단계 예정 일수</div>
+        <input class="field-inp" id="s1-s2-days" placeholder="IAF MD5 기준 산정">
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <div class="field-lbl" style="margin-bottom:4px">2단계 집중 심사 예정 영역 (1단계 후 업데이트)</div>
+      <textarea class="field-ta" id="s1-s2-focus" rows="3"
+        placeholder="1단계 문서 검토 결과를 바탕으로 2단계 집중 영역을 기재합니다. (1단계 심사 후 작성)"></textarea>
+    </div>
+  </div>
+
+  <!-- §8 비밀보장 및 공정성 -->
+  <div class="sec">
+    <div class="sec-h s1"><span class="sec-no s1">8</span> 비밀보장 및 공정성 선언
+      <span class="badge-ref">§5.2 / §8.4</span></div>
+    <div class="notice amber">
+      ⚠️ 심사팀 전원은 아래 사항에 동의함을 서명으로 확인합니다.
+    </div>
+    <table class="form-tbl" style="font-size:10px">
+      <tr><td colspan="2" style="line-height:1.7">
+        ① 본 심사에서 취득한 피심사 조직의 모든 정보는 기밀로 유지합니다.<br>
+        ② 피심사 조직과 이해충돌 관계가 없음을 확인합니다. (최근 2년 이내 컨설팅 제공 없음 등)<br>
+        ③ 심사는 객관적 증거에 근거하여 공정하게 수행합니다.
+      </td></tr>
+    </table>
+  </div>
+
+  <!-- §9 계획서 승인 -->
+  <div class="sec">
+    <div class="sec-h s1"><span class="sec-no s1">9</span> 계획서 배포 및 승인
+      <span class="badge-ref">§9.2.3.4, §9.2.3.5</span></div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-role">심사팀장 (작성)</div>
+        <div class="sig-line"><input class="inp" id="s1-sig1" placeholder="성명 / 자격번호"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="s1-sig1-d" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">심사프로그램 관리자 (승인)</div>
+        <div class="sig-line"><input class="inp" id="s1-sig2" placeholder="성명 / 직책"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="s1-sig2-d" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">피심사 조직 확인</div>
+        <div class="sig-line"><input class="inp" id="s1-sig3" placeholder="성명 / 직책"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="s1-sig3-d" style="width:120px;display:inline"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- doc-wrap -->
+</div><!-- page-0 -->
+
+
+<!-- ══════════════════════════════════════════════
+     2단계 심사계획서
+══════════════════════════════════════════════ -->
+<div class="doc-page page-break" id="page-1">
+<div class="doc-wrap">
+
+  <div class="doc-hd s2">
+    <div class="doc-tag s2">ISO/IEC 17021-1 §9.2.3 · §9.3.1.3 · 2단계 심사</div>
+    <div class="doc-title">2단계 심사계획서</div>
+    <div class="doc-sub">Stage 2 Audit Plan — 현장심사 및 경영시스템 이행 검증</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">계획서 번호</span>
+      <span><input class="inp" id="s2-rno" placeholder="예) AP2-2025-001"
+        style="border-bottom:1px solid var(--border);width:160px"></span>
+      <span class="dm-lbl">작성일</span>
+      <span><input class="inp" type="date" id="s2-created"
+        style="border-bottom:1px solid var(--border);width:130px"></span>
+      <span class="dm-lbl">개정 번호</span>
+      <span><input class="inp" id="s2-rev" placeholder="Rev. 0"
+        style="border-bottom:1px solid var(--border);width:80px"></span>
+    </div>
+  </div>
+
+  <!-- §1 기본 정보 -->
+  <div class="sec">
+    <div class="sec-h s2"><span class="sec-no s2">1</span> 심사 기본 정보
+      <span class="badge-ref">§9.2.3.2 a)b)c)</span></div>
+    <table class="form-tbl">
+      <tr>
+        <td class="lbl">피심사 조직</td>
+        <td><input class="inp" id="s2-org"></td>
+        <td class="lbl">주소</td>
+        <td><input class="inp" id="s2-addr"></td>
+      </tr>
+      <tr>
+        <td class="lbl">심사 유형</td>
+        <td colspan="3">
+          <select id="s2-type" class="inp" style="width:300px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px">
+            <option>최초인증 2단계 심사 (Initial Certification)</option>
+            <option>사후심사 1차 (1st Surveillance Audit)</option>
+            <option>사후심사 2차 (2nd Surveillance Audit)</option>
+            <option>갱신심사 (Recertification Audit)</option>
+          </select>
+          <span style="font-size:10px;color:var(--text3);margin-left:8px">ISO/IEC 17021-1 §9.3.1.3 / §9.3.1.4 / §9.3.1.5</span>
+        </td>
+      </tr>
+      <tr>
+        <td class="lbl">심사 목적</td>
+        <td colspan="3" style="font-size:10px;line-height:1.8;color:var(--text2)">
+          a) 경영시스템 표준 요구사항 전반적 이행 여부 확인 (현장 증거 기반)<br>
+          b) 방침·목표·절차 수립·이행·유지 여부 및 성과 목표 충족 여부<br>
+          c) 법적·규제적 요구사항 이행 모니터링 및 결과 확인<br>
+          d) 운용 통제의 실제 이행 및 프로세스 성과 확인<br>
+          e) 내부심사 및 경영검토 결과의 실질적 활용 여부<br>
+          f) 경영시스템 목표 달성에 대한 신뢰 근거 확보
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- §2 심사 기준 및 범위 -->
+  <div class="sec">
+    <div class="sec-h s2"><span class="sec-no s2">2</span> 심사 기준 및 인증 범위
+      <span class="badge-ref">§9.2.1.2, §9.2.1.3, §9.2.1.4</span></div>
+    <div class="field-lbl" style="margin-bottom:6px">심사 대상 표준</div>
+    <div class="std-grid" id="s2-std-grid"></div>
+    <table class="form-tbl" style="margin-top:10px">
+      <tr>
+        <td class="lbl">심사 기준</td>
+        <td><input class="inp" id="s2-criteria" placeholder="선택 표준 자동 입력 — 추가 기준 기재"></td>
+      </tr>
+      <tr>
+        <td class="lbl">인증 범위</td>
+        <td><textarea class="ta" id="s2-scope" rows="2"
+          placeholder="제품/서비스 및 사이트 포함한 전체 인증 범위"></textarea></td>
+      </tr>
+      <tr>
+        <td class="lbl">통합심사 여부</td>
+        <td>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;margin-right:16px">
+            <input type="checkbox" id="s2-ims"> 통합경영시스템(IMS) 심사
+            <span style="font-size:9px;color:var(--text3)">(IAF MD11 적용)</span>
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px">
+            <input type="checkbox" id="s2-joint"> 공동심사 (Joint Audit)
+          </label>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- §3 심사팀 구성 -->
+  <div class="sec">
+    <div class="sec-h s2"><span class="sec-no s2">3</span> 심사팀 구성
+      <span class="badge-ref">§9.2.2</span></div>
+    <table class="team-tbl" id="s2-team-tbl">
+      <thead>
+        <tr>
+          <th style="width:110px">역할 <span style="font-weight:400;color:var(--text3)">(§9.2.2)</span></th>
+          <th>성명</th>
+          <th style="width:90px">자격 / 소속</th>
+          <th>담당 표준 / 전문분야</th>
+          <th style="min-width:160px">역할 설명</th>
+          <th class="no-print" style="width:40px"></th>
+        </tr>
+      </thead>
+      <tbody id="s2-team-tbody"></tbody>
+    </table>
+    <button class="team-add-btn no-print" onclick="addTeamMember('s2')">+ 팀원 추가</button>
+  </div>
+
+  <!-- §4 IAF MD5 심사일수 산정 -->
+  <div class="sec">
+    <div class="sec-h s2"><span class="sec-no s2">4</span> 심사일수 산정 (IAF MD5 기준)
+      <span class="badge-ref">§9.1.4 / IAF MD5</span></div>
+    <div class="md5-box">
+      <div class="md5-title">📊 IAF MD5 심사일수 계산기
+        <span style="font-size:9px;font-weight:400;color:var(--text3)">(Quality/Environmental MS 기준 — 다른 표준은 별도 IAF MD 확인)</span>
+      </div>
+      <div class="md5-grid">
+        <div class="field-group">
+          <div class="field-lbl">총 종업원 수</div>
+          <input class="field-inp" type="number" id="md5-emp" placeholder="명" min="1"
+            oninput="calcMD5()">
+        </div>
+        <div class="field-group">
+          <div class="field-lbl">복수 표준 수</div>
+          <select class="field-inp" id="md5-stds" onchange="calcMD5()">
+            <option value="1">1개 표준</option>
+            <option value="2">2개 표준 (약 +30%)</option>
+            <option value="3">3개 이상 (약 +50%)</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="field-lbl">복잡도 조정</div>
+          <select class="field-inp" id="md5-complex" onchange="calcMD5()">
+            <option value="1.0">표준 (×1.0)</option>
+            <option value="0.8">단순 (×0.8)</option>
+            <option value="1.2">복잡 (×1.2)</option>
+            <option value="1.5">매우복잡 (×1.5)</option>
+          </select>
+        </div>
+      </div>
+      <div class="md5-result">
+        <span style="font-size:11px;color:var(--text2)">산정된 최소 심사일수 (Stage 2 기준)</span>
+        <span class="md5-days" id="md5-result">— 인일</span>
+      </div>
+      <div style="margin-top:6px">
+        <div class="field-lbl" style="margin-bottom:3px">심사일수 산정 근거 기록 (§9.1.4.3)</div>
+        <textarea class="field-ta" id="s2-days-basis" rows="2"
+          placeholder="IAF MD5 Table 1 기준, 종업원 수 _명 → 기준 _일, 복수 표준 조정 +_일, 복잡도 조정 ×_ = 총 _인일"></textarea>
+      </div>
+    </div>
+    <div class="row-3">
+      <div class="field-group">
+        <div class="field-lbl">계획 심사 시작일</div>
+        <input class="field-inp" type="date" id="s2-start">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">계획 심사 종료일</div>
+        <input class="field-inp" type="date" id="s2-end">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">총 심사 인일 (확정)</div>
+        <input class="field-inp" id="s2-total-days" placeholder="예) 2.5인일">
+      </div>
+    </div>
+  </div>
+
+  <!-- §5 심사 일정 (시간 단위) -->
+  <div class="sec">
+    <div class="sec-h s2"><span class="sec-no s2">5</span> 심사 일정 (상세)
+      <span class="badge-ref">§9.2.3.2 d)e)f)</span></div>
+    <div class="notice blue">
+      ℹ️ 심사 일정은 사전에 피심사 조직과 합의하여 확정합니다. (§9.2.3.4)<br>
+      개회의·종결회의는 필수 항목이며, 심사팀장이 주관합니다. (§9.4.2, §9.4.7)
+    </div>
+    <table class="timetable" id="s2-timetable">
+      <thead>
+        <tr>
+          <th class="tt-hd-s2" style="width:165px">일시 / 시간</th>
+          <th class="tt-hd-s2" style="min-width:180px">심사 활동 / 부서·조항</th>
+          <th class="tt-hd-s2" style="min-width:130px">세부 확인 항목</th>
+          <th class="tt-hd-s2" style="width:110px">담당 심사원</th>
+          <th class="tt-hd-s2" style="width:80px">장소</th>
+          <th class="tt-hd-s2 no-print" style="width:36px"></th>
+        </tr>
+      </thead>
+      <tbody id="s2-tbody"></tbody>
+    </table>
+    <button class="tt-add-btn no-print" onclick="addRow('s2')">+ 행 추가</button>
+  </div>
+
+  <!-- §6 심사원별 조항 배정 -->
+  <div class="sec">
+    <div class="sec-h s2"><span class="sec-no s2">6</span> 심사원별 담당 조항 / 부서 배정
+      <span class="badge-ref">§9.2.2.1.5</span></div>
+    <table class="assign-tbl" id="s2-assign-tbl">
+      <tr>
+        <th style="width:100px">심사원</th>
+        <th>담당 표준 / 조항</th>
+        <th>담당 부서 / 사이트</th>
+        <th style="width:80px">배정 시간</th>
+      </tr>
+      <tr>
+        <td><input class="inp" id="as1-name" placeholder="심사팀장 성명"></td>
+        <td><input class="inp" id="as1-clause" placeholder="예) HLS 공통(4~10항), ISO 14001 §5, §9"></td>
+        <td><input class="inp" id="as1-dept" placeholder="예) 경영진, 환경안전팀, 총무팀"></td>
+        <td><input class="inp" id="as1-time" placeholder="예) 8시간"></td>
+      </tr>
+      <tr>
+        <td><input class="inp" id="as2-name" placeholder="심사원 성명"></td>
+        <td><input class="inp" id="as2-clause" placeholder="예) ISO 14001 §6.1~§8, ISO 45001 §6~§8"></td>
+        <td><input class="inp" id="as2-dept" placeholder="예) 생산부, 설비팀, 구매팀"></td>
+        <td><input class="inp" id="as2-time"></td>
+      </tr>
+      <tr>
+        <td><input class="inp" id="as3-name" placeholder="심사원 성명"></td>
+        <td><input class="inp" id="as3-clause"></td>
+        <td><input class="inp" id="as3-dept"></td>
+        <td><input class="inp" id="as3-time"></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- §7 다중 사이트 표본 추출 -->
+  <div class="sec">
+    <div class="sec-h s2"><span class="sec-no s2">7</span> 다중 사이트 표본 추출 계획
+      <span class="badge-ref">§9.1.5 / IAF MD1</span></div>
+    <div class="row-2" style="margin-bottom:10px">
+      <div class="field-group">
+        <div class="field-lbl">사이트 수</div>
+        <input class="field-inp" id="s2-sites-n" placeholder="예) 3개 사이트">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">표본 추출 방법</div>
+        <select class="field-inp" id="s2-sampling">
+          <option>단일 사이트 (표본 불필요)</option>
+          <option>다중 사이트 — IAF MD1 표본 추출</option>
+          <option>다중 사이트 — 전수 심사</option>
+        </select>
+      </div>
+    </div>
+    <textarea class="field-ta" id="s2-sampling-basis" rows="3"
+      placeholder="표본 추출 근거 및 선정 사이트를 기재하세요&#10;단일 사이트인 경우 '단일 사이트, 표본 추출 불필요' 기재"></textarea>
+  </div>
+
+  <!-- §8 비밀보장 및 공정성 -->
+  <div class="sec">
+    <div class="sec-h s2"><span class="sec-no s2">8</span> 비밀보장 및 공정성 선언
+      <span class="badge-ref">§5.2 / §8.4</span></div>
+    <table class="form-tbl" style="font-size:10px">
+      <tr><td colspan="2" style="line-height:1.7">
+        ① 본 심사에서 취득한 피심사 조직의 모든 정보는 기밀로 유지합니다.<br>
+        ② 피심사 조직과 이해충돌 관계가 없음을 확인합니다.<br>
+        ③ 심사는 객관적 증거에 근거하여 공정하게 수행합니다.<br>
+        ④ 심사팀장은 발견사항을 종결회의에서 명확히 발표합니다. (§9.4.7)
+      </td></tr>
+    </table>
+  </div>
+
+  <!-- §9 계획서 승인 -->
+  <div class="sec">
+    <div class="sec-h s2"><span class="sec-no s2">9</span> 계획서 배포 및 승인
+      <span class="badge-ref">§9.2.3.4, §9.2.3.5</span></div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-role">심사팀장 (작성)</div>
+        <div class="sig-line"><input class="inp" id="s2-sig1" placeholder="성명 / 자격번호"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="s2-sig1-d" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">심사프로그램 관리자 (승인)</div>
+        <div class="sig-line"><input class="inp" id="s2-sig2" placeholder="성명 / 직책"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="s2-sig2-d" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">피심사 조직 확인</div>
+        <div class="sig-line"><input class="inp" id="s2-sig3" placeholder="성명 / 직책"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="s2-sig3-d" style="width:120px;display:inline"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- doc-wrap -->
+</div><!-- page-1 -->
+
+</div><!-- #pg -->
+
+<script>
+const STANDARDS=[
+  {k:'q',  l:'ISO 9001:2015',      s:'품질',    c:'on-q'},
+  {k:'e',  l:'ISO 14001:2015',     s:'환경:15', c:'on-e'},
+  {k:'e26',l:'ISO 14001:2026',     s:'환경:26', c:'on-e26'},
+  {k:'s',  l:'ISO 45001:2018',     s:'안전보건',c:'on-s'},
+  {k:'m',  l:'ISO 13485:2016',     s:'의료기기',c:'on-m'},
+  {k:'f',  l:'ISO 22000:2018',     s:'식품안전',c:'on-f'},
+  {k:'fs', l:'FSSC 22000 V6',      s:'FSSC',   c:'on-fs'},
+  {k:'i',  l:'ISO/IEC 27001:2022', s:'정보보안',c:'on-i'},
+  {k:'en', l:'ISO 50001:2018',     s:'에너지',  c:'on-en'},
+  {k:'sa', l:'SA 8000:2014',       s:'SA8000', c:'on-sa'},
+  {k:'ac', l:'ISO 37001:2016',     s:'반부패',  c:'on-ac'},
+  {k:'co', l:'ISO 37301:2021',     s:'준법경영',c:'on-co'},
+  {k:'ai', l:'ISO/IEC 42001:2023', s:'AI경영',  c:'on-ai'},
+  {k:'nu', l:'ISO 19443:2018',     s:'원자력',  c:'on-nu'},
+  {k:'sd', l:'UN SDGs',            s:'SDGs',   c:'on-sd'},
+  {k:'bc', l:'ISO 22301:2019',     s:'사업연속',c:'on-bc'},
+  {k:'pr', l:'ISO/IEC 27701:2019', s:'개인정보',c:'on-pr'},
+];
+
+
+// ════════════════════════════════════════════════════════
+// 상수 & 상태
+// ════════════════════════════════════════════════════════
+
+// ISO 17021-1 공식 용어
+const ROLES = [
+  {v:'leader',  l:'심사팀장 (Audit Team Leader)',    badge:'rb-leader',  short:'심사팀장'},
+  {v:'auditor', l:'심사원 (Auditor)',                 badge:'rb-auditor', short:'심사원'},
+  {v:'te',      l:'기술전문가 (Technical Expert)',    badge:'rb-te',      short:'기술전문가'},
+  {v:'observer',l:'참관인 (Observer)',                badge:'rb-observer',short:'참관인'},
+  {v:'guide',   l:'안내인 (Guide)',                   badge:'rb-guide',   short:'안내인'},
+];
+
+const ROLE_DESC = {
+  leader:   '심사 전반 총괄, 개·종결회의 주관, 발견사항 종합 판정 (§9.2.2.1.5)',
+  auditor:  '담당 조항·부서·프로세스 심사 수행',
+  te:       '기술 자문 — 심사원과 동행, 단독 심사 불가 (§9.2.2.2.2)',
+  observer: '참관 전용 — 심사에 영향 미치지 않음 (§9.2.2.2.1)',
+  guide:    '피심사 조직 측 안내 — 각 심사원에 1인 배정 (§9.2.2.2.3)',
+};
+
+// 30분 단위 시간 목록
+const TIMES30 = (()=>{
+  const t=[];
+  for(let h=7;h<=20;h++){
+    t.push(`${String(h).padStart(2,'0')}:00`);
+    t.push(`${String(h).padStart(2,'0')}:30`);
+  }
+  t.push('21:00');
+  return t;
+})();
+
+// Day 선택 (1단계는 단일일, 2단계는 Day1~Day5)
+const S1_DAYS=['당일'];
+const S2_DAYS=['Day 1','Day 2','Day 3','Day 4','Day 5'];
+
+let s1Stds=[], s2Stds=[];
+let s1Rows=[], s2Rows=[];
+let s1Team=[], s2Team=[];
+
+// ════════════════════════════════════════════════════════
+// 팀원 리스트 헬퍼
+// ════════════════════════════════════════════════════════
+function getTeam(prefix){ return prefix==='s1'?s1Team:s2Team; }
+
+// 일정 드롭다운용 심사원 목록 (팀 구성에서 수집)
+function getAuditorOptions(prefix, selectedName){
+  const team=getTeam(prefix);
+  const auditors=team
+    .filter(m=>m.role==='leader'||m.role==='auditor')
+    .map(m=>m.name||'');
+  // 팀원 없으면 기본 옵션
+  const all=['—(미배정)', ...auditors.filter(Boolean)];
+  return all.map(n=>`<option value="${n}"${n===selectedName?' selected':''}>${n}</option>`).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// 심사팀 구성
+// ════════════════════════════════════════════════════════
+function addTeamMember(prefix){
+  const team=getTeam(prefix);
+  // 팀장이 없으면 팀장으로, 있으면 심사원으로 기본
+  const hasLeader=team.some(m=>m.role==='leader');
+  team.push({id:Date.now(), role:hasLeader?'auditor':'leader',
+             name:'', qual:'', std:'', desc:''});
+  renderTeam(prefix);
+  saveAll();
+}
+
+function delTeamMember(prefix,id){
+  if(prefix==='s1') s1Team=s1Team.filter(m=>m.id!==id);
+  else s2Team=s2Team.filter(m=>m.id!==id);
+  renderTeam(prefix);
+  renderRows(prefix); // 담당자 드롭다운 갱신
+  saveAll();
+}
+
+function updateTeam(prefix,id,field,val){
+  const team=getTeam(prefix);
+  const m=team.find(x=>x.id===id);
+  if(m){
+    m[field]=val;
+    if(field==='role'){
+      // 역할 변경 시 역할 설명 자동 채우기 (빈 경우만)
+      if(!m.desc) m.desc=ROLE_DESC[val]||'';
+      const descEl=document.getElementById(`td-desc-${prefix}-${id}`);
+      if(descEl&&!descEl.value) descEl.value=m.desc;
+    }
+  }
+  if(field==='role'||field==='name') renderRows(prefix); // 담당자 드롭다운 갱신
+  saveAll();
+}
+
+function renderTeam(prefix){
+  const team=getTeam(prefix);
+  const tbody=document.getElementById(prefix+'-team-tbody');
+  if(!tbody) return;
+  const color=prefix==='s1'?'var(--teal)':'var(--blue)';
+  tbody.innerHTML=team.map(m=>{
+    const roleOpts=ROLES.map(r=>`<option value="${r.v}"${m.role===r.v?' selected':''}>${r.l}</option>`).join('');
+    const rb=ROLES.find(r=>r.v===m.role)||ROLES[1];
+    return `<tr>
+      <td>
+        <select class="team-sel" onchange="updateTeam('${prefix}',${m.id},'role',this.value)">
+          ${roleOpts}
+        </select>
+        <div style="margin-top:3px"><span class="role-badge ${rb.badge}">${rb.short}</span></div>
+      </td>
+      <td><input class="inp" value="${m.name||''}"
+        placeholder="성명"
+        oninput="updateTeam('${prefix}',${m.id},'name',this.value)"
+        style="border-bottom:1px solid var(--border);width:100%"></td>
+      <td><input class="inp" value="${m.qual||''}"
+        placeholder="심사원번호 / 소속"
+        oninput="updateTeam('${prefix}',${m.id},'qual',this.value)"
+        style="border-bottom:1px solid var(--border);width:100%;font-size:10px"></td>
+      <td><input class="inp" value="${m.std||''}"
+        placeholder="예) ISO 14001, ISO 45001"
+        oninput="updateTeam('${prefix}',${m.id},'std',this.value)"
+        style="border-bottom:1px solid var(--border);width:100%;font-size:10px"></td>
+      <td><input class="inp" id="td-desc-${prefix}-${m.id}"
+        value="${m.desc||ROLE_DESC[m.role]||''}"
+        oninput="updateTeam('${prefix}',${m.id},'desc',this.value)"
+        style="border-bottom:1px solid var(--border);width:100%;font-size:10px"></td>
+      <td class="no-print">
+        <button class="team-del-btn" onclick="delTeamMember('${prefix}',${m.id})">삭제</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  if(team.length===0){
+    tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:12px;
+      color:var(--text3);font-size:11px">팀원을 추가하세요</td></tr>`;
+  }
+}
+
+function initDefaultTeam(){
+  if(s1Team.length===0){
+    s1Team=[
+      {id:1,role:'leader', name:'',qual:'',std:'전체 표준',     desc:ROLE_DESC.leader},
+      {id:2,role:'auditor',name:'',qual:'',std:'',              desc:ROLE_DESC.auditor},
+      {id:3,role:'guide',  name:'',qual:'피심사 조직',std:'',   desc:ROLE_DESC.guide},
+    ];
+  }
+  if(s2Team.length===0){
+    s2Team=[
+      {id:10,role:'leader', name:'',qual:'',std:'전체 표준',    desc:ROLE_DESC.leader},
+      {id:11,role:'auditor',name:'',qual:'',std:'',             desc:ROLE_DESC.auditor},
+      {id:12,role:'auditor',name:'',qual:'',std:'',             desc:ROLE_DESC.auditor},
+      {id:13,role:'guide',  name:'',qual:'피심사 조직',std:'',  desc:ROLE_DESC.guide},
+    ];
+  }
+  renderTeam('s1');
+  renderTeam('s2');
+}
+
+// ════════════════════════════════════════════════════════
+// 심사 일정
+// ════════════════════════════════════════════════════════
+function timeOptions(selected){
+  return TIMES30.map(t=>`<option value="${t}"${t===selected?' selected':''}>${t}</option>`).join('');
+}
+
+function dayOptions(prefix, selected){
+  const days=prefix==='s1'?S1_DAYS:S2_DAYS;
+  return days.map(d=>`<option value="${d}"${d===selected?' selected':''}>${d}</option>`).join('');
+}
+
+function addRow(prefix){
+  const rows=prefix==='s1'?s1Rows:s2Rows;
+  const id=Date.now();
+  rows.push({id, day:prefix==='s1'?'당일':'Day 1',
+             timeFrom:'09:00', timeTo:'09:30',
+             activity:'', note:'', auditor:'', place:''});
+  renderRows(prefix);
+  saveAll();
+}
+
+function delRow(prefix,id){
+  if(prefix==='s1') s1Rows=s1Rows.filter(r=>r.id!==id);
+  else s2Rows=s2Rows.filter(r=>r.id!==id);
+  renderRows(prefix);
+  saveAll();
+}
+
+function updateRow(prefix,id,field,val){
+  const rows=prefix==='s1'?s1Rows:s2Rows;
+  const r=rows.find(x=>x.id===id);
+  if(r) r[field]=val;
+  saveAll();
+}
+
+function renderRows(prefix){
+  const rows=prefix==='s1'?s1Rows:s2Rows;
+  const tbody=document.getElementById(prefix+'-tbody');
+  if(!tbody) return;
+  const placeHint=prefix==='s1'?'원격/현장':'회의실/현장';
+  tbody.innerHTML=rows.map(r=>`
+    <tr>
+      <td style="min-width:160px">
+        <div class="time-cell">
+          ${prefix==='s2'?`<select class="time-day-sel"
+            onchange="updateRow('${prefix}',${r.id},'day',this.value)">
+            ${dayOptions(prefix, r.day||'Day 1')}
+          </select>`:``}
+          <select class="time-sel"
+            onchange="updateRow('${prefix}',${r.id},'timeFrom',this.value)">
+            ${timeOptions(r.timeFrom||'09:00')}
+          </select>
+          <span class="time-sep">~</span>
+          <select class="time-sel"
+            onchange="updateRow('${prefix}',${r.id},'timeTo',this.value)">
+            ${timeOptions(r.timeTo||'09:30')}
+          </select>
+        </div>
+      </td>
+      <td>
+        <div class="act-cell">
+          <input class="act-main" value="${(r.activity||'').replace(/"/g,'&quot;')}"
+            placeholder="${prefix==='s1'?'검토 활동명':'심사 활동 / 부서·조항'}"
+            oninput="updateRow('${prefix}',${r.id},'activity',this.value)">
+        </div>
+      </td>
+      <td>
+        <textarea class="act-note" rows="2"
+          placeholder="${prefix==='s1'?'세부 검토 항목, 요청 문서 등':'세부 확인 포인트, 면담 대상, 조항 등'}"
+          oninput="updateRow('${prefix}',${r.id},'note',this.value)">${r.note||''}</textarea>
+      </td>
+      <td>
+        <select class="aud-sel"
+          onchange="updateRow('${prefix}',${r.id},'auditor',this.value)">
+          ${getAuditorOptions(prefix, r.auditor||'')}
+        </select>
+      </td>
+      <td><input class="inp" value="${(r.place||'').replace(/"/g,'&quot;')}"
+        placeholder="${placeHint}"
+        oninput="updateRow('${prefix}',${r.id},'place',this.value)"
+        style="border-bottom:1px solid var(--border);width:100%;font-size:10px"></td>
+      <td class="no-print">
+        <button class="tt-del-btn" onclick="delRow('${prefix}',${r.id})">삭제</button>
+      </td>
+    </tr>`).join('');
+}
+
+function initDefaultRows(){
+  if(s1Rows.length===0){
+    s1Rows=[
+      {id:1, day:'당일',timeFrom:'08:30',timeTo:'09:00',
+       activity:'개회의',
+       note:'심사 목적·범위·기준·일정 설명, 심사팀 소개, 비밀보장 확인 (§9.4.2)',
+       auditor:'',place:'원격 / 현장'},
+      {id:2, day:'당일',timeFrom:'09:00',timeTo:'11:00',
+       activity:'경영시스템 문서 검토',
+       note:'매뉴얼, 방침, 절차서 목록 검토\n조항별 문서 매핑 확인',
+       auditor:'',place:'원격'},
+      {id:3, day:'당일',timeFrom:'11:00',timeTo:'12:00',
+       activity:'6항 기획 문서 검토',
+       note:'이슈 분석, 리스크·기회, 목표 및 계획',
+       auditor:'',place:'원격'},
+      {id:4, day:'당일',timeFrom:'13:00',timeTo:'14:30',
+       activity:'내부심사·경영검토 기록 검토',
+       note:'내부심사 계획·결과 (9.2), 경영검토 회의록 (9.3)\n이행 여부 확인 (§9.3.1.2 g)',
+       auditor:'',place:'원격'},
+      {id:5, day:'당일',timeFrom:'14:30',timeTo:'15:30',
+       activity:'법규 및 준수의무 검토',
+       note:'법규 목록, 준수평가 기록\n외주 프로세스 통제 문서',
+       auditor:'',place:'원격'},
+      {id:6, day:'당일',timeFrom:'15:30',timeTo:'16:30',
+       activity:'1단계 결과 정리 및 2단계 계획 협의',
+       note:'1단계 결과 요약, 발견사항 전달\n2단계 일정·집중 영역 협의',
+       auditor:'',place:'원격 / 현장'},
+    ];
+  }
+  if(s2Rows.length===0){
+    s2Rows=[
+      {id:10,day:'Day 1',timeFrom:'08:30',timeTo:'09:00',
+       activity:'개회의 (§9.4.2)',
+       note:'심사 목적·범위·기준·일정·방법 확인\n비밀보장, 안전 규정, 안내인 확인',
+       auditor:'',place:'대회의실'},
+      {id:11,day:'Day 1',timeFrom:'09:00',timeTo:'10:30',
+       activity:'경영진 면담',
+       note:'리더십 및 의지 (5항)\n경영 방침, 목표, 경영검토 (9.3)',
+       auditor:'',place:'임원실'},
+      {id:12,day:'Day 1',timeFrom:'10:30',timeTo:'12:30',
+       activity:'경영시스템 관리 부서',
+       note:'문서관리 (7.5), 역량·교육 (7.1~7.3)\n내부심사 결과 (9.2), 시정조치 (10.2)',
+       auditor:'',place:'관리부'},
+      {id:13,day:'Day 1',timeFrom:'13:30',timeTo:'15:30',
+       activity:'현장 심사 — 운용 통제',
+       note:'8항 운용 통제 현장 확인\n위험성 평가 이행, 환경측면 통제',
+       auditor:'',place:'생산현장'},
+      {id:14,day:'Day 1',timeFrom:'15:30',timeTo:'17:00',
+       activity:'구매·외부 공급자 관리',
+       note:'외부 공급자 선정·평가 (8.4)\nESG 공급망 관리',
+       auditor:'',place:'구매팀'},
+      {id:15,day:'Day 2',timeFrom:'09:00',timeTo:'11:00',
+       activity:'성과 평가 — 모니터링·측정',
+       note:'KPI 측정 기록 (9.1.1)\n법규 준수 평가 결과 (9.1.2)',
+       auditor:'',place:'환경안전팀'},
+      {id:16,day:'Day 2',timeFrom:'11:00',timeTo:'12:30',
+       activity:'근로자 면담',
+       note:'안전보건·환경 인식 확인\n표준 인지, 비상사태 대응 방법',
+       auditor:'',place:'현장'},
+      {id:17,day:'Day 2',timeFrom:'13:30',timeTo:'15:00',
+       activity:'발견사항 정리 (심사팀 내부 회의)',
+       note:'발견사항 분류·등급 결정\n종결회의 발표 내용 준비',
+       auditor:'',place:'심사팀 전용'},
+      {id:18,day:'Day 2',timeFrom:'15:00',timeTo:'17:00',
+       activity:'종결회의 (§9.4.7)',
+       note:'발견사항 발표 및 설명\n피심사 측 이의 확인, 서명',
+       auditor:'',place:'대회의실'},
+    ];
+  }
+  renderRows('s1');
+  renderRows('s2');
+}
+
+
+
+// ── 탭 전환 ──
+function showTab(n){
+  document.querySelectorAll('.doc-page').forEach((p,i)=>p.classList.toggle('active',i===n));
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===n));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── 표준 그리드 ──
+function buildStdGrid(gridId, stdsVar, criteriaId){
+  const g=document.getElementById(gridId);
+  if(!g) return;
+  g.innerHTML='';
+  STANDARDS.forEach(st=>{
+    const b=document.createElement('button');
+    const isOn=stdsVar.includes(st.k);
+    b.className='std-chip'+(isOn?' '+st.c:'');
+    b.title=st.l;
+    b.textContent=st.s;
+    b.onclick=()=>{
+      if(stdsVar.includes(st.k)){
+        const i=stdsVar.indexOf(st.k); stdsVar.splice(i,1);
+        b.className='std-chip';
+      } else {
+        stdsVar.push(st.k);
+        b.className='std-chip '+st.c;
+      }
+      // 심사 기준 자동 업데이트
+      const ci=document.getElementById(criteriaId);
+      if(ci) ci.value=stdsVar.map(k=>STANDARDS.find(x=>x.k===k)?.l||k).join(', ');
+      saveAll();
+    };
+    g.appendChild(b);
+  });
+}
+
+// ── 일정 테이블 행 ──
+function addRow(prefix){
+  const rows = prefix==='s1'?s1Rows:s2Rows;
+  const id=Date.now();
+  rows.push({id, time:'', content:'', auditor:'', place:''});
+  renderRows(prefix);
+  saveAll();
+}
+
+function delRow(prefix, id){
+  if(prefix==='s1') s1Rows=s1Rows.filter(r=>r.id!==id);
+  else s2Rows=s2Rows.filter(r=>r.id!==id);
+  renderRows(prefix);
+  saveAll();
+}
+
+function updateRow(prefix, id, field, val){
+  const rows=prefix==='s1'?s1Rows:s2Rows;
+  const r=rows.find(x=>x.id===id);
+  if(r) r[field]=val;
+  saveAll();
+}
+
+function renderRows(prefix){
+  const rows=prefix==='s1'?s1Rows:s2Rows;
+  const tbody=document.getElementById(prefix+'-tbody');
+  if(!tbody) return;
+  const hd = prefix==='s1'?'tt-hd-s1':'tt-hd-s2';
+  tbody.innerHTML=rows.map(r=>`
+    <tr>
+      <td><input class="inp" value="${r.time||''}" placeholder="${prefix==='s1'?'09:00~10:00':'Day1 09:00~'}"
+        oninput="updateRow('${prefix}',${r.id},'time',this.value)"></td>
+      <td><input class="inp" value="${r.content||''}" placeholder="${prefix==='s1'?'검토 항목 / 문서명':'부서명 / 심사 조항 / 확인 내용'}"
+        oninput="updateRow('${prefix}',${r.id},'content',this.value)"></td>
+      <td><input class="inp" value="${r.auditor||''}" placeholder="심사원"
+        oninput="updateRow('${prefix}',${r.id},'auditor',this.value)"></td>
+      <td><input class="inp" value="${r.place||''}" placeholder="${prefix==='s1'?'원격/현장':'회의실/현장'}"
+        oninput="updateRow('${prefix}',${r.id},'place',this.value)"></td>
+      <td class="no-print"><button class="tt-del-btn" onclick="delRow('${prefix}',${r.id})">삭제</button></td>
+    </tr>`).join('');
+}
+
+// 기본 행 초기화
+function initDefaultRows(){
+  if(s1Rows.length===0){
+    const defaults=[
+      {id:1,time:'09:00~09:30',content:'개회의 (심사 목적·범위·일정 설명)',auditor:'심사팀장',place:'원격/현장'},
+      {id:2,time:'09:30~11:30',content:'경영시스템 매뉴얼·방침·절차서 문서 검토',auditor:'심사팀장',place:'원격'},
+      {id:3,time:'11:30~12:30',content:'조항별 문서 현황 — 6항 기획, 7항 지원',auditor:'심사원 1',place:'원격'},
+      {id:4,time:'13:30~15:00',content:'내부심사·경영검토 기록 검토',auditor:'심사팀장',place:'원격'},
+      {id:5,time:'15:00~16:00',content:'법규 목록, 외주 프로세스 확인',auditor:'심사원 1',place:'원격'},
+      {id:6,time:'16:00~17:00',content:'1단계 결과 정리 및 2단계 계획 협의',auditor:'심사팀장',place:'원격/현장'},
+    ];
+    s1Rows=defaults;
+  }
+  if(s2Rows.length===0){
+    const defaults=[
+      {id:10,time:'Day1 08:30~09:00',content:'개회의 — 심사 목적·범위·방법·일정 확인 (§9.4.2)',auditor:'심사팀장',place:'대회의실'},
+      {id:11,time:'Day1 09:00~10:30',content:'경영진 면담 — 리더십·방침·목표·경영검토 (4·5·6·9.3항)',auditor:'심사팀장',place:'임원실'},
+      {id:12,time:'Day1 10:30~12:30',content:'관리부서 심사 — 문서관리·교육·내부심사·시정조치 (7·9·10항)',auditor:'심사팀장',place:'관리부'},
+      {id:13,time:'Day1 13:30~16:00',content:'생산/현장 심사 — 운용통제·위험성평가·환경측면 (8항)',auditor:'심사원 1',place:'생산현장'},
+      {id:14,time:'Day1 16:00~17:00',content:'구매·공급자 심사 — 외부 공급자 관리 (8.4항)',auditor:'심사원 1',place:'구매팀'},
+      {id:15,time:'Day2 09:00~11:00',content:'성과평가 심사 — KPI·모니터링·측정·법규준수 (9.1항)',auditor:'심사팀장',place:'환경안전팀'},
+      {id:16,time:'Day2 11:00~12:30',content:'근로자 면담 — 안전보건·환경 인식 확인',auditor:'심사원 1',place:'현장'},
+      {id:17,time:'Day2 13:30~15:30',content:'발견사항 정리 및 팀 내부 회의',auditor:'심사팀 전원',place:'심사팀 전용'},
+      {id:18,time:'Day2 15:30~17:00',content:'종결회의 — 발견사항 발표·설명, 서명 (§9.4.7)',auditor:'심사팀장',place:'대회의실'},
+    ];
+    s2Rows=defaults;
+  }
+  renderRows('s1');
+  renderRows('s2');
+}
+
+// ── IAF MD5 계산 ──
+function calcMD5(){
+  const emp=parseInt(document.getElementById('md5-emp')?.value||0);
+  const stds=parseInt(document.getElementById('md5-stds')?.value||1);
+  const complex=parseFloat(document.getElementById('md5-complex')?.value||1.0);
+  if(!emp||emp<=0){ document.getElementById('md5-result').textContent='— 인일'; return; }
+  // IAF MD5 Table 1 기준 (QMS/EMS)
+  let base=0;
+  if(emp<=5)      base=1.0;
+  else if(emp<=10) base=1.5;
+  else if(emp<=25) base=2.0;
+  else if(emp<=45) base=2.5;
+  else if(emp<=65) base=3.0;
+  else if(emp<=85) base=3.5;
+  else if(emp<=125) base=4.0;
+  else if(emp<=175) base=4.5;
+  else if(emp<=275) base=5.0;
+  else if(emp<=425) base=5.5;
+  else if(emp<=625) base=6.0;
+  else if(emp<=875) base=6.5;
+  else if(emp<=1175) base=7.0;
+  else if(emp<=1550) base=7.5;
+  else if(emp<=2000) base=8.0;
+  else base=Math.min(8+Math.ceil((emp-2000)/500)*0.5, 12);
+  let adj=1.0;
+  if(stds===2) adj=1.3;
+  if(stds>=3) adj=1.5;
+  const total=(base*adj*complex);
+  document.getElementById('md5-result').textContent=total.toFixed(1)+' 인일';
+}
+
+// ── 저장/복원 ──
+function g(id){ return document.getElementById(id)?.value||''; }
+
+function collectAll(){
+  const data={};
+  document.querySelectorAll('input[id],textarea[id],select[id]').forEach(el=>{
+    if(!el.id) return;
+    if(el.type==='checkbox') data[el.id]=el.checked;
+    else data[el.id]=el.value;
+  });
+  data._s1Stds=s1Stds; data._s2Stds=s2Stds;
+  data._s1Rows=s1Rows; data._s2Rows=s2Rows;
+  data._s1Team=s1Team; data._s2Team=s2Team;
+  return data;
+}
+
+function restoreAll(data){
+  if(!data) return;
+  Object.entries(data).forEach(([id,val])=>{
+    if(id.startsWith('_')) return;
+    const el=document.getElementById(id);
+    if(!el) return;
+    if(el.type==='checkbox') el.checked=val;
+    else el.value=val||'';
+  });
+  if(data._s1Stds){ s1Stds=data._s1Stds; buildStdGrid('s1-std-grid',s1Stds,'s1-criteria'); }
+  if(data._s2Stds){ s2Stds=data._s2Stds; buildStdGrid('s2-std-grid',s2Stds,'s2-criteria'); }
+  if(data._s1Rows&&data._s1Rows.length){ s1Rows=data._s1Rows; renderRows('s1'); }
+  if(data._s2Rows&&data._s2Rows.length){ s2Rows=data._s2Rows; renderRows('s2'); }
+  if(data._s1Team&&data._s1Team.length){ s1Team=data._s1Team; renderTeam('s1'); }
+  if(data._s2Team&&data._s2Team.length){ s2Team=data._s2Team; renderTeam('s2'); }
+}
+
+function saveAll(){
+  try{ localStorage.setItem('audit_plan_data', JSON.stringify(collectAll())); }catch(e){}
+  const n=document.getElementById('save-notice');
+  if(n){ n.style.display='block'; clearTimeout(n._t); n._t=setTimeout(()=>n.style.display='none',2000); }
+}
+
+let _at=null;
+document.addEventListener('input',()=>{ clearTimeout(_at); _at=setTimeout(saveAll,1500); });
+document.addEventListener('change',()=>{ clearTimeout(_at); _at=setTimeout(saveAll,1500); });
+
+// ── 초기화 ──
+document.addEventListener('DOMContentLoaded',()=>{
+  // 표준 그리드 빌드
+  buildStdGrid('s1-std-grid',s1Stds,'s1-criteria');
+  buildStdGrid('s2-std-grid',s2Stds,'s2-criteria');
+
+  // 기본 심사팀 + 일정 초기화
+  initDefaultTeam();
+  initDefaultRows();
+
+  // 오늘 날짜
+  const today=new Date().toISOString().slice(0,10);
+  ['s1-created','s2-created','s1-sig1-d','s1-sig2-d','s1-sig3-d',
+   's2-sig1-d','s2-sig2-d','s2-sig3-d'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el&&!el.value) el.value=today;
+  });
+
+  // 저장 데이터 복원
+  try{
+    const saved=localStorage.getItem('audit_plan_data');
+    if(saved) restoreAll(JSON.parse(saved));
+  }catch(e){}
+});
+</script>
+<script src="/static/js/audit_doc_master.js?v=20260807demo1"></script>
+</body>
+</html>

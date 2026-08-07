@@ -55,6 +55,22 @@ _STD_TO_ESG_NAME = {
     "ISO19443": "ISO 19443",
 }
 
+# Known mis-links in esg_master_kpis (energy rows parked under ISO 9001).
+_ESG_REMAP_BY_KPI_ID = {
+    17: "ISO 50001",  # 에너지 내부심사 실시
+    18: "ISO 50001",  # 에너지 경영검토
+}
+
+# Soft domain guard: exclude cross-standard bleed by KPI name keywords.
+_ESG_DOMAIN_BLOCK = {
+    "ISO9001": re.compile(
+        r"에너지|온실가스|GHG|Scope\s*[123]|용수|폐기물|배출권|EnPI|재생에너지",
+        re.IGNORECASE,
+    ),
+    "ISO14001": re.compile(r"제품\s*불량률|납기\s*준수|PPM|품질\s*방침", re.IGNORECASE),
+    "ISO45001": re.compile(r"제품\s*불량률|납기\s*준수|PPM|에너지\s*집약", re.IGNORECASE),
+}
+
 _DDL = """
 CREATE TABLE IF NOT EXISTS iso_audit_kpi_master (
   kpi_id VARCHAR(40) NOT NULL,
@@ -304,6 +320,91 @@ def _parse_clause_range(detail: str) -> Optional[Tuple[int, int]]:
     return None
 
 
+def _iso_num_from_code(pg: str) -> Optional[str]:
+    m = re.search(r"(\d{4,5})", pg or "")
+    return m.group(1) if m else None
+
+
+def _resolve_esg_standard_names(db: Session, pg: str) -> List[str]:
+    """Map process standard_code → managed_standard_name values present in master."""
+    preferred = _STD_TO_ESG_NAME.get(pg or "", "")
+    names: List[str] = []
+    if preferred:
+        names.append(preferred)
+    num = _iso_num_from_code(pg)
+    if not num or not _table_exists(db, "esg_master_kpis"):
+        return names
+    try:
+        rows = db.execute(
+            text(
+                "SELECT DISTINCT managed_standard_name FROM esg_master_kpis "
+                "WHERE managed_standard_name LIKE :pat "
+                "ORDER BY managed_standard_name"
+            ),
+            {"pat": f"%{num}%"},
+        ).mappings().all()
+        for r in rows:
+            n = (r.get("managed_standard_name") or "").strip()
+            if n and n not in names and n not in {"기타/확인필요", "공통"}:
+                names.append(n)
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    return names
+
+
+def ensure_esg_standard_kpi_links(db: Session) -> Dict[str, int]:
+    """Soft-fix known mis-linked esg_master_kpis rows (no DROP). Idempotent."""
+    fixed = 0
+    if not _table_exists(db, "esg_master_kpis"):
+        return {"fixed": 0}
+    for kid, target in _ESG_REMAP_BY_KPI_ID.items():
+        try:
+            res = db.execute(
+                text(
+                    "UPDATE esg_master_kpis SET managed_standard_name = :tgt "
+                    "WHERE kpi_id = :kid AND managed_standard_name <> :tgt"
+                ),
+                {"tgt": target, "kid": kid},
+            )
+            fixed += int(res.rowcount or 0)
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.exception("esg kpi remap failed for kpi_id=%s", kid)
+    # Energy-named rows still parked on ISO 9001 → ISO 50001
+    try:
+        res = db.execute(
+            text(
+                "UPDATE esg_master_kpis SET managed_standard_name = 'ISO 50001' "
+                "WHERE managed_standard_name = 'ISO 9001' "
+                "AND is_iso_auditable = 1 "
+                "AND (kpi_name LIKE '%에너지%' OR kpi_name LIKE '%EnPI%' "
+                "OR kpi_name LIKE '%재생에너지%')"
+            )
+        )
+        fixed += int(res.rowcount or 0)
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("esg energy→50001 remap failed")
+    if fixed:
+        try:
+            db.commit()
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+    return {"fixed": fixed}
+
+
 def list_esg_kpis_for_clause(
     db: Session,
     *,
@@ -311,27 +412,30 @@ def list_esg_kpis_for_clause(
     clause_no: str,
     limit: int = 40,
 ) -> List[Dict[str, str]]:
-    """ESG panel — prefer esg_master_kpis; soft-fall back to kpi_master."""
+    """ESG panel — esg_master_kpis aligned to selected standard + clause chapter."""
     pg = to_process_standard_code(standard_code) or (standard_code or "").strip()
     chap = _major_chapter(clause_no)
     chap_n = int(chap) if chap and chap.isdigit() else None
+    block_re = _ESG_DOMAIN_BLOCK.get(pg or "")
 
     if _table_exists(db, "esg_master_kpis"):
-        esg_name = _STD_TO_ESG_NAME.get(pg or "", "")
+        esg_names = _resolve_esg_standard_names(db, pg or "")
+        rows: List[Any] = []
         try:
-            if not esg_name:
-                rows = []
-            else:
+            if esg_names:
+                # Exact preferred name first; also accept fuzzy ISO-number matches
+                placeholders = ", ".join(f":n{i}" for i in range(len(esg_names)))
+                params: Dict[str, Any] = {f"n{i}": n for i, n in enumerate(esg_names)}
                 rows = db.execute(
                     text(
                         "SELECT kpi_id, kpi_name, esg_category, managed_standard_name, "
                         "iso_clause_detail, unit_format "
                         "FROM esg_master_kpis "
                         "WHERE is_iso_auditable = 1 "
-                        "AND managed_standard_name = :ename "
+                        f"AND managed_standard_name IN ({placeholders}) "
                         "ORDER BY kpi_id"
                     ),
-                    {"ename": esg_name},
+                    params,
                 ).mappings().all()
         except Exception:
             try:
@@ -340,18 +444,28 @@ def list_esg_kpis_for_clause(
                 pass
             rows = []
         matched: List[Dict[str, str]] = []
+        preferred = _STD_TO_ESG_NAME.get(pg or "", "")
         for r in rows:
+            mname = str(r.get("managed_standard_name") or "").strip()
+            # Prefer exact standard label when multiple fuzzy hits exist
+            if preferred and mname != preferred and len(esg_names) > 1:
+                # still allow if only fuzzy variants exist for this ISO number
+                if any(n == preferred for n in esg_names) and mname != preferred:
+                    continue
+            kn_raw = str(r.get("kpi_name") or "")
+            if block_re and block_re.search(kn_raw):
+                continue
             detail = str(r.get("iso_clause_detail") or "")
             rng = _parse_clause_range(detail)
             if chap_n is not None and rng is not None:
                 if not (rng[0] <= chap_n <= rng[1]):
                     continue
             elif chap_n is not None and rng is None:
-                # no clause link — skip for specific chapter view
+                # no clause chapter link — skip for specific chapter view
                 continue
             kid = f"esg:{r['kpi_id']}"
             cat = r.get("esg_category") or ""
-            kn = str(r.get("kpi_name") or kid)
+            kn = kn_raw or kid
             label = f"[{cat}] {kn}" if cat else kn
             matched.append(
                 {
@@ -361,6 +475,8 @@ def list_esg_kpis_for_clause(
                     "label": label,
                     "source": "esg_master",
                     "kpi_kind": "esg",
+                    "managed_standard_name": mname,
+                    "iso_clause_detail": detail,
                 }
             )
             if len(matched) >= limit:
@@ -368,18 +484,19 @@ def list_esg_kpis_for_clause(
         if matched:
             return matched
 
-    # fallback: kpi_master (ESG runtime) — usually no iso_clause; return empty soft
+    # fallback: kpi_master (ESG runtime) — filter by applicable_stds / iso_clause
     if _table_exists(db, "kpi_master") and chap_n is not None:
+        num = _iso_num_from_code(pg or "")
         try:
             rows = db.execute(
                 text(
-                    "SELECT id, name_kr, category_esg, iso_clause "
+                    "SELECT id, name_kr, category_esg, iso_clause, applicable_stds "
                     "FROM kpi_master "
                     "WHERE is_active = 1 AND iso_clause IS NOT NULL "
                     "AND TRIM(iso_clause) <> '' "
                     "ORDER BY sort_order, id LIMIT :lim"
                 ),
-                {"lim": limit},
+                {"lim": max(limit * 3, 60)},
             ).mappings().all()
         except Exception:
             try:
@@ -389,6 +506,12 @@ def list_esg_kpis_for_clause(
             return []
         out: List[Dict[str, str]] = []
         for r in rows:
+            appl = str(r.get("applicable_stds") or "")
+            if num and appl and num not in appl and "공통" not in appl:
+                continue
+            kn_raw = str(r.get("name_kr") or "")
+            if block_re and block_re.search(kn_raw):
+                continue
             detail = str(r.get("iso_clause") or "")
             rng = _parse_clause_range(detail)
             if rng and not (rng[0] <= chap_n <= rng[1]):
@@ -397,7 +520,7 @@ def list_esg_kpis_for_clause(
                 continue
             kid = f"kpi:{r['id']}"
             cat = r.get("category_esg") or ""
-            kn = str(r.get("name_kr") or kid)
+            kn = kn_raw or kid
             label = f"[{cat}] {kn}" if cat else kn
             out.append(
                 {
@@ -409,6 +532,8 @@ def list_esg_kpis_for_clause(
                     "kpi_kind": "esg",
                 }
             )
+            if len(out) >= limit:
+                break
         return out
     return []
 

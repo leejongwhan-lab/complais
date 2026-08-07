@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>인증 검증 및 심의서 — ISO/IEC 17021-1 §9.5</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="/static/css/main.css?v=20260807docs1">
+<link rel="stylesheet" href="/static/css/portal.css?v=20260807theme1">
+<link rel="stylesheet" href="/static/css/style.css?v=20260807cal1">
+<link rel="stylesheet" href="/static/css/admin_doc_theme.css?v=20260807theme1">
+<style>
+:root{
+  --blue:#1a5fa8;--blue2:#e8f0fb;--blue3:#c5d8f5;
+  --green:#1e7a4a;--green2:#e6f5ec;--green3:#b8e2c8;
+  --amber:#8a5c00;--amber2:#fff8e1;--amber3:#fde68a;
+  --red:#b71c1c;--red2:#fce8e8;--red3:#fca5a5;
+  --purple:#4527a0;--purple2:#ede7f6;
+  --teal:#00695c;--teal2:#e0f2f1;
+  --navy:#1e3a5f;
+  --text1:#1a1a2e;--text2:#5a6072;--text3:#9098aa;
+  --border:#dde1e7;--bg:#fff;--bg2:#f7f8fa;--card:#fff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
+  background:var(--bg2);color:var(--text1);font-size:12px}
+
+/* ── 헤더 ── */
+#hdr{background:var(--navy);color:#fff;padding:10px 20px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.logo{font-size:14px;font-weight:800}
+.logo small{font-size:10px;font-weight:400;opacity:.7;margin-left:5px}
+.hdr-r{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.hbtn{padding:5px 13px;font-size:10px;font-weight:600;
+  border:1px solid rgba(255,255,255,.4);border-radius:6px;
+  background:rgba(255,255,255,.15);color:#fff;cursor:pointer;transition:.15s}
+.hbtn:hover{background:rgba(255,255,255,.28)}
+.hbtn.pri{background:#fff;color:var(--navy)}
+#conn-badge{font-size:10px;padding:3px 9px;border-radius:12px;white-space:nowrap}
+.cb-wait{background:rgba(245,158,11,.3);color:#fde68a}
+.cb-ok{background:rgba(34,197,94,.3);color:#bbf7d0}
+
+/* ── 탭 ── */
+#tab-bar{background:var(--card);border-bottom:2px solid var(--border);
+  padding:0 20px;display:flex;gap:0;overflow-x:auto}
+.tab{padding:11px 18px;font-size:11px;font-weight:600;cursor:pointer;
+  border-bottom:3px solid transparent;color:var(--text2);white-space:nowrap;
+  transition:.15s;background:none;border-top:none;border-left:none;border-right:none}
+.tab:hover{color:var(--navy);background:var(--blue2)}
+.tab.active{color:var(--navy);border-bottom-color:var(--navy)}
+
+#save-notice{background:var(--green2);color:var(--green);font-size:10px;
+  font-weight:700;text-align:center;padding:5px;display:none}
+#pg{max-width:900px;margin:0 auto;padding:20px 14px 60px}
+.doc-page{display:none}.doc-page.active{display:block}
+
+/* ── 문서 공통 ── */
+.doc-wrap{background:var(--card);border-radius:10px;
+  border:1px solid var(--border);padding:30px 36px}
+.doc-hd{border-bottom:3px solid var(--navy);padding-bottom:18px;margin-bottom:22px}
+.doc-tag{font-size:9px;font-weight:700;color:var(--navy);letter-spacing:1px;
+  text-transform:uppercase;margin-bottom:5px}
+.doc-title{font-size:20px;font-weight:800;margin-bottom:3px;line-height:1.2}
+.doc-sub{font-size:11px;color:var(--text2);margin-bottom:14px}
+.doc-meta{display:inline-grid;grid-template-columns:auto auto;gap:3px 18px;
+  font-size:10px;background:var(--bg2);padding:9px 16px;
+  border-radius:7px;border:1px solid var(--border)}
+.dm-lbl{color:var(--text3);font-weight:600}
+
+.sec{margin-bottom:22px}
+.sec-h{font-size:12px;font-weight:800;color:var(--navy);
+  border-bottom:2px solid #c7d2fe;padding-bottom:5px;
+  margin-bottom:12px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.sec-no{background:var(--navy);color:#fff;font-size:9px;
+  font-weight:700;padding:2px 7px;border-radius:10px}
+.badge-ref{font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;
+  background:var(--purple2);color:var(--purple)}
+
+/* ── 입력 ── */
+.form-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.form-tbl td{padding:7px 10px;border:1px solid var(--border);vertical-align:top}
+.form-tbl td.lbl{background:var(--bg2);font-weight:600;width:140px;
+  color:var(--text2);white-space:nowrap}
+.form-tbl td.lbl2{background:var(--bg2);font-weight:600;width:100px;color:var(--text2)}
+.inp{width:100%;border:none;background:transparent;font-size:11px;
+  font-family:inherit;color:var(--text1);outline:none;padding:0;min-height:20px}
+.inp:focus{background:var(--blue2);border-radius:2px;padding:1px 3px}
+.ta{width:100%;border:none;background:transparent;font-size:11px;
+  font-family:inherit;color:var(--text1);outline:none;resize:vertical;
+  min-height:40px;line-height:1.5}
+.ta:focus{background:var(--blue2);border-radius:2px;padding:2px 4px}
+.field-inp{padding:6px 9px;border:1px solid var(--border);border-radius:6px;
+  font-size:11px;background:var(--bg);color:var(--text1);
+  font-family:inherit;outline:none;width:100%}
+.field-inp:focus{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue2)}
+.field-ta{width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;
+  font-size:11px;resize:vertical;background:var(--bg);color:var(--text1);
+  font-family:inherit;outline:none;min-height:60px;line-height:1.5}
+.field-ta:focus{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue2)}
+.field-lbl{font-size:9px;color:var(--text3);font-weight:600;
+  text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+.field-group{display:flex;flex-direction:column;gap:3px}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+/* ── 알림 ── */
+.notice{padding:9px 12px;border-radius:6px;font-size:10px;line-height:1.6;margin-bottom:10px}
+.notice.blue{background:var(--blue2);color:var(--blue)}
+.notice.green{background:var(--green2);color:var(--green)}
+.notice.amber{background:var(--amber2);color:var(--amber)}
+.notice.red{background:var(--red2);color:var(--red)}
+.notice.navy{background:#e8edf5;color:var(--navy)}
+
+/* ── 검토 체크리스트 ── */
+.rev-item{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;
+  border-bottom:1px solid var(--border)}
+.rev-item:last-child{border-bottom:none}
+.rev-ref{font-size:9px;color:var(--text3);width:90px;flex-shrink:0;margin-top:1px;line-height:1.3}
+.rev-text{flex:1;font-size:11px;color:var(--text1);line-height:1.5}
+.rev-note{margin-top:3px}
+.rev-note-inp{width:100%;border:none;border-bottom:1px dashed var(--border);
+  background:transparent;font-size:10px;font-family:inherit;color:var(--text2);outline:none}
+.rev-btns{display:flex;gap:4px;flex-shrink:0;margin-left:8px}
+.rbtn{padding:3px 9px;border-radius:5px;border:1px solid var(--border);
+  background:var(--bg2);font-size:9px;font-weight:600;cursor:pointer;transition:.15s}
+.rbtn.ok{background:var(--green2);border-color:var(--green3);color:var(--green)}
+.rbtn.ng{background:var(--red2);border-color:var(--red3);color:var(--red)}
+.rbtn.na{background:#f8fafc;border-color:var(--border);color:var(--text3)}
+
+/* ── 부적합 이력 ── */
+.nc-tbl{width:100%;border-collapse:collapse;font-size:10px}
+.nc-tbl th{background:var(--bg2);padding:6px 8px;border:1px solid var(--border);
+  font-size:9px;font-weight:700;text-align:left}
+.nc-tbl td{padding:6px 8px;border:1px solid var(--border);vertical-align:top}
+.nc-tbl tr:nth-child(even) td{background:#fafbfc}
+.grade-major{color:var(--red);font-weight:700}
+.grade-minor{color:var(--amber);font-weight:700}
+.grade-obs{color:var(--blue);font-weight:700}
+
+/* ── 결정 패널 ── */
+.decision-panel{border-radius:10px;padding:18px 22px;margin-bottom:14px}
+.dp-grant{background:var(--green2);border:2px solid var(--green3)}
+.dp-cond{background:var(--amber2);border:2px solid var(--amber3)}
+.dp-deny{background:var(--red2);border:2px solid var(--red3)}
+.dp-suspend{background:#faf5ff;border:2px solid #d8b4fe}
+.dp-withdraw{background:#fef2f2;border:2px solid var(--red3)}
+.dp-hd{font-size:14px;font-weight:800;margin-bottom:5px}
+.dp-desc{font-size:11px;opacity:.85;line-height:1.5}
+
+/* ── 결정 선택 버튼 ── */
+.decision-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.decision-btns.two{grid-template-columns:repeat(2,1fr)}
+.d-btn{padding:10px 8px;border-radius:8px;border:2px solid var(--border);
+  background:var(--bg2);cursor:pointer;font-size:10px;font-weight:700;
+  text-align:center;transition:.15s;line-height:1.4}
+.d-btn:hover{border-color:var(--navy);background:var(--blue2)}
+.d-btn.sel-grant{border-color:var(--green);background:var(--green2);color:var(--green)}
+.d-btn.sel-cond{border-color:var(--amber);background:var(--amber2);color:var(--amber)}
+.d-btn.sel-deny{border-color:var(--red);background:var(--red2);color:var(--red)}
+.d-btn.sel-maintain{border-color:var(--green);background:var(--green2);color:var(--green)}
+.d-btn.sel-suspend{border-color:#9333ea;background:#faf5ff;color:#7e22ce}
+.d-btn.sel-withdraw{border-color:var(--red);background:var(--red2);color:var(--red)}
+.d-btn.sel-reduce{border-color:var(--amber);background:var(--amber2);color:var(--amber)}
+.d-btn.sel-expand{border-color:var(--blue);background:var(--blue2);color:var(--blue)}
+
+/* ── 서명 ── */
+.sig-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.sig-box{padding:8px 0}
+.sig-role{font-size:9px;color:var(--text3);font-weight:600;margin-bottom:4px}
+.sig-name{border-bottom:1px solid var(--text1);min-height:28px;padding:3px 0;
+  font-size:12px;font-weight:700}
+.sig-date{font-size:10px;color:var(--text3);margin-top:4px}
+.sig-qual{font-size:9px;color:var(--text3)}
+
+/* ── 인증서 정보 ── */
+.cert-box{border:2px solid var(--navy);border-radius:10px;padding:18px 22px;
+  background:linear-gradient(135deg,#f8fafc 0%,#e8edf5 100%)}
+.cert-box-title{font-size:13px;font-weight:800;color:var(--navy);margin-bottom:12px;
+  display:flex;align-items:center;gap:6px}
+.cert-field{padding:6px 0;border-bottom:1px solid #c7d2fe;
+  display:flex;align-items:baseline;gap:10px}
+.cert-field:last-child{border-bottom:none}
+.cert-field-lbl{font-size:10px;color:var(--text3);font-weight:600;width:110px;flex-shrink:0}
+.cert-field-val{font-size:12px;font-weight:700;color:var(--text1);flex:1}
+
+/* ── 심의 이력 ── */
+.history-tbl{width:100%;border-collapse:collapse;font-size:10px}
+.history-tbl th{background:var(--bg2);padding:6px 8px;border:1px solid var(--border);
+  font-size:9px;font-weight:700;text-align:left}
+.history-tbl td{padding:6px 8px;border:1px solid var(--border)}
+
+/* ── 공정성 선언 ── */
+.impartial-box{background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;
+  padding:14px 18px;font-size:10px;line-height:1.8}
+.impartial-box ul{padding-left:16px}
+.impartial-box li{margin-bottom:3px}
+
+/* ── chip ── */
+.chip{font-size:8px;padding:1px 5px;border-radius:8px;font-weight:700;display:inline-block}
+.chip-q{background:var(--blue2);color:var(--blue)}
+.chip-e{background:var(--green2);color:var(--green)}
+.chip-s{background:var(--amber2);color:var(--amber)}
+
+@media print{
+  #hdr .hdr-r,#tab-bar,#save-notice,.no-print{display:none!important}
+  #hdr{position:static}
+  #pg{padding:4px 0;max-width:100%}
+  .doc-page{display:block!important}
+  .doc-wrap{border:none;padding:18px 0}
+  .page-break{page-break-before:always;margin-top:24px}
+  .d-btn.sel-grant,.d-btn.sel-cond,.d-btn.sel-deny,
+  .d-btn.sel-maintain,.d-btn.sel-suspend,.d-btn.sel-withdraw,
+  .d-btn.sel-reduce,.d-btn.sel-expand{
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+@page{margin:15mm 13mm}
+</style>
+<style id="admin-doc-theme-overrides">
+/* Modern admin tokens win over page :root aliases */
+:root {
+  --admin-primary: #0F172A;
+  --admin-primary-light: #1E293B;
+  --admin-accent: #2563EB;
+  --admin-accent-bg: #EFF6FF;
+  --admin-bg: #F8FAFC;
+  --admin-card: #FFFFFF;
+  --admin-border: #E2E8F0;
+  --admin-text: #1E293B;
+  --admin-text-muted: #64748B;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --bg: var(--admin-card);
+  --bg2: var(--admin-bg);
+  --card: var(--admin-card);
+  --border: var(--admin-border);
+  --text1: var(--admin-text);
+  --text2: var(--admin-text-muted);
+  --text3: #94A3B8;
+  --blue: var(--admin-accent);
+  --blue2: var(--admin-accent-bg);
+  --indigo: var(--admin-primary);
+  --indigo2: #E2E8F0;
+  --green: var(--success);
+  --green2: #ECFDF5;
+  --red: var(--danger);
+  --red2: #FEF2F2;
+  --amber: #B45309;
+  --amber2: #FFFBEB;
+  --purple: #3730A3;
+  --purple2: #EEF2FF;
+  --teal: #0F766E;
+  --teal2: #F0FDFA;
+}
+</style>
+
+</head>
+<body class="portal-page admin-page">
+
+<div id="hdr">
+  <div class="logo">ComplAIs <small>인증 검증 및 심의서 — ISO/IEC 17021-1 §9.5</small></div>
+  <div class="hdr-r">
+    <span id="conn-badge" class="cb-wait">⚡ 연계 대기</span>
+    <button class="hbtn" onclick="syncData()">📡 심사보고서 연계</button>
+    <button class="hbtn" onclick="saveAll()">💾 저장</button>
+    <button class="hbtn pri no-print" onclick="window.print()">🖨️ 인쇄 / PDF</button>
+  </div>
+</div>
+
+<div id="tab-bar">
+  <button class="tab active" onclick="showTab(0)">① 심사보고서 검토</button>
+  <button class="tab" onclick="showTab(1)">② 인증 심의</button>
+  <button class="tab" onclick="showTab(2)">③ 인증 결정서</button>
+  <button class="tab" onclick="showTab(3)">④ 인증 유지·변경 관리</button>
+</div>
+
+<div id="save-notice">✅ 저장 완료</div>
+<div id="pg">
+
+<!-- ════════════════════════════════════════
+     ① 심사보고서 검토 (Report Review)
+     §9.5.2 결정 전 검토
+════════════════════════════════════════ -->
+<div class="doc-page active" id="page-0">
+<div class="doc-wrap">
+  <div class="doc-hd">
+    <div class="doc-tag">ISO/IEC 17021-1 §9.5.2 · Actions Prior to Making a Decision</div>
+    <div class="doc-title">심사보고서 검토서</div>
+    <div class="doc-sub">Certification Review — 인증 결정 전 심사팀 정보의 충분성·적정성 검토</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">문서 번호</span>
+      <span><input class="inp" id="r1-rno" placeholder="CRV-2025-001"
+        style="border-bottom:1px solid var(--border);width:160px"></span>
+      <span class="dm-lbl">검토일</span>
+      <span><input class="inp" type="date" id="r1-date"
+        style="border-bottom:1px solid var(--border);width:130px"></span>
+    </div>
+  </div>
+
+  <!-- 기본 정보 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">1</span> 심사 개요 정보
+      <span class="badge-ref">§9.5.1.4</span></div>
+    <div class="notice navy">
+      ℹ️ <b>§9.5.1.1:</b> 인증 결정은 심사를 수행한 심사팀 이외의 사람(들)이 내려야 합니다.
+      검토자는 심사팀 구성원이 아니어야 합니다.
+    </div>
+    <table class="form-tbl">
+      <tr>
+        <td class="lbl">피심사 조직</td>
+        <td><input class="inp" id="r1-org" placeholder="조직명"></td>
+        <td class="lbl" style="width:90px">심사 유형</td>
+        <td>
+          <select id="r1-audit-type" style="width:100%;font-size:11px;border:1px solid var(--border);
+            border-radius:4px;padding:4px 6px;background:var(--bg)">
+            <option>최초심사 (Initial Certification)</option>
+            <option>사후심사 1차 (1st Surveillance)</option>
+            <option>사후심사 2차 (2nd Surveillance)</option>
+            <option>갱신심사 (Recertification)</option>
+            <option>전환심사 (Transfer)</option>
+            <option>특별심사 (Special Audit)</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td class="lbl">심사 기준</td>
+        <td><input class="inp" id="r1-std" placeholder="예) ISO 14001:2015, ISO 45001:2018"></td>
+        <td class="lbl">심사 일자</td>
+        <td><input class="inp" id="r1-audit-date" type="date"></td>
+      </tr>
+      <tr>
+        <td class="lbl">심사팀장</td>
+        <td><input class="inp" id="r1-lead" placeholder="성명 / 자격번호"></td>
+        <td class="lbl">심사보고서 번호</td>
+        <td><input class="inp" id="r1-report-no" placeholder="AR2-2025-001"></td>
+      </tr>
+      <tr>
+        <td class="lbl">검토자 (결정권자)</td>
+        <td><input class="inp" id="r1-reviewer" placeholder="성명 / 직책 / 자격"></td>
+        <td class="lbl">검토자와 심사팀<br>관계 확인</td>
+        <td>
+          <label style="display:inline-flex;align-items:center;gap:4px;margin-right:14px;font-size:11px">
+            <input type="radio" name="r1-sep" value="confirmed" id="r1-sep-ok"> ✅ 분리 확인됨
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px">
+            <input type="radio" name="r1-sep" value="issue" id="r1-sep-ng"> ⚠️ 이슈 있음
+          </label>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- §9.5.2 검토 항목 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">2</span> 결정 전 검토 항목
+      <span class="badge-ref">§9.5.2 a)b)c)</span></div>
+    <div id="review-checklist"></div>
+  </div>
+
+  <!-- §9.4.10 심사보고서 완결성 확인 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">3</span> 심사보고서 완결성 확인
+      <span class="badge-ref">§9.4.10 a)~n)</span></div>
+    <div id="report-completeness"></div>
+  </div>
+
+  <!-- 추가 정보 요청 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">4</span> 추가 정보 요청 사항
+      <span class="badge-ref">§9.5.1.4</span></div>
+    <div class="notice amber">
+      ⚠️ 검토 결과 추가 정보 또는 명확화가 필요한 경우, 인증 결정 전에 심사팀에 요청하고 기록해야 합니다.
+    </div>
+    <div style="margin-bottom:8px">
+      <label style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600">
+        <input type="radio" name="r1-addinfo" value="none" id="r1-add-none" checked>
+        추가 정보 불필요 — 현 보고서로 결정 가능
+      </label>
+    </div>
+    <div style="margin-bottom:8px">
+      <label style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600">
+        <input type="radio" name="r1-addinfo" value="needed" id="r1-add-need">
+        추가 정보 요청 필요
+      </label>
+    </div>
+    <textarea class="field-ta" id="r1-addinfo-note" rows="3"
+      placeholder="추가 정보 요청 내용 및 심사팀 답변 기록 (필요 시 기재)"></textarea>
+  </div>
+
+  <!-- 검토 결론 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">5</span> 검토 결론</div>
+    <div class="decision-btns two">
+      <button class="d-btn" id="rev-pass" onclick="setRevDecision('pass')">
+        ✅ 검토 완료 — 인증 심의 진행 가능<br>
+        <small style="font-weight:400;font-size:9px">보고서 충분성 확인, 심의위원회 상정</small>
+      </button>
+      <button class="d-btn" id="rev-return" onclick="setRevDecision('return')">
+        🔄 보완 요청 — 심사팀 재확인 필요<br>
+        <small style="font-weight:400;font-size:9px">보고서 보완 후 재검토</small>
+      </button>
+    </div>
+    <div class="field-group">
+      <div class="field-lbl">검토 의견</div>
+      <textarea class="field-ta" id="r1-conclusion" rows="3"
+        placeholder="검토 결론 및 근거를 기재하세요"></textarea>
+    </div>
+  </div>
+
+  <!-- 검토자 서명 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">6</span> 검토자 서명</div>
+    <div class="notice navy">
+      <b>§9.5.1.2:</b> 결정권자는 심사를 수행하지 않은 사람이어야 합니다.
+      심사팀에게는 의사결정 권한이 없습니다.
+    </div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-role">보고서 검토자 (심사팀 외)</div>
+        <div class="sig-name"><input class="inp" id="r1-sig1" placeholder="성명"></div>
+        <div class="sig-qual"><input class="inp" id="r1-sig1-q" placeholder="직책 / 심사원 자격번호"
+          style="font-size:10px;border-bottom:1px dashed var(--border);width:100%"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="r1-sig1-d"
+          style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">확인 (심사프로그램 관리자)</div>
+        <div class="sig-name"><input class="inp" id="r1-sig2" placeholder="성명"></div>
+        <div class="sig-qual"><input class="inp" id="r1-sig2-q"
+          style="font-size:10px;border-bottom:1px dashed var(--border);width:100%"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="r1-sig2-d"
+          style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">심사팀장 (보고서 제출 확인)</div>
+        <div class="sig-name"><input class="inp" id="r1-sig3" placeholder="성명"></div>
+        <div class="sig-qual"><input class="inp" id="r1-sig3-q"
+          style="font-size:10px;border-bottom:1px dashed var(--border);width:100%"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="r1-sig3-d"
+          style="width:120px;display:inline"></div>
+      </div>
+    </div>
+  </div>
+</div></div><!-- page-0 -->
+
+<!-- ════════════════════════════════════════
+     ② 인증 심의
+     §9.5.1 Certification Decision
+════════════════════════════════════════ -->
+<div class="doc-page page-break" id="page-1">
+<div class="doc-wrap">
+  <div class="doc-hd">
+    <div class="doc-tag">ISO/IEC 17021-1 §9.5.1 · Certification Decision</div>
+    <div class="doc-title">인증 심의서</div>
+    <div class="doc-sub">Certification Review Committee — 인증 결정 심의 기록</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">심의서 번호</span>
+      <span><input class="inp" id="c1-rno" placeholder="CDR-2025-001"
+        style="border-bottom:1px solid var(--border);width:160px"></span>
+      <span class="dm-lbl">심의일</span>
+      <span><input class="inp" type="date" id="c1-date"
+        style="border-bottom:1px solid var(--border);width:130px"></span>
+      <span class="dm-lbl">참조 검토서</span>
+      <span><input class="inp" id="c1-ref-rno"
+        style="border-bottom:1px solid var(--border);width:160px"></span>
+    </div>
+  </div>
+
+  <!-- §1 심의 기본 정보 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">1</span> 심의 기본 정보
+      <span class="badge-ref">§9.5.1.4</span></div>
+    <table class="form-tbl">
+      <tr>
+        <td class="lbl">피심사 조직</td>
+        <td colspan="3"><input class="inp" id="c1-org" placeholder="조직명 (법인명)"></td>
+      </tr>
+      <tr>
+        <td class="lbl">심사 유형</td>
+        <td><input class="inp" id="c1-type" placeholder="예) 최초심사"></td>
+        <td class="lbl" style="width:90px">심사 기준</td>
+        <td><input class="inp" id="c1-std"></td>
+      </tr>
+      <tr>
+        <td class="lbl">인증 범위 (Scope)</td>
+        <td colspan="3"><textarea class="ta" id="c1-scope" rows="2"
+          placeholder="인증 범위 — 제품/서비스, 사이트, 적용 제외 사항"></textarea></td>
+      </tr>
+      <tr>
+        <td class="lbl">심사 일자</td>
+        <td><input class="inp" id="c1-audit-date" type="date"></td>
+        <td class="lbl">심사보고서 번호</td>
+        <td><input class="inp" id="c1-rptno"></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- §2 심사 결과 요약 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">2</span> 심사 결과 요약
+      <span class="badge-ref">§9.4.10 k)</span></div>
+    <div class="row-3" style="margin-bottom:12px">
+      <div class="field-group">
+        <div class="field-lbl">중부적합 (Major NC)</div>
+        <input class="field-inp" type="number" id="c1-major" min="0" value="0"
+          oninput="updateSummary()">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">경부적합 (Minor NC)</div>
+        <input class="field-inp" type="number" id="c1-minor" min="0" value="0"
+          oninput="updateSummary()">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">관찰사항 (Observation)</div>
+        <input class="field-inp" type="number" id="c1-obs" min="0" value="0"
+          oninput="updateSummary()">
+      </div>
+    </div>
+    <!-- 부적합 목록 -->
+    <table class="nc-tbl" id="nc-summary-tbl">
+      <tr>
+        <th style="width:60px">No.</th>
+        <th style="width:70px">등급</th>
+        <th style="width:120px">조항</th>
+        <th>발견사항 요약</th>
+        <th style="width:100px">시정조치 상태</th>
+      </tr>
+      <tr>
+        <td><input class="inp" id="nc1-no" placeholder="NC-01"></td>
+        <td>
+          <select id="nc1-grade" style="width:100%;font-size:10px;border:none;background:transparent">
+            <option class="grade-major">중부적합</option>
+            <option class="grade-minor">경부적합</option>
+            <option class="grade-obs">관찰사항</option>
+          </select>
+        </td>
+        <td><input class="inp" id="nc1-clause"></td>
+        <td><input class="inp" id="nc1-summary"></td>
+        <td>
+          <select id="nc1-status" style="width:100%;font-size:10px;border:none;background:transparent">
+            <option>시정계획 제출</option><option>시정완료</option>
+            <option>미제출</option><option>해당없음</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td><input class="inp" id="nc2-no"></td>
+        <td><select id="nc2-grade" style="width:100%;font-size:10px;border:none;background:transparent">
+          <option>중부적합</option><option>경부적합</option><option>관찰사항</option>
+        </select></td>
+        <td><input class="inp" id="nc2-clause"></td>
+        <td><input class="inp" id="nc2-summary"></td>
+        <td><select id="nc2-status" style="width:100%;font-size:10px;border:none;background:transparent">
+          <option>시정계획 제출</option><option>시정완료</option>
+          <option>미제출</option><option>해당없음</option>
+        </select></td>
+      </tr>
+      <tr>
+        <td><input class="inp" id="nc3-no"></td>
+        <td><select id="nc3-grade" style="width:100%;font-size:10px;border:none;background:transparent">
+          <option>중부적합</option><option>경부적합</option><option>관찰사항</option>
+        </select></td>
+        <td><input class="inp" id="nc3-clause"></td>
+        <td><input class="inp" id="nc3-summary"></td>
+        <td><select id="nc3-status" style="width:100%;font-size:10px;border:none;background:transparent">
+          <option>시정계획 제출</option><option>시정완료</option>
+          <option>미제출</option><option>해당없음</option>
+        </select></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- §3 심의 결정 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">3</span> 인증 결정
+      <span class="badge-ref">§9.5.1 / §9.5.2</span></div>
+    <div class="notice navy" style="margin-bottom:12px">
+      <b>§9.5.2 결정 기준:</b><br>
+      a) 심사팀 정보가 인증 요구사항 및 범위에 대해 충분한가?<br>
+      b) 중부적합에 대해 시정 및 시정조치를 검토·수락·검증하였는가?<br>
+      c) 경부적합에 대해 시정조치를 검토하고 수락하였는가?
+    </div>
+
+    <div id="summary-box" style="margin-bottom:12px"></div>
+
+    <div class="decision-btns" id="decision-btns">
+      <button class="d-btn" id="dc-grant" onclick="setCertDecision('grant')">
+        ✅ 인증 부여<br><small style="font-weight:400;font-size:9px">부적합 없음 / 시정 완료 확인</small>
+      </button>
+      <button class="d-btn" id="dc-cond" onclick="setCertDecision('cond')">
+        ⚠️ 조건부 인증<br><small style="font-weight:400;font-size:9px">경부적합 시정계획 수락</small>
+      </button>
+      <button class="d-btn" id="dc-deny" onclick="setCertDecision('deny')">
+        ❌ 인증 불승인<br><small style="font-weight:400;font-size:9px">중부적합 미해소</small>
+      </button>
+    </div>
+
+    <div id="decision-panel-container"></div>
+
+    <div style="margin-top:12px">
+      <div class="field-lbl" style="margin-bottom:4px">심의 결정 근거 및 조건</div>
+      <textarea class="field-ta" id="c1-basis" rows="4"
+        placeholder="인증 결정의 구체적 근거를 기재하세요.&#10;예) 중부적합 0건, 경부적합 2건 시정계획 적절하여 수락, 관찰사항 1건 차기 심사 확인 예정 → 조건부 인증 결정"></textarea>
+    </div>
+    <div style="margin-top:10px">
+      <div class="field-lbl" style="margin-bottom:4px">시정조치 이행 확인 기한 (경부적합)</div>
+      <div class="row-2">
+        <input class="field-inp" type="date" id="c1-ca-deadline">
+        <input class="field-inp" id="c1-ca-method"
+          placeholder="확인 방법: 예) 서류 제출 / 현장 확인 / 다음 심사 시 확인">
+      </div>
+    </div>
+  </div>
+
+  <!-- §4 인증 정보 (발행할 인증서) -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">4</span> 인증 발행 정보
+      <span class="badge-ref">§9.5 / §8.2</span></div>
+    <div class="cert-box">
+      <div class="cert-box-title">🏆 인증서 발행 정보</div>
+      <div class="cert-field">
+        <div class="cert-field-lbl">인증서 번호</div>
+        <div class="cert-field-val"><input class="inp" id="cert-no"
+          placeholder="예) KQC-EMS-2025-001"></div>
+      </div>
+      <div class="cert-field">
+        <div class="cert-field-lbl">인증 조직</div>
+        <div class="cert-field-val"><input class="inp" id="cert-org"></div>
+      </div>
+      <div class="cert-field">
+        <div class="cert-field-lbl">인증 표준</div>
+        <div class="cert-field-val"><input class="inp" id="cert-std"></div>
+      </div>
+      <div class="cert-field">
+        <div class="cert-field-lbl">인증 범위</div>
+        <div class="cert-field-val"><textarea class="ta" id="cert-scope" rows="2"></textarea></div>
+      </div>
+      <div class="cert-field">
+        <div class="cert-field-lbl">인증 결정일</div>
+        <div class="cert-field-val"><input class="inp" type="date" id="cert-decision-date"></div>
+      </div>
+      <div class="cert-field">
+        <div class="cert-field-lbl">인증서 발행일</div>
+        <div class="cert-field-val"><input class="inp" type="date" id="cert-issue-date"></div>
+      </div>
+      <div class="cert-field">
+        <div class="cert-field-lbl">유효기간</div>
+        <div class="cert-field-val">
+          <input class="inp" type="date" id="cert-valid-from"
+            style="border-bottom:1px solid var(--border);width:130px;display:inline">
+          <span style="margin:0 6px;color:var(--text3)">~</span>
+          <input class="inp" type="date" id="cert-valid-to"
+            style="border-bottom:1px solid var(--border);width:130px;display:inline">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- §5 공정성 확인 및 심의 서명 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">5</span> 공정성 확인 및 심의 서명
+      <span class="badge-ref">§9.5.1.2 · §5.2</span></div>
+    <div class="impartial-box">
+      <b>인증 결정권자 공정성 선언</b>
+      <ul style="margin-top:6px">
+        <li>본인은 이 인증 결정과 관련하여 심사를 직접 수행하지 않았음을 확인합니다.</li>
+        <li>피심사 조직과의 이해충돌 관계(소유·고용·컨설팅 등)가 없음을 확인합니다.</li>
+        <li>최근 2년 이내 해당 조직에 경영시스템 컨설팅을 제공한 사실이 없습니다.</li>
+        <li>본 결정은 객관적 증거 및 심사 보고서에 근거하여 내려졌습니다.</li>
+      </ul>
+    </div>
+    <div class="sig-grid" style="margin-top:14px">
+      <div class="sig-box">
+        <div class="sig-role">인증 결정권자 (Certification Decision Maker)</div>
+        <div class="sig-name"><input class="inp" id="c1-sig1" placeholder="성명"></div>
+        <div class="sig-qual"><input class="inp" id="c1-sig1-q" placeholder="직책 / 자격"
+          style="font-size:10px;border-bottom:1px dashed var(--border);width:100%"></div>
+        <div class="sig-date">결정일: <input class="inp" type="date" id="c1-sig1-d"
+          style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">심의위원 1</div>
+        <div class="sig-name"><input class="inp" id="c1-sig2" placeholder="성명"></div>
+        <div class="sig-qual"><input class="inp" id="c1-sig2-q"
+          style="font-size:10px;border-bottom:1px dashed var(--border);width:100%"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="c1-sig2-d"
+          style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">심의위원 2</div>
+        <div class="sig-name"><input class="inp" id="c1-sig3" placeholder="성명"></div>
+        <div class="sig-qual"><input class="inp" id="c1-sig3-q"
+          style="font-size:10px;border-bottom:1px dashed var(--border);width:100%"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="c1-sig3-d"
+          style="width:120px;display:inline"></div>
+      </div>
+    </div>
+  </div>
+</div></div><!-- page-1 -->
+
+<!-- ════════════════════════════════════════
+     ③ 인증 결정서 (Certificate Decision Record)
+════════════════════════════════════════ -->
+<div class="doc-page page-break" id="page-2">
+<div class="doc-wrap">
+  <div class="doc-hd">
+    <div class="doc-tag">ISO/IEC 17021-1 §9.5.1.4 · §9.9 · Certification Decision Record</div>
+    <div class="doc-title">인증 결정서</div>
+    <div class="doc-sub">Certification Decision Record — 인증 결정 공식 기록 및 통보</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">결정서 번호</span>
+      <span><input class="inp" id="d1-rno" placeholder="CDD-2025-001"
+        style="border-bottom:1px solid var(--border);width:160px"></span>
+      <span class="dm-lbl">결정일</span>
+      <span><input class="inp" type="date" id="d1-date"
+        style="border-bottom:1px solid var(--border);width:130px"></span>
+    </div>
+  </div>
+
+  <!-- 공식 결정 기록 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">1</span> 인증 결정 공식 기록
+      <span class="badge-ref">§9.5.1.4 / §9.9</span></div>
+    <div class="notice navy">
+      <b>§9.5.1.4:</b> 인증기관은 인증 결정을 기록해야 하며, 심사팀 또는 기타 출처로부터 요청한 추가 정보 또는 명확화 사항을 포함해야 합니다.
+    </div>
+    <table class="form-tbl">
+      <tr><td class="lbl">피심사 조직</td>
+        <td colspan="3"><input class="inp" id="d1-org"></td></tr>
+      <tr>
+        <td class="lbl">인증 결정 유형</td>
+        <td colspan="3">
+          <select id="d1-decision-type" style="width:100%;font-size:11px;
+            border:1px solid var(--border);border-radius:4px;padding:4px 6px;background:var(--bg)">
+            <option>인증 부여 (Grant of Certification)</option>
+            <option>인증 갱신 (Renewal of Certification)</option>
+            <option>인증 유지 (Maintenance of Certification)</option>
+            <option>인증 범위 확대 (Expansion of Scope)</option>
+            <option>인증 범위 축소 (Reduction of Scope)</option>
+            <option>인증 정지 (Suspension of Certification)</option>
+            <option>인증 정지 해제 (Restoration of Certification)</option>
+            <option>인증 취소 (Withdrawal of Certification)</option>
+            <option>인증 불승인 (Refusal of Certification)</option>
+          </select>
+        </td>
+      </tr>
+      <tr><td class="lbl">인증 표준</td>
+        <td><input class="inp" id="d1-std"></td>
+        <td class="lbl" style="width:90px">인증서 번호</td>
+        <td><input class="inp" id="d1-cert-no"></td></tr>
+      <tr><td class="lbl">인증 범위</td>
+        <td colspan="3"><textarea class="ta" id="d1-scope" rows="2"></textarea></td></tr>
+      <tr>
+        <td class="lbl">결정 일자</td>
+        <td><input class="inp" type="date" id="d1-decision-date"></td>
+        <td class="lbl">통보 일자</td>
+        <td><input class="inp" type="date" id="d1-notify-date"></td>
+      </tr>
+      <tr>
+        <td class="lbl">인증 유효기간</td>
+        <td><input class="inp" type="date" id="d1-from"></td>
+        <td class="lbl">만료일</td>
+        <td><input class="inp" type="date" id="d1-to"></td>
+      </tr>
+      <tr>
+        <td class="lbl">참조 심의서 번호</td>
+        <td><input class="inp" id="d1-ref-cdr"></td>
+        <td class="lbl">참조 보고서 번호</td>
+        <td><input class="inp" id="d1-ref-rpt"></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 부적합 시정조치 이행 조건 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">2</span> 시정조치 이행 조건 (경부적합)
+      <span class="badge-ref">§9.5.2 c)</span></div>
+    <textarea class="field-ta" id="d1-ca-conditions" rows="4"
+      placeholder="인증 결정에 따른 시정조치 이행 조건을 명시하세요.&#10;예)&#10;- NC-01 (§9.2 내부심사): 2025.06.30까지 시정조치 결과 서면 제출&#10;- NC-02 (§6.1.3 법규준수 평가): 2025.07.31까지 준수평가 기록 제출&#10;&#10;시정조치 완료 미확인 시 인증 정지 조치를 취할 수 있음을 통보합니다."></textarea>
+  </div>
+
+  <!-- 추가 정보 요청 기록 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">3</span> 추가 정보 및 명확화 요청 기록
+      <span class="badge-ref">§9.5.1.4</span></div>
+    <textarea class="field-ta" id="d1-clarifications" rows="3"
+      placeholder="결정 과정에서 심사팀 또는 기타 출처에 요청한 추가 정보·명확화 내용을 기록하세요.&#10;없으면 '추가 정보 요청 없음'으로 기재"></textarea>
+  </div>
+
+  <!-- 이의 제기 안내 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">4</span> 이의 제기 및 불만 처리 안내
+      <span class="badge-ref">§9.7 / §9.8</span></div>
+    <div style="padding:12px 16px;border:1px solid var(--border);border-radius:8px;
+      font-size:10px;line-height:1.8;background:var(--bg2)">
+      본 인증 결정에 이견이 있는 경우 <strong>인증기관의 이의 제기 절차(§9.7)</strong>에 따라 이의를 제기할 수 있습니다.<br>
+      이의 제기 기한: <input class="inp" id="d1-appeal-deadline"
+        placeholder="결정 통보일로부터 _일 이내"
+        style="border-bottom:1px solid var(--border);width:200px;display:inline"><br>
+      이의 제기 방법: <input class="inp" id="d1-appeal-method"
+        placeholder="서면 / 이메일 / 온라인 포털"
+        style="border-bottom:1px solid var(--border);width:200px;display:inline"><br>
+      불만 제기: 인증기관의 불만 처리 절차(§9.8)에 따라 처리됩니다.
+    </div>
+  </div>
+
+  <!-- 인증기관 직인 및 서명 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">5</span> 인증기관 서명</div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-role">인증 결정권자</div>
+        <div class="sig-name"><input class="inp" id="d1-sig1"></div>
+        <div class="sig-qual"><input class="inp" id="d1-sig1-q"
+          style="font-size:10px;border-bottom:1px dashed var(--border);width:100%"></div>
+        <div class="sig-date">결정일: <input class="inp" type="date" id="d1-sig1-d"
+          style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">인증기관 대표 / 관리자</div>
+        <div class="sig-name"><input class="inp" id="d1-sig2"></div>
+        <div class="sig-qual"><input class="inp" id="d1-sig2-q"
+          style="font-size:10px;border-bottom:1px dashed var(--border);width:100%"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="d1-sig2-d"
+          style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">수령 확인 (피심사 조직)</div>
+        <div class="sig-name"></div>
+        <div class="sig-date">일자:</div>
+      </div>
+    </div>
+  </div>
+</div></div><!-- page-2 -->
+
+<!-- ════════════════════════════════════════
+     ④ 인증 유지·변경 관리
+     §9.6 Maintaining Certification
+════════════════════════════════════════ -->
+<div class="doc-page page-break" id="page-3">
+<div class="doc-wrap">
+  <div class="doc-hd">
+    <div class="doc-tag">ISO/IEC 17021-1 §9.6 · Maintaining, Expanding, Reducing Certification</div>
+    <div class="doc-title">인증 유지·변경 관리대장</div>
+    <div class="doc-sub">Certification Maintenance &amp; Change Management — 인증 상태 변경 이력 관리</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">관리대장 번호</span>
+      <span><input class="inp" id="m1-rno" placeholder="CMR-2025-001"
+        style="border-bottom:1px solid var(--border);width:160px"></span>
+      <span class="dm-lbl">피심사 조직</span>
+      <span><input class="inp" id="m1-org"
+        style="border-bottom:1px solid var(--border);width:200px"></span>
+    </div>
+  </div>
+
+  <!-- 현재 인증 상태 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">1</span> 현재 인증 상태
+      <span class="badge-ref">§9.6.1</span></div>
+    <table class="form-tbl">
+      <tr><td class="lbl">인증서 번호</td>
+        <td><input class="inp" id="m1-cert-no"></td>
+        <td class="lbl" style="width:90px">인증 표준</td>
+        <td><input class="inp" id="m1-std"></td></tr>
+      <tr><td class="lbl">인증 범위</td>
+        <td colspan="3"><textarea class="ta" id="m1-scope" rows="2"></textarea></td></tr>
+      <tr>
+        <td class="lbl">인증 결정일</td>
+        <td><input class="inp" type="date" id="m1-grant-date"></td>
+        <td class="lbl">인증 만료일</td>
+        <td><input class="inp" type="date" id="m1-expiry"></td>
+      </tr>
+      <tr>
+        <td class="lbl">현재 인증 상태</td>
+        <td colspan="3">
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px">
+              <input type="radio" name="m1-status" value="active" checked> 🟢 유효 (Active)
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px">
+              <input type="radio" name="m1-status" value="suspended"> 🟡 정지 (Suspended)
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px">
+              <input type="radio" name="m1-status" value="withdrawn"> 🔴 취소 (Withdrawn)
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px">
+              <input type="radio" name="m1-status" value="expired"> ⚫ 만료 (Expired)
+            </label>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 인증 변경 처리 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">2</span> 인증 변경 처리
+      <span class="badge-ref">§9.6.1 · §9.6.4</span></div>
+    <div class="notice amber">
+      ⚠️ 다음 변경 사항 발생 시 인증 결정 절차에 준하여 처리하고 기록합니다.
+    </div>
+    <div class="decision-btns" id="change-btns" style="grid-template-columns:repeat(2,1fr)">
+      <button class="d-btn" id="ch-expand" onclick="setChange('expand')">
+        🔼 범위 확대 (Expansion)<br>
+        <small style="font-weight:400;font-size:9px">§9.6.1</small>
+      </button>
+      <button class="d-btn" id="ch-reduce" onclick="setChange('reduce')">
+        🔽 범위 축소 (Reduction)<br>
+        <small style="font-weight:400;font-size:9px">§9.6.1</small>
+      </button>
+      <button class="d-btn" id="ch-suspend" onclick="setChange('suspend')">
+        ⏸ 인증 정지 (Suspension)<br>
+        <small style="font-weight:400;font-size:9px">§9.6.2</small>
+      </button>
+      <button class="d-btn" id="ch-restore" onclick="setChange('restore')">
+        ▶️ 정지 해제 (Restoration)<br>
+        <small style="font-weight:400;font-size:9px">§9.6.2</small>
+      </button>
+      <button class="d-btn" id="ch-withdraw" onclick="setChange('withdraw')">
+        🚫 인증 취소 (Withdrawal)<br>
+        <small style="font-weight:400;font-size:9px">§9.6.3</small>
+      </button>
+      <button class="d-btn" id="ch-none" onclick="setChange('none')">
+        ✅ 변경 없음 (No Change)<br>
+        <small style="font-weight:400;font-size:9px"></small>
+      </button>
+    </div>
+    <table class="form-tbl" style="margin-top:8px">
+      <tr><td class="lbl">변경 일자</td>
+        <td><input class="inp" type="date" id="m1-change-date"></td>
+        <td class="lbl" style="width:90px">변경 사유</td>
+        <td><input class="inp" id="m1-change-reason"
+          placeholder="변경 사유 기재"></td></tr>
+      <tr><td class="lbl">변경 내용</td>
+        <td colspan="3"><textarea class="ta" id="m1-change-detail" rows="2"
+          placeholder="변경 내용 상세 기재"></textarea></td></tr>
+      <tr><td class="lbl">고객 통보 일자</td>
+        <td><input class="inp" type="date" id="m1-notify"></td>
+        <td class="lbl">인정기관 보고</td>
+        <td><input class="inp" id="m1-ab-report"
+          placeholder="해당 시 인정기관 보고 일자"></td></tr>
+    </table>
+  </div>
+
+  <!-- 심사 이력 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">3</span> 3년 인증 주기 심사 이력
+      <span class="badge-ref">§9.1.3.2 / §9.9</span></div>
+    <table class="history-tbl">
+      <tr>
+        <th style="width:120px">심사 유형</th>
+        <th style="width:100px">심사 일자</th>
+        <th style="width:90px">결정 결과</th>
+        <th style="width:60px">Major</th>
+        <th style="width:60px">Minor</th>
+        <th style="width:60px">OBS</th>
+        <th>비고</th>
+      </tr>
+      <tr>
+        <td><select style="width:100%;font-size:10px;border:none;background:transparent">
+          <option>최초심사</option><option>사후심사 1차</option>
+          <option>사후심사 2차</option><option>갱신심사</option></select></td>
+        <td><input class="inp" type="date" id="h1-d"></td>
+        <td><select style="width:100%;font-size:10px;border:none;background:transparent">
+          <option>인증 부여</option><option>조건부 인증</option>
+          <option>인증 불승인</option></select></td>
+        <td><input class="inp" id="h1-maj" style="text-align:center" placeholder="0"></td>
+        <td><input class="inp" id="h1-min" style="text-align:center" placeholder="0"></td>
+        <td><input class="inp" id="h1-obs" style="text-align:center" placeholder="0"></td>
+        <td><input class="inp" id="h1-note" placeholder="비고"></td>
+      </tr>
+      <tr>
+        <td><select style="width:100%;font-size:10px;border:none;background:transparent">
+          <option>사후심사 1차</option><option>사후심사 2차</option>
+          <option>갱신심사</option><option>최초심사</option></select></td>
+        <td><input class="inp" type="date" id="h2-d"></td>
+        <td><select style="width:100%;font-size:10px;border:none;background:transparent">
+          <option>인증 유지</option><option>조건부 유지</option>
+          <option>인증 정지</option></select></td>
+        <td><input class="inp" id="h2-maj" style="text-align:center" placeholder="0"></td>
+        <td><input class="inp" id="h2-min" style="text-align:center" placeholder="0"></td>
+        <td><input class="inp" id="h2-obs" style="text-align:center" placeholder="0"></td>
+        <td><input class="inp" id="h2-note"></td>
+      </tr>
+      <tr>
+        <td><select style="width:100%;font-size:10px;border:none;background:transparent">
+          <option>사후심사 2차</option><option>사후심사 1차</option>
+          <option>갱신심사</option></select></td>
+        <td><input class="inp" type="date" id="h3-d"></td>
+        <td><select style="width:100%;font-size:10px;border:none;background:transparent">
+          <option>인증 갱신</option><option>조건부 갱신</option>
+          <option>인증 취소</option></select></td>
+        <td><input class="inp" id="h3-maj" style="text-align:center" placeholder="0"></td>
+        <td><input class="inp" id="h3-min" style="text-align:center" placeholder="0"></td>
+        <td><input class="inp" id="h3-obs" style="text-align:center" placeholder="0"></td>
+        <td><input class="inp" id="h3-note"></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 관리자 서명 -->
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">4</span> 관리 확인 서명</div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-role">인증 관리 담당자</div>
+        <div class="sig-name"><input class="inp" id="m1-sig1"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="m1-sig1-d"
+          style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">인증프로그램 관리자</div>
+        <div class="sig-name"><input class="inp" id="m1-sig2"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="m1-sig2-d"
+          style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">피심사 조직 수령 확인</div>
+        <div class="sig-name"></div>
+        <div class="sig-date">일자:</div>
+      </div>
+    </div>
+  </div>
+</div></div><!-- page-3 -->
+
+</div><!-- #pg -->
+
+<script>
+const STANDARDS = [
+  {k:'q',  label:'ISO 9001:2015',      short:'품질',     cls:'chip-q',  on:'on-q',  desc:'품질경영시스템'},
+  {k:'e',  label:'ISO 14001:2015',     short:'환경:15',  cls:'chip-e',  on:'on-e',  desc:'환경경영시스템 (현행)'},
+  {k:'e26',label:'ISO 14001:2026',     short:'환경:26',  cls:'chip-e26',on:'on-e26',desc:'환경경영시스템 (2026 신판)'},
+  {k:'s',  label:'ISO 45001:2018',     short:'안전보건', cls:'chip-s',  on:'on-s',  desc:'안전보건경영시스템'},
+  {k:'m',  label:'ISO 13485:2016',     short:'의료기기', cls:'chip-m',  on:'on-m',  desc:'의료기기 품질경영시스템'},
+  {k:'f',  label:'ISO 22000:2018',     short:'식품안전', cls:'chip-f',  on:'on-f',  desc:'식품안전경영시스템'},
+  {k:'fs', label:'FSSC 22000 V6',      short:'FSSC',    cls:'chip-fs', on:'on-fs', desc:'식품안전시스템인증 V6'},
+  {k:'i',  label:'ISO/IEC 27001:2022', short:'정보보안', cls:'chip-i',  on:'on-i',  desc:'정보보안경영시스템'},
+  {k:'en', label:'ISO 50001:2018',     short:'에너지',   cls:'chip-en', on:'on-en', desc:'에너지경영시스템'},
+  {k:'sa', label:'SA 8000:2014',       short:'SA8000',  cls:'chip-sa', on:'on-sa', desc:'사회적책임경영'},
+  {k:'ac', label:'ISO 37001:2016',     short:'반부패',   cls:'chip-ac', on:'on-ac', desc:'부패방지경영시스템'},
+  {k:'co', label:'ISO 37301:2021',     short:'준법경영', cls:'chip-co', on:'on-co', desc:'준법경영시스템'},
+  {k:'ai', label:'ISO/IEC 42001:2023', short:'AI경영',  cls:'chip-ai', on:'on-ai', desc:'인공지능경영시스템'},
+  {k:'nu', label:'ISO 19443:2018',     short:'원자력',   cls:'chip-nu', on:'on-nu', desc:'원자력 공급망 품질경영'},
+  {k:'sd', label:'UN SDGs',            short:'SDGs',    cls:'chip-sd', on:'on-sd', desc:'지속가능발전목표 17개'},
+  {k:'bc', label:'ISO 22301:2019',     short:'사업연속', cls:'chip-bc', on:'on-bc', desc:'사업연속성경영시스템'},
+  {k:'pr', label:'ISO/IEC 27701:2019', short:'개인정보', cls:'chip-pr', on:'on-pr', desc:'개인정보보호경영시스템'},
+];
+
+// ════════════════════════════════════════
+// 체크리스트 정의
+// ════════════════════════════════════════
+const REVIEW_CHECKS = [
+  {r:'§9.5.2 a)', t:'심사팀이 제공한 정보가 인증 요구사항 및 인증 범위에 대해 충분한가?'},
+  {r:'§9.5.2 a)', t:'심사 보고서가 §9.4.10의 모든 필수 항목을 포함하고 있는가?'},
+  {r:'§9.5.2 b)', t:'중부적합에 대한 시정 및 시정조치를 검토·수락·검증하였는가?'},
+  {r:'§9.5.2 b)', t:'중부적합 해소를 객관적 증거를 통해 검증하였는가?'},
+  {r:'§9.5.2 c)', t:'경부적합에 대한 시정조치 계획을 검토하고 수락하였는가?'},
+  {r:'§9.5.1.2', t:'결정권자가 해당 심사에 참여하지 않은 사람인가?'},
+  {r:'§9.5.1.3', t:'결정권자가 요구되는 역량 기준을 충족하는가?'},
+  {r:'§5.2',     t:'결정권자와 피심사 조직 간의 이해충돌 가능성이 없는가?'},
+];
+
+const REPORT_CHECKS = [
+  {r:'§9.4.10 a)', t:'a) 인증기관 명칭이 기재되었는가?'},
+  {r:'§9.4.10 b)', t:'b) 고객 경영대리인의 성명·주소가 포함되었는가?'},
+  {r:'§9.4.10 c)', t:'c) 심사 유형(최초인증/사후/갱신 등)이 명시되었는가?'},
+  {r:'§9.4.10 d)', t:'d) 심사 기준이 명시되었는가?'},
+  {r:'§9.4.10 e)', t:'e) 심사 목적이 기술되었는가?'},
+  {r:'§9.4.10 f)', t:'f) 심사 범위 (조직 단위, 기간)가 상세히 기재되었는가?'},
+  {r:'§9.4.10 g)', t:'g) 심사 계획 대비 편차 및 사유가 기록되었는가?'},
+  {r:'§9.4.10 h)', t:'h) 심사 프로그램에 중대한 영향을 미친 사안이 기록되었는가?'},
+  {r:'§9.4.10 i)', t:'i) 심사팀장, 팀원, 동반자 명단이 포함되었는가?'},
+  {r:'§9.4.10 j)', t:'j) 심사 활동 날짜 및 장소가 기재되었는가?'},
+  {r:'§9.4.10 k)', t:'k) 발견사항, 증거, 결론이 요구사항에 적합하게 포함되었는가?'},
+  {r:'§9.4.10 l)', t:'l) 경영시스템에 영향을 미치는 중대한 변경사항이 기록되었는가?'},
+  {r:'§9.4.10 m)', t:'m) 미해결 이슈가 있는 경우 기재되었는가?'},
+  {r:'§9.4.10 n)', t:'n) 권고사항이 있는 경우 기재되었는가?'},
+];
+
+// ════════════════════════════════════════
+// 상태
+// ════════════════════════════════════════
+let checkStates = {};
+let revDecision = null, certDecision = null, changeDecision = null;
+
+// ════════════════════════════════════════
+// 탭
+// ════════════════════════════════════════
+function showTab(n){
+  document.querySelectorAll('.doc-page').forEach((p,i)=>p.classList.toggle('active',i===n));
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===n));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ════════════════════════════════════════
+// 체크리스트 렌더
+// ════════════════════════════════════════
+function renderChecklists(){
+  // 검토 체크리스트
+  const rc = document.getElementById('review-checklist');
+  if(rc){
+    const rStates = checkStates['review']||{};
+    rc.innerHTML = REVIEW_CHECKS.map((item,i)=>`
+      <div class="rev-item">
+        <div class="rev-ref">${item.r}</div>
+        <div style="flex:1">
+          <div class="rev-text">${item.t}</div>
+          <div class="rev-note"><input class="rev-note-inp" placeholder="비고"
+            value="${(rStates[i+'r']||'').replace(/"/g,'&quot;')}"
+            oninput="saveCheckNote('review',${i},this.value)"></div>
+        </div>
+        <div class="rev-btns">
+          <button class="rbtn${rStates[i]==='ok'?' ok':''}" onclick="setCheck('review',${i},'ok')">✓</button>
+          <button class="rbtn${rStates[i]==='ng'?' ng':''}" onclick="setCheck('review',${i},'ng')">✗</button>
+          <button class="rbtn${rStates[i]==='na'?' na':''}" onclick="setCheck('review',${i},'na')">N/A</button>
+        </div>
+      </div>`).join('');
+  }
+  // 보고서 완결성
+  const rpc = document.getElementById('report-completeness');
+  if(rpc){
+    const rpStates = checkStates['report']||{};
+    rpc.innerHTML = REPORT_CHECKS.map((item,i)=>`
+      <div class="rev-item">
+        <div class="rev-ref">${item.r}</div>
+        <div class="rev-text" style="flex:1">${item.t}</div>
+        <div class="rev-btns">
+          <button class="rbtn${rpStates[i]==='ok'?' ok':''}" onclick="setCheck('report',${i},'ok')">✓</button>
+          <button class="rbtn${rpStates[i]==='ng'?' ng':''}" onclick="setCheck('report',${i},'ng')">✗</button>
+          <button class="rbtn${rpStates[i]==='na'?' na':''}" onclick="setCheck('report',${i},'na')">N/A</button>
+        </div>
+      </div>`).join('');
+  }
+}
+
+function setCheck(sec, idx, val){
+  if(!checkStates[sec]) checkStates[sec]={};
+  checkStates[sec][idx] = checkStates[sec][idx]===val ? undefined : val;
+  saveAll(); renderChecklists();
+}
+function saveCheckNote(sec, idx, val){
+  if(!checkStates[sec]) checkStates[sec]={};
+  checkStates[sec][idx+'r'] = val;
+  saveAll();
+}
+
+// ════════════════════════════════════════
+// 결정 버튼
+// ════════════════════════════════════════
+function setRevDecision(val){
+  revDecision=val;
+  ['pass','return'].forEach(x=>{
+    const b=document.getElementById('rev-'+x);
+    if(b) b.className='d-btn'+(x===val?` sel-${val==='pass'?'grant':'deny'}`:'');
+  });
+  saveAll();
+}
+
+function setCertDecision(val){
+  certDecision=val;
+  ['grant','cond','deny'].forEach(x=>{
+    const b=document.getElementById('dc-'+x);
+    if(b) b.className='d-btn'+(x===val?` sel-${x}`:'');
+  });
+  updateSummary();
+  saveAll();
+}
+
+function setChange(val){
+  changeDecision=val;
+  ['expand','reduce','suspend','restore','withdraw','none'].forEach(x=>{
+    const b=document.getElementById('ch-'+x);
+    if(!b) return;
+    const cls={expand:'sel-expand',reduce:'sel-reduce',suspend:'sel-suspend',
+               restore:'sel-grant',withdraw:'sel-withdraw',none:'sel-grant'}[x]||'';
+    b.className='d-btn'+(x===val?' '+cls:'');
+  });
+  saveAll();
+}
+
+function updateSummary(){
+  const major=parseInt(document.getElementById('c1-major')?.value||0);
+  const minor=parseInt(document.getElementById('c1-minor')?.value||0);
+  const obs=parseInt(document.getElementById('c1-obs')?.value||0);
+  const box=document.getElementById('summary-box');
+  if(!box) return;
+
+  let recommend='';
+  if(major>0){
+    recommend=`<div class="decision-panel dp-deny"><div class="dp-hd" style="color:var(--red)">❌ 인증 불승인 권고</div>
+      <div class="dp-desc">중부적합 <strong>${major}건</strong>이 발견되었습니다.<br>
+      §9.5.2 b): 모든 중부적합의 시정 및 시정조치를 검토·수락·검증한 후 인증 결정이 가능합니다.</div></div>`;
+  } else if(minor>0){
+    recommend=`<div class="decision-panel dp-cond"><div class="dp-hd" style="color:var(--amber)">⚠️ 조건부 인증 권고</div>
+      <div class="dp-desc">경부적합 <strong>${minor}건</strong>이 발견되었습니다.<br>
+      §9.5.2 c): 시정조치 계획을 검토하고 수락한 후 인증 결정이 가능합니다.<br>
+      관찰사항 ${obs}건은 차기 심사에서 확인합니다.</div></div>`;
+  } else if(obs>0){
+    recommend=`<div class="decision-panel dp-grant"><div class="dp-hd" style="color:var(--green)">✅ 인증 부여 권고</div>
+      <div class="dp-desc">부적합 사항 없음 — 관찰사항 <strong>${obs}건</strong>은 차기 심사에서 확인합니다.<br>
+      §9.5.2: 요구사항 충족, 인증 결정 가능합니다.</div></div>`;
+  } else {
+    recommend=`<div class="decision-panel dp-grant"><div class="dp-hd" style="color:var(--green)">✅ 인증 부여 권고</div>
+      <div class="dp-desc">부적합 및 관찰사항 없음. 모든 요구사항 충족.</div></div>`;
+  }
+  box.innerHTML=recommend;
+}
+
+// ════════════════════════════════════════
+// BroadcastChannel 연계
+// ════════════════════════════════════════
+const bc = new BroadcastChannel('complais_audit');
+bc.onmessage = function(e){
+  if(e.data.type!=='AUDIT_DATA') return;
+  const d=e.data.data;
+  // 기본 정보 자동 채우기
+  if(d.coName){
+    ['r1-org','c1-org','d1-org','m1-org'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el&&!el.value) el.value=d.coName;
+    });
+  }
+  if(d.auditDate){
+    ['r1-audit-date','c1-audit-date'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el&&!el.value) el.value=d.auditDate;
+    });
+  }
+  if(d.selectedStds?.length){
+    const stdNames=d.selectedStds.map(k=>{const s=STANDARDS.find(x=>x.k===k);return s?s.label:k;}).join(', ');
+    ['r1-std','c1-std','d1-std','m1-std'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el&&!el.value) el.value=stdNames;
+    });
+  }
+  // 부적합 카운트
+  const saved=d.saved||{};
+  let major=0,minor=0,obs=0;
+  Object.values(saved).forEach(v=>{
+    if(v.verdict==='major') major++;
+    else if(v.verdict==='minor') minor++;
+    else if(v.verdict==='obs') obs++;
+  });
+  const mEl=document.getElementById('c1-major');
+  const nEl=document.getElementById('c1-minor');
+  const oEl=document.getElementById('c1-obs');
+  if(mEl) mEl.value=major;
+  if(nEl) nEl.value=minor;
+  if(oEl) oEl.value=obs;
+  updateSummary();
+
+  const badge=document.getElementById('conn-badge');
+  badge.className='cb-ok';
+  badge.textContent=`✅ 연계됨 — NC ${major+minor}건, OBS ${obs}건`;
+};
+
+function syncData(){
+  bc.postMessage({type:'REQUEST_DATA'});
+  document.getElementById('conn-badge').className='cb-wait';
+  document.getElementById('conn-badge').textContent='⏳ 요청 중...';
+  setTimeout(()=>{
+    if(document.getElementById('conn-badge').className==='cb-wait'){
+      document.getElementById('conn-badge').className='cb-wait';
+      document.getElementById('conn-badge').textContent='⚠️ 응답 없음';
+    }
+  },3000);
+}
+
+// ════════════════════════════════════════
+// 저장 / 복원
+// ════════════════════════════════════════
+function collectFields(){
+  const d={};
+  document.querySelectorAll('input[id],textarea[id],select[id]').forEach(el=>{
+    if(!el.id) return;
+    if(el.type==='radio'||el.type==='checkbox') return;
+    d[el.id]=el.value;
+  });
+  // 라디오
+  ['r1-sep','r1-addinfo','m1-status'].forEach(name=>{
+    const el=document.querySelector(`input[name="${name}"]:checked`);
+    if(el) d['radio-'+name]=el.value;
+  });
+  return d;
+}
+function restoreFields(d){
+  if(!d) return;
+  Object.entries(d).forEach(([id,val])=>{
+    if(id.startsWith('radio-')){
+      const name=id.replace('radio-','');
+      const el=document.querySelector(`input[name="${name}"][value="${val}"]`);
+      if(el) el.checked=true;
+      return;
+    }
+    const el=document.getElementById(id);
+    if(!el||el.type==='radio'||el.type==='checkbox') return;
+    el.value=val||'';
+  });
+}
+function getSaved(k){ try{const v=localStorage.getItem('certdoc_'+k);return v?JSON.parse(v):null;}catch(e){return null;} }
+function setSaved(k,v){ try{localStorage.setItem('certdoc_'+k,JSON.stringify(v));}catch(e){} }
+
+function saveAll(){
+  setSaved('fields',collectFields());
+  setSaved('checks',checkStates);
+  setSaved('revDecision',revDecision);
+  setSaved('certDecision',certDecision);
+  setSaved('changeDecision',changeDecision);
+  const n=document.getElementById('save-notice');
+  if(n){n.style.display='block';clearTimeout(n._t);n._t=setTimeout(()=>n.style.display='none',2000);}
+}
+
+let _at=null;
+document.addEventListener('input',()=>{clearTimeout(_at);_at=setTimeout(saveAll,1500);});
+document.addEventListener('change',()=>{clearTimeout(_at);_at=setTimeout(saveAll,1500);});
+
+// ════════════════════════════════════════
+// 초기화
+// ════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',()=>{
+  const today=new Date().toISOString().slice(0,10);
+  document.querySelectorAll('input[type="date"]').forEach(el=>{if(!el.value)el.value=today;});
+
+  renderChecklists();
+  updateSummary();
+
+  // 저장 복원
+  const f=getSaved('fields'); if(f) restoreFields(f);
+  const chk=getSaved('checks'); if(chk){checkStates=chk;renderChecklists();}
+  const rv=getSaved('revDecision'); if(rv) setRevDecision(rv);
+  const cv=getSaved('certDecision'); if(cv) setCertDecision(cv);
+  const ch=getSaved('changeDecision'); if(ch) setChange(ch);
+  updateSummary();
+
+  // 자동 연계
+  setTimeout(()=>syncData(),500);
+});
+</script>
+<script src="/static/js/audit_doc_master.js?v=20260807demo1"></script>
+</body>
+</html>

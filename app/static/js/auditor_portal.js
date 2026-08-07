@@ -5,6 +5,7 @@
     dashboard: { title: "대시보드", sub: "배정 일정 · 보고서 · NCR · 소속 현황" },
     schedules: { title: "심사 일정 관리", sub: "월간 캘린더 · 배정 상세" },
     reports: { title: "심사 보고서 · 심사노트", sub: "조항별 심사노트 · 작성 중인 보고서" },
+    docs: { title: "인증심사 문서", sub: "최초·사후·갱신·전환·특별 문서세트 · Master DB 데모" },
     ncrs: { title: "시정조치(NCR) 검토", sub: "기업 제출 시정조치 검토" },
     mypage: { title: "마이페이지", sub: "기본 정보 · 자격 · 소속 · 학력/경력" },
     profile: { title: "자격 및 소속 관리", sub: "자격 이력 · 멀티 CB 소속 · 신규 신청" },
@@ -74,6 +75,17 @@
     document.querySelectorAll(".sidebar-menu-item[data-tab]").forEach((el) => {
       el.classList.toggle("active", el.getAttribute("data-tab") === tab);
     });
+    /* leave 심사노트 viewport lock when navigating away from reports */
+    if (tab !== "reports") {
+      document.body.classList.remove("aud-note-open");
+    } else {
+      const ed = document.getElementById("audit-note-editor");
+      const open =
+        ed &&
+        ed.style.display !== "none" &&
+        ed.getAttribute("aria-hidden") !== "true";
+      document.body.classList.toggle("aud-note-open", !!open);
+    }
     const meta = TAB_META[tab];
     const title = document.getElementById("page-title");
     const sub = document.getElementById("page-subtitle");
@@ -91,17 +103,28 @@
       if (target) setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     }
     if (tab === "schedules") loadSchedulesPanel();
+    if (tab === "docs") loadDocsPanel();
     if (tab === "reports") {
       loadReportsPanel();
-      // Always surface 심사노트 3-pane shell (preview if no contract)
-      const ed = document.getElementById("audit-note-editor");
-      const editorVisible =
-        ed && ed.style.display !== "none" && ed.getAttribute("aria-hidden") !== "true";
-      if (!editorVisible && window.AuditorAuditNotes) {
-        const contract = url.searchParams.get("contract");
-        const standard = url.searchParams.get("standard");
-        if (contract) window.AuditorAuditNotes.open(contract, standard);
-        else window.AuditorAuditNotes.openPreview(standard);
+      const contract = url.searchParams.get("contract");
+      const standard = url.searchParams.get("standard");
+      const view = url.searchParams.get("view") || "";
+      const rptPanel = document.getElementById("audit-result-report");
+      const reportVisible =
+        rptPanel &&
+        rptPanel.style.display !== "none" &&
+        rptPanel.getAttribute("aria-hidden") !== "true";
+      if (view === "report" && contract) {
+        openResultReport(contract);
+      } else if (!reportVisible) {
+        // Surface 심사노트 3-pane shell (preview if no contract)
+        const ed = document.getElementById("audit-note-editor");
+        const editorVisible =
+          ed && ed.style.display !== "none" && ed.getAttribute("aria-hidden") !== "true";
+        if (!editorVisible && window.AuditorAuditNotes) {
+          if (contract) window.AuditorAuditNotes.open(contract, standard);
+          else window.AuditorAuditNotes.openPreview(standard);
+        }
       }
     }
     if (tab === "ncrs") loadNcrsPanel();
@@ -173,12 +196,17 @@
       }
     });
 
-    const heads = ["일", "월", "화", "수", "목", "금", "토"]
-      .map((h) => '<div class="cal-head">' + h + "</div>")
+    const weekLabels = ["일", "월", "화", "수", "목", "금", "토"];
+    const heads = weekLabels
+      .map((h, i) => {
+        const wk =
+          i === 0 ? " is-sun" : i === 6 ? " is-sat" : "";
+        return '<div class="cal-head' + wk + '">' + h + "</div>";
+      })
       .join("");
     let cells = "";
     for (let i = 0; i < startPad; i++) {
-      cells += '<div class="cal-cell is-empty"></div>';
+      cells += '<div class="cal-cell is-empty" aria-hidden="true"></div>';
     }
     for (let d = 1; d <= daysInMonth; d++) {
       const iso =
@@ -187,6 +215,7 @@
         String(calState.month).padStart(2, "0") +
         "-" +
         String(d).padStart(2, "0");
+      const dow = (startPad + d - 1) % 7;
       const list = byDate[iso] || [];
       const names = list
         .slice(0, 3)
@@ -206,6 +235,8 @@
         list.length ? "has-events" : "",
         iso === todayIso ? "is-today" : "",
         iso === calState.selectedDate ? "is-selected" : "",
+        dow === 0 ? "is-sun" : "",
+        dow === 6 ? "is-sat" : "",
       ]
         .filter(Boolean)
         .join(" ");
@@ -214,12 +245,15 @@
         cls +
         '" data-cal-date="' +
         iso +
-        '"><div class="cal-day">' +
+        '" aria-label="' +
+        iso +
+        (list.length ? ", 일정 " + list.length + "건" : "") +
+        '"><span class="cal-day">' +
         d +
-        "</div>" +
+        '</span><span class="cal-events">' +
         names +
         more +
-        "</button>";
+        "</span></button>";
     }
     box.innerHTML = '<div class="cal-grid">' + heads + cells + "</div>";
   }
@@ -319,10 +353,12 @@
           return `<div class="aud-list-item">
         <strong>${esc(r.company_name || ("계약 #" + (r.contract_id || r.id)))}</strong>
         <small>${esc(r.report_type || "report")} · ${esc(r.status_label || r.status || "")}${r.report_no ? " · " + esc(r.report_no) : ""}${r.updated_at ? " · 갱신 " + esc(String(r.updated_at).slice(0, 16).replace("T", " ")) : ""}</small>
-        <div style="margin-top:8px;">
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
           ${
             cid
-              ? `<button type="button" class="btn ghost" data-open-note="${esc(cid)}">심사노트 열기</button>`
+              ? `<button type="button" class="btn ghost" data-open-note="${esc(cid)}">심사노트 열기</button>
+                 <button type="button" class="btn" data-open-report="${esc(cid)}">결과보고서</button>
+                 <a class="btn ghost" href="/auditor-portal?tab=reports&contract=${encodeURIComponent(cid)}" title="딥링크">노트 딥링크</a>`
               : `<button type="button" class="btn ghost" data-open-preview-note>심사노트 열기 (미리보기)</button>`
           }
         </div>
@@ -330,6 +366,170 @@
         })
         .join("") + previewBtn
     );
+  }
+
+  /* ── 심사결과보고서 (② 조항 / ③ NCR / ⑤ 매트릭스) — live from notes ── */
+  let reportState = { contractId: null, data: null, tab: "clauses" };
+
+  function showReportPanel(show) {
+    const list = document.getElementById("reports-list-wrap");
+    const panel = document.getElementById("audit-result-report");
+    const noteEd = document.getElementById("audit-note-editor");
+    if (list) list.style.display = show ? "none" : "";
+    if (panel) {
+      panel.style.display = show ? "" : "none";
+      panel.setAttribute("aria-hidden", show ? "false" : "true");
+    }
+    if (show && noteEd) {
+      noteEd.style.display = "none";
+      noteEd.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  function renderReportBody() {
+    const box = document.getElementById("aud-report-body");
+    const data = reportState.data;
+    if (!box || !data) return;
+    const tab = reportState.tab || "clauses";
+    document.querySelectorAll(".aud-rpt-tab").forEach((b) => {
+      b.classList.toggle("active", b.getAttribute("data-rpt-tab") === tab);
+    });
+
+    if (tab === "ncrs") {
+      const cards = (data.ncrs || [])
+        .map((n) => {
+          const g = String(n.grade || "").toLowerCase();
+          let label = "관찰사항 (Observation)";
+          let border = "#1a5fa8";
+          if (g.includes("major") || g.includes("중대") || g === "중부적합") {
+            label = "중부적합 (Major Nonconformity)";
+            border = "#b71c1c";
+          } else if (g.includes("minor") || g.includes("경미") || g === "경부적합") {
+            label = "경부적합 (Minor Nonconformity)";
+            border = "#8a5c00";
+          }
+          return `<article style="border:1px solid #e3ebe4;border-left:4px solid ${border};border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+            <div style="font-size:0.8rem;font-weight:700;margin-bottom:6px;">${esc(label)} · §${esc(n.clause || "—")} ${esc(n.standard || "")}</div>
+            <div style="font-weight:700;margin-bottom:4px;">${esc(n.title || "")}</div>
+            <div style="font-size:0.9rem;line-height:1.5;">${esc(n.description || "")}</div>
+            ${n.requirement ? `<div class="muted" style="margin-top:6px;font-size:0.82rem;">요구사항: ${esc(n.requirement)}</div>` : ""}
+            ${n.due_date ? `<div class="muted" style="margin-top:4px;font-size:0.82rem;">시정 기한: ${esc(n.due_date)}</div>` : ""}
+          </article>`;
+        })
+        .join("");
+      box.innerHTML = `
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <span class="aud-matrix-stat warn">중부적합 ${data.ncr_major || 0}</span>
+          <span class="aud-matrix-stat">경부적합 ${data.ncr_minor || 0}</span>
+          <span class="aud-matrix-stat">관찰사항 ${data.ncr_obs || 0}</span>
+        </div>
+        ${cards || '<div class="aud-empty">부적합 사항 없음 (심사노트 NCR 기준)</div>'}`;
+      return;
+    }
+
+    if (tab === "matrix") {
+      const rows = (data.matrix_cells || [])
+        .map((c) => {
+          const badge = c.missing
+            ? '<span class="aud-matrix-badge miss">빠짐</span>'
+            : '<span class="aud-matrix-badge done">작성</span>';
+          return `<tr class="${c.missing ? "missing" : "written"}">
+            <td>${esc(c.standard_code || c.standard_key || "")}</td>
+            <td>${esc(c.clause_no)}</td>
+            <td>${esc(c.clause_topic || "")}</td>
+            <td>${esc(c.verdict || "—")}</td>
+            <td>${badge}</td>
+          </tr>`;
+        })
+        .join("");
+      box.innerHTML = `<div class="aud-matrix-box">
+        <div class="aud-matrix-hd">
+          <div>
+            <strong>심사 매트릭스</strong>
+            <div class="muted" style="font-size:0.82rem;">ISO/IEC 17021-1 §9.1.3 · 계약 표준 × standard_clause_masters · 심사노트 작성 여부</div>
+          </div>
+          <div class="aud-matrix-stats">
+            <span class="aud-matrix-stat">필수 ${data.matrix_required || 0}</span>
+            <span class="aud-matrix-stat ok">작성 ${data.matrix_written || 0}</span>
+            <span class="aud-matrix-stat warn">빠짐 ${data.matrix_missing || 0}</span>
+            <span class="aud-matrix-stat">커버리지 ${data.matrix_coverage_pct || 0}%</span>
+          </div>
+        </div>
+        <table class="aud-matrix-table">
+          <thead><tr><th>표준</th><th>조항</th><th>조항명</th><th>판정</th><th>상태</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="5" class="muted">매트릭스 데이터 없음</td></tr>'}</tbody>
+        </table>
+      </div>`;
+      return;
+    }
+
+    // clauses (② 조항별 심사 결과)
+    const rows = (data.clauses || [])
+      .map((c) => {
+        return `<tr>
+          <td style="font-weight:700;text-align:center;">${esc(c.clause_no)}<br><span class="muted" style="font-size:0.75rem;">${esc(c.standard_code || c.standard || "")}</span></td>
+          <td>${esc(c.clause_label || "")}</td>
+          <td>${esc(c.verdict || "—")}</td>
+          <td style="font-size:0.85rem;">${esc((c.note || "").slice(0, 160))}</td>
+        </tr>`;
+      })
+      .join("");
+    box.innerHTML = `
+      <p class="muted" style="margin:0 0 10px;font-size:0.85rem;">심사노트(audit_note_clauses)에서 실시간 수집 · 조항명/판정/심사 요약</p>
+      <table class="aud-matrix-table">
+        <thead><tr><th style="width:90px">조항</th><th>조항명</th><th style="width:100px">판정</th><th>심사 요약</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4" class="muted">심사노트 조항 데이터 없음 — 노트를 먼저 저장하세요</td></tr>'}</tbody>
+      </table>`;
+  }
+
+  async function openResultReport(contractId) {
+    const cid = String(contractId || "").trim();
+    if (!cid) return;
+    showReportPanel(true);
+    reportState.contractId = cid;
+    reportState.tab = "clauses";
+    const body = document.getElementById("aud-report-body");
+    if (body) body.innerHTML = '<div class="aud-empty">불러오는 중…</div>';
+    const title = document.getElementById("aud-report-title");
+    const sub = document.getElementById("aud-report-sub");
+    const planA = document.getElementById("aud-report-open-plan");
+    if (planA) {
+      // Deep-link to plan UI (PHP) when available; JSON plan API as fallback
+      planA.href = "/audit-docs/plan?demo=1&contract_id=" + encodeURIComponent(cid);
+      planA.onclick = null;
+    }
+    try {
+      const res = await fetch(API + "/auditor/audit-reports/" + encodeURIComponent(cid), {
+        headers: authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "결과보고서 조회 실패");
+      reportState.data = data;
+      if (title) title.textContent = "심사결과보고서 · " + (data.company_name || ("계약 #" + cid));
+      if (sub) {
+        sub.textContent =
+          (data.standards_label || "") +
+          (data.team_label ? " · " + data.team_label : "") +
+          (data.plan_id ? " · 계획서 #" + data.plan_id : " · 계획서 없음");
+      }
+      renderReportBody();
+      const url = new URL(location.href);
+      url.searchParams.set("tab", "reports");
+      url.searchParams.set("contract", cid);
+      url.searchParams.set("view", "report");
+      history.replaceState(null, "", url.pathname + "?" + url.searchParams.toString());
+    } catch (e) {
+      if (body) body.innerHTML = `<div class="aud-empty">${esc(e.message || "조회 실패")}</div>`;
+    }
+  }
+
+  function closeResultReport() {
+    showReportPanel(false);
+    reportState = { contractId: null, data: null, tab: "clauses" };
+    const url = new URL(location.href);
+    url.searchParams.set("tab", "reports");
+    url.searchParams.delete("view");
+    history.replaceState(null, "", url.pathname + "?" + url.searchParams.toString());
   }
 
   function statusClass(st) {
@@ -340,6 +540,168 @@
 
   /* ── data loaders ── */
   let dashCache = null;
+
+  function docsQuery() {
+    const urlParams = new URLSearchParams(location.search);
+    const cid = urlParams.get("contract_id") || urlParams.get("contract") || "1";
+    return {
+      cid: String(cid),
+      q: "demo=1&contract_id=" + encodeURIComponent(cid),
+    };
+  }
+
+  function closeDocsViewer() {
+    const list = document.getElementById("docs-list-wrap");
+    const viewer = document.getElementById("audit-doc-viewer");
+    const frame = document.getElementById("aud-doc-frame");
+    if (list) list.style.display = "";
+    if (viewer) {
+      viewer.style.display = "none";
+      viewer.setAttribute("aria-hidden", "true");
+    }
+    if (frame) frame.src = "about:blank";
+    const url = new URL(location.href);
+    url.searchParams.set("tab", "docs");
+    url.searchParams.delete("doc");
+    history.replaceState(null, "", url.pathname + "?" + url.searchParams.toString());
+  }
+
+  function openDocsViewer(slug, title, path) {
+    const { cid, q } = docsQuery();
+    const list = document.getElementById("docs-list-wrap");
+    const viewer = document.getElementById("audit-doc-viewer");
+    const frame = document.getElementById("aud-doc-frame");
+    const titleEl = document.getElementById("aud-doc-title");
+    const subEl = document.getElementById("aud-doc-sub");
+    const ext = document.getElementById("aud-doc-external");
+    const notes = document.getElementById("aud-doc-open-notes");
+    const report = document.getElementById("aud-doc-open-report");
+    const plan = document.getElementById("aud-doc-open-plan");
+    const src = (path || "/audit-docs/" + slug) + "?" + q;
+    if (list) list.style.display = "none";
+    if (viewer) {
+      viewer.style.display = "";
+      viewer.setAttribute("aria-hidden", "false");
+    }
+    if (titleEl) titleEl.textContent = title || slug;
+    if (subEl) subEl.textContent = "contract #" + cid + " · Master DB";
+    if (frame) frame.src = src;
+    if (ext) ext.href = src;
+    if (notes) notes.href = "/auditor-portal?tab=reports&" + q;
+    if (report) report.href = "/auditor-portal?tab=reports&view=report&" + q;
+    if (plan) {
+      plan.href = "#";
+      plan.onclick = (e) => {
+        e.preventDefault();
+        openDocsViewer("plan", "심사계획서", "/audit-docs/plan");
+      };
+    }
+    const url = new URL(location.href);
+    url.searchParams.set("tab", "docs");
+    url.searchParams.set("doc", slug);
+    url.searchParams.set("demo", "1");
+    url.searchParams.set("contract_id", cid);
+    history.replaceState(null, "", url.pathname + "?" + url.searchParams.toString());
+  }
+
+  async function loadDocsPanel() {
+    const box = document.getElementById("docs-hub-list");
+    if (!box) return;
+    const { cid, q } = docsQuery();
+    const urlParams = new URLSearchParams(location.search);
+    const openDoc = urlParams.get("doc") || "";
+    box.innerHTML = '<div class="aud-empty">불러오는 중…</div>';
+    try {
+      const res = await fetch(API + "/demo/audit-docs/context?" + q);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "문서 컨텍스트 조회 실패");
+      const m = data.master || {};
+      const groups = {};
+      const order = [];
+      const bySlug = {};
+      (data.pages || []).forEach((p) => {
+        bySlug[p.slug] = p;
+        const g = p.group || "other";
+        if (!groups[g]) {
+          groups[g] = { label: p.group_label || g, pages: [] };
+          order.push(g);
+        }
+        groups[g].pages.push(p);
+      });
+      let html =
+        '<p class="muted" style="margin:0 0 12px;">company #' +
+        esc(m.company_id) +
+        " " +
+        esc(m.company_name) +
+        " · contract #" +
+        esc(m.contract_id) +
+        " " +
+        esc(m.contract_no) +
+        " · " +
+        esc((m.standard_keys || []).join(", ")) +
+        (data.audit_plan_id ? " · audit_plan #" + esc(data.audit_plan_id) : "") +
+        '</p><div class="aud-quick" style="margin-bottom:14px;">' +
+        '<button type="button" class="btn ghost" data-goto="reports">심사노트</button>' +
+        '<a class="btn ghost" href="/auditor-portal?tab=reports&view=report&' +
+        q +
+        '">결과보고서</a>' +
+        '<a class="btn ghost" href="/auditor-portal?tab=schedules&demo=1">일정</a>' +
+        '<a class="btn ghost" href="/demo/audit-docs?' +
+        q +
+        '">데모 허브</a></div>';
+      order.forEach((g) => {
+        html +=
+          "<h4 style='margin:16px 0 8px;'>" +
+          esc(groups[g].label) +
+          "</h4><div class='aud-quick'>";
+        groups[g].pages.forEach((p) => {
+          html +=
+            '<button type="button" class="btn ghost" data-open-doc="' +
+            esc(p.slug) +
+            '" data-doc-title="' +
+            esc(p.title) +
+            '" data-doc-path="' +
+            esc(p.path) +
+            '">' +
+            esc(p.title) +
+            "</button>";
+        });
+        html += "</div>";
+      });
+      // portal-native deep links (노트/보고서는 기존 reports 패널)
+      html +=
+        "<h4 style='margin:16px 0 8px;'>포털 연동</h4><div class='aud-quick'>" +
+        '<button type="button" class="btn" data-goto="reports">심사노트 (reports)</button>' +
+        '<a class="btn ghost" href="/auditor-portal?tab=reports&view=report&' +
+        q +
+        '">결과보고서</a></div>';
+      box.innerHTML = html;
+      box.querySelectorAll("[data-open-doc]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          openDocsViewer(
+            btn.getAttribute("data-open-doc"),
+            btn.getAttribute("data-doc-title"),
+            btn.getAttribute("data-doc-path")
+          );
+        });
+      });
+      if (openDoc && bySlug[openDoc]) {
+        openDocsViewer(openDoc, bySlug[openDoc].title, bySlug[openDoc].path);
+      } else if (openDoc === "notes") {
+        switchTab("reports");
+      } else if (openDoc === "report") {
+        switchTab("reports");
+        openResultReport(cid);
+      } else {
+        closeDocsViewer();
+      }
+    } catch (e) {
+      box.innerHTML =
+        '<div class="aud-empty">' +
+        esc(e.message || "문서 목록 로드 실패") +
+        ' · <a href="/demo/audit-docs?demo=1&contract_id=1">데모 허브</a></div>';
+    }
+  }
 
   async function loadDashboard() {
     setError("");
@@ -1032,10 +1394,38 @@
       renderCalendar();
       return;
     }
+    const openReport = evt.target.closest("[data-open-report]");
+    if (openReport) {
+      evt.preventDefault();
+      const cid = openReport.getAttribute("data-open-report");
+      switchTab("reports");
+      if (cid) openResultReport(cid);
+      return;
+    }
+    const rptTab = evt.target.closest(".aud-rpt-tab[data-rpt-tab]");
+    if (rptTab) {
+      evt.preventDefault();
+      reportState.tab = rptTab.getAttribute("data-rpt-tab") || "clauses";
+      renderReportBody();
+      return;
+    }
+    if (evt.target.closest("#aud-report-back")) {
+      evt.preventDefault();
+      closeResultReport();
+      return;
+    }
+    if (evt.target.closest("#aud-report-open-notes")) {
+      evt.preventDefault();
+      const cid = reportState.contractId;
+      closeResultReport();
+      if (cid && window.AuditorAuditNotes) window.AuditorAuditNotes.open(cid);
+      return;
+    }
     const openNote = evt.target.closest("[data-open-note]");
     if (openNote) {
       evt.preventDefault();
       const cid = openNote.getAttribute("data-open-note");
+      closeResultReport();
       switchTab("reports");
       if (window.AuditorAuditNotes) {
         if (cid) window.AuditorAuditNotes.open(cid);
@@ -1046,6 +1436,7 @@
     const openPreview = evt.target.closest("[data-open-preview-note]");
     if (openPreview) {
       evt.preventDefault();
+      closeResultReport();
       switchTab("reports");
       if (window.AuditorAuditNotes) {
         window.AuditorAuditNotes.openPreview(
@@ -1136,10 +1527,20 @@
   window.searchCb = searchCb;
   window.searchCompany = searchCompany;
   window.addManualIaf = addManualIaf;
+  document.getElementById("aud-doc-back")?.addEventListener("click", () => {
+    closeDocsViewer();
+    loadDocsPanel();
+  });
+
   window.AuditorPortal = {
     switchTab,
     loadDashboard,
     reloadReports: loadReportsPanel,
+    openResultReport,
+    closeResultReport,
+    openDocsViewer,
+    closeDocsViewer,
+    loadDocsPanel,
   };
 
   loadIafDatalist();

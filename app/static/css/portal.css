@@ -104,7 +104,7 @@ body.portal-page {
    are NOT white-on-primary (transparent bg + white text = invisible).
    Also exclude .aud-nav-btn (심사노트 left-nav clauses) — those use
    transparent/dark vs green/white saved states, not primary chrome. */
-button:not(.ghost):not([class*="bg-"]):not(.btn-ghost):not(.held-std-link):not(.held-std-text):not(.scope-badge):not(.btn-detail):not(.btn-close):not(.btn-secondary):not(.nav-link):not(.aud-nav-btn),
+button:not(.ghost):not([class*="bg-"]):not(.btn-ghost):not(.held-std-link):not(.held-std-text):not(.scope-badge):not(.btn-detail):not(.btn-close):not(.btn-secondary):not(.nav-link):not(.aud-nav-btn):not(.cal-cell),
 .btn-primary,
 a.btn-primary {
   padding: 9px 14px;
@@ -120,7 +120,7 @@ a.btn-primary {
   transition: background 0.15s ease;
 }
 
-button:not(.ghost):not(.held-std-link):not(.held-std-text):not(.scope-badge):not(.btn-detail):not(.btn-close):not(.btn-secondary):not(.nav-link):not(.aud-nav-btn):hover,
+button:not(.ghost):not(.held-std-link):not(.held-std-text):not(.scope-badge):not(.btn-detail):not(.btn-close):not(.btn-secondary):not(.nav-link):not(.aud-nav-btn):not(.cal-cell):hover,
 .btn-primary:hover {
   filter: brightness(0.95);
 }
@@ -414,7 +414,155 @@ a.hover\:underline:hover,
 /* ---- Auditor 심사노트 (shared) ---- */
 body.auditor-portal-page {
   font-family: "Pretendard", var(--font-family-main, system-ui), sans-serif;
+  /*
+   * Header offsets for 심사노트 sticky 3-pane:
+   *   --aud-note-header-offset  112px = admin-main pad (~32) + .cb-page-header (~80)
+   *   --aud-note-toolbar-offset 56px  = .aud-note-toolbar
+   *   --aud-note-side-sticky-top 168px = header + toolbar
+   * Left/Right: top: var(--aud-note-side-sticky-top);
+   *             height: calc(100vh - var(--aud-note-side-sticky-top));
+   */
+  --aud-note-header-offset: 112px;
+  --aud-note-toolbar-offset: 56px;
+  --aud-note-side-sticky-top: calc(
+    var(--aud-note-header-offset) + var(--aud-note-toolbar-offset)
+  );
 }
+
+/* Lock page scroll when note editor is open — only .doc-wrap scrolls */
+body.auditor-portal-page.aud-note-open {
+  overflow: hidden;
+  height: 100vh;
+}
+body.auditor-portal-page.aud-note-open .admin-main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+body.auditor-portal-page.aud-note-open .cb-page-header,
+body.auditor-portal-page.aud-note-open #global-error {
+  flex-shrink: 0;
+}
+body.auditor-portal-page.aud-note-open #tab-reports.tab-panel.active {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 3-pane shell under page header: toolbar + [nav | doc-wrap | AI] */
+.aud-note-editor[aria-hidden="false"] {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+}
+.aud-note-editor[aria-hidden="false"] .aud-note-toolbar {
+  flex-shrink: 0;
+  z-index: 4;
+  margin-bottom: 10px;
+}
+.aud-note-editor[aria-hidden="false"] .aud-note-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) 250px;
+  gap: 0;
+  align-items: stretch;
+  border: 1px solid var(--admin-border, #e3ebe4);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+/*
+ * Left + Right sticky panels
+ * top / height use --aud-note-side-sticky-top (header 112px + toolbar 56px).
+ * max-height:100% keeps them inside the flex grid row.
+ */
+.aud-note-editor[aria-hidden="false"] .aud-note-nav-pane,
+.aud-note-editor[aria-hidden="false"] .aud-note-ai {
+  position: sticky;
+  top: var(--aud-note-side-sticky-top);
+  height: calc(100vh - var(--aud-note-side-sticky-top));
+  max-height: 100%;
+  overflow-y: auto;
+  align-self: stretch;
+  box-sizing: border-box;
+}
+.aud-note-editor[aria-hidden="false"] .aud-note-nav-pane {
+  display: flex;
+  flex-direction: column;
+  /* mode tabs / std select stay; clause list scrolls inside */
+  overflow: hidden;
+}
+.aud-note-editor[aria-hidden="false"] .aud-note-nav-pane .aud-note-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.aud-note-editor[aria-hidden="false"] .aud-note-ai {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.aud-note-editor[aria-hidden="false"] .aud-note-ai .aud-note-ai-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Center only: independent vertical scrollbar for the note form */
+.aud-note-editor[aria-hidden="false"] .aud-note-main.doc-wrap,
+.aud-note-editor[aria-hidden="false"] .doc-wrap {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1100px) {
+  body.auditor-portal-page.aud-note-open,
+  body.auditor-portal-page.aud-note-open .admin-main {
+    height: auto;
+    max-height: none;
+    overflow: auto;
+  }
+  .aud-note-editor[aria-hidden="false"] {
+    height: auto;
+    max-height: none;
+  }
+  .aud-note-editor[aria-hidden="false"] .aud-note-grid {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+  .aud-note-editor[aria-hidden="false"] .aud-note-nav-pane,
+  .aud-note-editor[aria-hidden="false"] .aud-note-ai,
+  .aud-note-editor[aria-hidden="false"] .aud-note-main.doc-wrap,
+  .aud-note-editor[aria-hidden="false"] .doc-wrap {
+    position: relative;
+    top: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .aud-note-editor[aria-hidden="false"] .aud-note-main.doc-wrap,
+  .aud-note-editor[aria-hidden="false"] .doc-wrap {
+    max-height: min(70vh, 720px);
+    overflow-y: auto;
+  }
+}
+
 .aud-note-nav {
   display: flex;
   flex-direction: column;
@@ -708,4 +856,252 @@ body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved.active .v,
 .aud-iv-mini.active { background: #ecfdf5; font-weight: 700; color: #0f766e; }
 @media (max-width: 560px) {
   .aud-iv-meta-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Shared month calendar (auditor / CB portals) ---- */
+.portal-cal-wrap,
+.aud-calendar-wrap,
+.cb-calendar-wrap {
+  background: var(--portal-card, var(--admin-surface, #fff));
+  border: 1px solid var(--portal-border, var(--admin-border, #e8ece9));
+  border-radius: var(--admin-radius-lg, 12px);
+  box-shadow: var(--admin-shadow, 0 1px 2px rgb(30 42 36 / 0.04));
+  padding: 18px 20px 20px;
+  margin-bottom: 16px;
+  font-family: "Pretendard", var(--font-family-main, system-ui), sans-serif;
+  color: var(--portal-ink, var(--admin-ink, #1e2a24));
+}
+
+.portal-cal-nav,
+.aud-calendar-nav,
+.cb-calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.portal-cal-nav h3,
+.aud-calendar-nav h3,
+.cb-calendar-nav h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--portal-ink, var(--admin-ink, #1e2a24));
+  letter-spacing: -0.02em;
+}
+
+.portal-cal-nav .btn.ghost,
+.aud-calendar-nav .btn.ghost,
+.cb-calendar-nav .btn.ghost,
+.portal-cal-nav button.ghost,
+.aud-calendar-nav button.ghost {
+  min-width: 40px;
+  padding: 8px 12px;
+  font-size: 1.1rem;
+  line-height: 1;
+  font-family: inherit;
+}
+
+.portal-cal-hint {
+  margin: 0 0 14px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--portal-muted, var(--admin-muted, #5a675f));
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cal-head {
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--portal-muted, var(--admin-muted, #5a675f));
+  padding: 8px 0 6px;
+  letter-spacing: -0.01em;
+}
+.cal-head.is-sun { color: var(--portal-red, #c94c52); }
+.cal-head.is-sat { color: var(--portal-blue, #2a6b5f); }
+
+button.cal-cell,
+.cal-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 102px;
+  margin: 0;
+  border: 1px solid var(--portal-border, var(--admin-border, #e8ece9));
+  border-radius: 10px;
+  padding: 8px;
+  background: #fbfdfb;
+  color: var(--portal-ink, var(--admin-ink, #1e2a24));
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: 1.35;
+  box-shadow: none;
+  filter: none;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+button.cal-cell:hover,
+.cal-cell:hover {
+  border-color: var(--admin-border-strong, #c5ddd0);
+  background: #f6faf7;
+  filter: none;
+  color: var(--portal-ink, var(--admin-ink, #1e2a24));
+}
+
+.cal-cell.is-empty {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+  pointer-events: none;
+  min-height: 102px;
+}
+button.cal-cell.is-empty:hover,
+.cal-cell.is-empty:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+.cal-cell.has-events {
+  background: #f3faf5;
+  border-color: var(--admin-border-strong, #c5ddd0);
+}
+
+.cal-cell.is-selected {
+  outline: 2px solid var(--portal-primary, var(--admin-primary, #2f6b4f));
+  outline-offset: -1px;
+  background: #eef7f1;
+}
+
+.cal-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  min-width: 1.65em;
+  height: 1.65em;
+  margin-bottom: 6px;
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: var(--portal-ink, var(--admin-ink, #1e2a24));
+  letter-spacing: -0.02em;
+  line-height: 1;
+  border-radius: 999px;
+}
+.cal-cell.is-sun .cal-day { color: var(--portal-red, #c94c52); }
+.cal-cell.is-sat .cal-day { color: var(--portal-blue, #2a6b5f); }
+.cal-cell.is-today .cal-day {
+  background: var(--portal-primary, var(--admin-primary, #2f6b4f));
+  color: #fff;
+  font-weight: 700;
+}
+
+.cal-events {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  width: 100%;
+}
+
+.cal-event {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  border: 0;
+  background: rgba(47, 107, 79, 0.1);
+  border-radius: 5px;
+  padding: 3px 6px;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--portal-primary, var(--admin-primary, #1f6b4a));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.cal-more {
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--portal-faint, var(--admin-faint, #8a948d));
+  padding: 1px 2px;
+}
+
+@media (max-width: 720px) {
+  .cal-cell,
+  button.cal-cell,
+  .cal-cell.is-empty {
+    min-height: 78px;
+    padding: 6px;
+  }
+  .cal-day { font-size: 0.85rem; }
+  .cal-event { font-size: 0.7rem; padding: 2px 4px; }
+}
+
+/* Auditor day-detail panel under calendar */
+.aud-day-detail {
+  background: var(--portal-card, var(--admin-surface, #fff));
+  border: 1px solid var(--portal-border, var(--admin-border, #e8ece9));
+  border-radius: var(--admin-radius-lg, 12px);
+  box-shadow: var(--admin-shadow, 0 1px 2px rgb(30 42 36 / 0.04));
+  padding: 18px 20px;
+  font-family: "Pretendard", var(--font-family-main, system-ui), sans-serif;
+}
+.aud-day-detail h3 {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--portal-ink, var(--admin-ink, #1e2a24));
+  letter-spacing: -0.02em;
+}
+.aud-detail-card {
+  border-top: 1px solid var(--portal-border, #eef3ef);
+  padding: 16px 0;
+}
+.aud-detail-card:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+.aud-detail-card h4 {
+  margin: 0 0 12px;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--portal-ink, var(--admin-ink, #1f2d24));
+  letter-spacing: -0.02em;
+}
+.aud-dl {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 8px 14px;
+  margin: 0;
+  font-size: 0.92rem;
+}
+.aud-dl dt {
+  margin: 0;
+  color: var(--portal-muted, var(--admin-muted, #5f7264));
+  font-weight: 650;
+}
+.aud-dl dd {
+  margin: 0;
+  color: var(--portal-ink, var(--admin-ink, #1f2d24));
+}
+@media (max-width: 720px) {
+  .aud-dl { grid-template-columns: 1fr; gap: 2px 0; }
+  .aud-dl dt { font-size: 0.8rem; margin-top: 6px; }
 }

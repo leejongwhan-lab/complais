@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1단계 서류준비성 검토 — Master DB</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="/static/css/main.css?v=20260807docs1">
+<link rel="stylesheet" href="/static/css/portal.css?v=20260807theme1">
+<link rel="stylesheet" href="/static/css/style.css?v=20260807cal1">
+<link rel="stylesheet" href="/static/css/admin_doc_theme.css?v=20260807theme1">
+<style>
+:root{ --navy:#0F172A; --navy2:#EFF6FF; --navy3:#BFDBFE; --bd:#E2E8F0; }
+body{margin:0;background:var(--admin-bg, var(--bg, #F8FAFC));font-family:"Pretendard",var(--font-family-main,system-ui),sans-serif;color:#0F172A}
+#pg{max-width:1100px;margin:0 auto;padding:20px 16px 64px}
+.doc-hd{margin-bottom:18px}
+.doc-tag{font-size:11px;color:#64748b;margin-bottom:4px}
+.doc-title{font-size:1.35rem;font-weight:800;margin:0}
+.doc-sub{color:#64748b;font-size:.9rem;margin:4px 0 10px}
+.info-tbl,.chk-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px}
+.info-tbl th{background:var(--admin-accent-bg, #EFF6FF);border:1px solid var(--admin-border, #e3ebe4);padding:10px 12px;width:120px;text-align:left;color:#1e40af}
+.info-tbl td{border:1px solid var(--admin-border, #e3ebe4);padding:10px 12px}
+.chk-tbl th{background:#0F172A;color:#fff;padding:10px;font-size:11px}
+.chk-tbl td{border:1px solid var(--admin-border, #e3ebe4);padding:8px 10px;vertical-align:top}
+.chk-tbl tr.std-extra td{background:#f0f4ff}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat-box{background:#fff;border:1px solid var(--admin-border, #e3ebe4);border-radius:8px;padding:12px;text-align:center}
+.stat-num{font-size:1.5rem;font-weight:800}
+.stat-lbl{font-size:12px;color:#64748b;margin-top:4px}
+.status-sel,.cinp,textarea{width:100%;box-sizing:border-box;border:1px solid var(--admin-border, #e3ebe4);border-radius:6px;padding:8px;font:inherit}
+.vvbs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.vvb{flex:1;min-width:140px;border:2px solid;border-radius:8px;padding:10px;font-weight:700;background:#fff;cursor:pointer}
+.vvb.go{border-color:#1e7a4a;color:#1e7a4a}.vvb.go.on{background:#1e7a4a;color:#fff}
+.vvb.cond{border-color:#8a5c00;color:#8a5c00}.vvb.cond.on{background:#8a5c00;color:#fff}
+.vvb.no{border-color:#b71c1c;color:#b71c1c}.vvb.no.on{background:#b71c1c;color:#fff}
+.sec{background:#fff;border:1px solid var(--admin-border, #e3ebe4);border-radius:10px;padding:16px;margin-bottom:14px}
+.sec-h{font-weight:700;margin:0 0 12px;display:flex;gap:8px;align-items:center}
+.sec-no{display:inline-flex;width:22px;height:22px;border-radius:6px;background:#2563EB;color:#fff;align-items:center;justify-content:center;font-size:11px}
+.links{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 20px}
+.links a{font-size:13px;color:#2563EB}
+.muted{color:#64748b;font-size:12px}
+</style>
+</head>
+<body class="portal-page admin-page">
+<div id="pg">
+  <div class="doc-hd">
+    <div class="doc-tag">ISO/IEC 17021-1 §9.3 · Stage 1 — Document Readiness (UX from stage1_readiness.php)</div>
+    <h1 class="doc-title">1단계 심사 · 서류준비성 검토표</h1>
+    <p class="doc-sub">Master DB companies / contracts / standard_masters / auditors · demo fill</p>
+    <div class="links" id="deep-links"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">1</span> 기본 정보</div>
+    <table class="info-tbl">
+      <tr>
+        <th>피심사 기업</th><td id="co-name">—</td>
+        <th>사업자번호</th><td id="co-biz">—</td>
+      </tr>
+      <tr>
+        <th>인증 범위</th><td colspan="3" id="co-scope">—</td>
+      </tr>
+      <tr>
+        <th>적용 표준</th><td id="co-std">—</td>
+        <th>심사 유형</th><td id="co-type">—</td>
+      </tr>
+      <tr>
+        <th>종업원 수</th><td id="co-emp">—</td>
+        <th>인증기관</th><td id="co-cb">—</td>
+      </tr>
+      <tr>
+        <th>계약 ID</th><td id="co-cid">—</td>
+        <th>계약번호</th><td id="co-cno">—</td>
+      </tr>
+      <tr>
+        <th>검토일</th>
+        <td colspan="3"><input class="cinp" id="review-date" type="date" style="max-width:180px"></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">2</span> 심사팀</div>
+    <table class="chk-tbl">
+      <thead><tr><th>역할</th><th>성명</th><th>등급</th><th>등록번호</th></tr></thead>
+      <tbody id="team-body"><tr><td colspan="4" class="muted">불러오는 중…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">3</span> 구비현황 요약</div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-num" id="stat-ok" style="color:#1e7a4a">0</div><div class="stat-lbl">구비됨</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-partial" style="color:#8a5c00">0</div><div class="stat-lbl">부분구비</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-ng" style="color:#b71c1c">0</div><div class="stat-lbl">미비</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-na" style="color:#6b7280">0</div><div class="stat-lbl">해당없음</div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">4</span> 항목별 서류준비성 점검표</div>
+    <table class="chk-tbl">
+      <thead>
+        <tr>
+          <th style="width:40px">No</th>
+          <th>점검 항목</th>
+          <th style="width:140px">준비상태</th>
+          <th style="width:180px">문서명 / 버전</th>
+          <th>비고</th>
+        </tr>
+      </thead>
+      <tbody id="chk-body"></tbody>
+    </table>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">4-1</span> 적용 제외 조항</div>
+    <textarea id="exclusion-clauses" rows="3" placeholder="적용 제외 조항 및 근거"></textarea>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">4-2</span> 2단계 예정</div>
+    <table class="info-tbl">
+      <tr>
+        <th>2단계 예정일</th><td><input class="cinp" id="stage2-date" type="date" style="max-width:180px"></td>
+        <th>장소</th>
+        <td>
+          <select id="stage2-location" class="status-sel" style="max-width:220px">
+            <option value="onsite">현장 방문</option>
+            <option value="remote">원격</option>
+            <option value="hybrid">혼합</option>
+          </select>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">5</span> 종합 판정</div>
+    <div class="vvbs">
+      <button type="button" class="vvb go" data-v="go">2단계 진행가능</button>
+      <button type="button" class="vvb cond" data-v="cond">보완 후 진행</button>
+      <button type="button" class="vvb no" data-v="no">재검토 필요</button>
+    </div>
+    <textarea id="opinion-val" rows="4" placeholder="1단계 종합 의견"></textarea>
+    <p class="muted" style="margin-top:10px">데모 보기 전용 — 저장은 audit_doc_data(doc_type=stage1_readiness) API 연동 시 활성화</p>
+  </div>
+</div>
+
+<script src="/static/js/audit_doc_master.js?v=20260807demo2"></script>
+<script>
+(function () {
+  var COMMON = [
+    '품질/환경/안전보건 경영 매뉴얼',
+    '프로세스 절차서 (핵심 절차)',
+    '조직도 및 역할·책임·권한 문서',
+    '경영방침 수립 및 공표 기록',
+    '내부심사 실시 기록 (최근 1회 이상)',
+    '경영검토 실시 기록 (최근 1회 이상)',
+    '경영목표 및 달성계획 수립 기록',
+    '리스크 및 기회 파악·평가 기록',
+    '법적요구사항 목록 및 준수평가 기록',
+    '인원 역량·교육훈련 계획 및 이수 기록',
+    '이해관계자 요구사항 파악 기록',
+    '부적합 및 시정조치 처리 기록 (있는 경우)',
+  ];
+  var EXTRA = {
+    QMS_2015: [
+      '[ISO 9001] 고객만족도 모니터링 방법 및 결과 기록',
+      '[ISO 9001] 설계·개발 관련 문서 (해당 시)',
+      '[ISO 9001] 외부 공급자 관리 절차 및 평가 기록',
+    ],
+    EMS_2015: [
+      '[ISO 14001] 환경측면 파악 및 중요 환경측면 목록',
+      '[ISO 14001] 환경 법규 목록 및 준수 평가 기록',
+      '[ISO 14001] 비상사태 대비·대응 절차 및 훈련 기록',
+    ],
+    OHSMS_2018: [
+      '[ISO 45001] 위험요인 파악 및 위험성 평가 기록',
+      '[ISO 45001] 근로자 협의 및 참여 절차·기록',
+      '[ISO 45001] 안전보건 법규 목록 및 준수 평가 기록',
+      '[ISO 45001] 산업재해 통계 및 조사 기록 (해당 시)',
+    ],
+  };
+
+  function text(id, v) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = v == null || v === '' ? '—' : String(v);
+  }
+
+  function updateStats() {
+    var ok=0, partial=0, ng=0, na=0;
+    document.querySelectorAll('.status-sel[data-item]').forEach(function (sel) {
+      if (sel.value === 'ok') ok++;
+      else if (sel.value === 'partial') partial++;
+      else if (sel.value === 'ng') ng++;
+      else if (sel.value === 'na') na++;
+    });
+    text('stat-ok', ok); text('stat-partial', partial); text('stat-ng', ng); text('stat-na', na);
+  }
+
+  function buildItems(keys) {
+    var items = COMMON.slice();
+    (keys || []).forEach(function (k) {
+      var fam = (k || '').split('_')[0];
+      var list = EXTRA[k] || EXTRA[fam + '_2015'] || EXTRA[fam + '_2018'] || [];
+      // also try family map
+      if (!list.length) {
+        if (fam === 'QMS') list = EXTRA.QMS_2015;
+        if (fam === 'EMS') list = EXTRA.EMS_2015;
+        if (fam === 'OHSMS') list = EXTRA.OHSMS_2018;
+      }
+      (list || []).forEach(function (x) { if (items.indexOf(x) < 0) items.push(x); });
+    });
+    var body = document.getElementById('chk-body');
+    body.innerHTML = items.map(function (name, i) {
+      var no = i + 1;
+      var extra = no > 12 ? ' class="std-extra"' : '';
+      return '<tr' + extra + '>' +
+        '<td style="text-align:center;font-weight:700">' + no + '</td>' +
+        '<td>' + name.replace(/</g,'&lt;') + '</td>' +
+        '<td><select class="status-sel" data-item="' + no + '" id="st_' + no + '">' +
+        '<option value="">선택</option><option value="ok">구비됨</option>' +
+        '<option value="partial">부분구비</option><option value="ng">미비</option>' +
+        '<option value="na">해당없음</option></select></td>' +
+        '<td><input class="cinp" id="dn_' + no + '" placeholder="문서명, 버전"></td>' +
+        '<td><textarea id="nt_' + no + '" rows="2" placeholder="확인 사항"></textarea></td></tr>';
+    }).join('');
+    body.querySelectorAll('.status-sel').forEach(function (el) {
+      el.addEventListener('change', updateStats);
+    });
+    // demo defaults: first 8 ok
+    for (var n = 1; n <= Math.min(8, items.length); n++) {
+      var s = document.getElementById('st_' + n);
+      if (s) s.value = 'ok';
+    }
+    updateStats();
+  }
+
+  function apply(ctx) {
+    var m = ctx.master || {};
+    text('co-name', m.company_name);
+    text('co-biz', m.biz_no);
+    text('co-scope', m.scope_kr);
+    text('co-std', (m.standards || []).join(', '));
+    text('co-type', m.audit_type);
+    text('co-emp', m.employee_count != null ? m.employee_count + '명' : '—');
+    text('co-cb', m.cb_name);
+    text('co-cid', m.contract_id);
+    text('co-cno', m.contract_no);
+    var today = new Date().toISOString().slice(0, 10);
+    var rd = document.getElementById('review-date');
+    if (rd && !rd.value) rd.value = today;
+
+    var team = ctx.team || [];
+    var tb = document.getElementById('team-body');
+    tb.innerHTML = team.length
+      ? team.map(function (t) {
+          return '<tr><td>' + (t.role === 'leader' ? '심사팀장' : '심사원') +
+            '</td><td>' + (t.name || '—') + '</td><td>' + (t.grade || '—') +
+            '</td><td>' + (t.registration_no || '—') + '</td></tr>';
+        }).join('')
+      : '<tr><td colspan="4" class="muted">팀 정보 없음</td></tr>';
+
+    buildItems(ctx.selected_standard_keys || m.standard_keys || []);
+
+    var q = 'demo=1&contract_id=' + encodeURIComponent(m.contract_id || 1);
+    document.getElementById('deep-links').innerHTML =
+      '<a href="/audit-docs/stage1_report?' + q + '" target="_blank">1단계 심사보고서</a>' +
+      '<a href="/audit-docs/stage2_report?' + q + '" target="_blank">2단계 심사보고서</a>' +
+      '<a href="/audit-docs/plan?' + q + '" target="_blank">심사계획서</a>' +
+      '<a href="/auditor-portal?tab=reports&' + q + '" target="_blank">심사노트</a>' +
+      '<a href="/demo/audit-docs?' + q + '">문서 허브</a>';
+  }
+
+  document.querySelectorAll('.vvb').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.vvb').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+    });
+  });
+
+  document.addEventListener('complais-audit-doc-ready', function (ev) {
+    apply(ev.detail || {});
+  });
+
+  // fallback if bridge already finished
+  if (window.ComplaisAuditDocMaster && window.ComplaisAuditDocMaster.context) {
+    apply(window.ComplaisAuditDocMaster.context);
+  } else if (!location.search.match(/demo=|contract_id=/)) {
+    // force load
+    location.replace(location.pathname + '?demo=1&contract_id=1');
+  }
+})();
+</script>
+</body>
+</html>

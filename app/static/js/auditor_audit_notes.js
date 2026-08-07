@@ -12,6 +12,7 @@
     noteId: null,
     session: null,
     clauseNo: null,
+    noteSeq: 1,
     pendingNc: null,
     ncGrade: "minor",
     noteMethod: "process", // clause | process (정렬 방식)
@@ -22,21 +23,28 @@
     view: "clause", // clause | interview | matrix
     interviewEntries: {}, // role_key → entry fields (v15)
     ivPersonIdx: 0,
-    dirtyClauses: {}, // clause_no → true (unsaved edits in current standard)
+    dirtyClauses: {}, // clause_no::note_seq → true
+    navExpanded: {}, // mainClauseNo → bool (하위 조항 아코디언)
+    guideOpen: {}, // clause_no::note_seq → bool (상세 가이드 아코디언)
   };
+
+  function noteKey(clauseNo, noteSeq) {
+    return String(clauseNo || "") + "::" + String(noteSeq == null ? 1 : noteSeq);
+  }
 
   function clearDirty() {
     state.dirtyClauses = {};
   }
 
-  function markDirty(clauseNo) {
+  function markDirty(clauseNo, noteSeq) {
     if (!clauseNo) return;
-    state.dirtyClauses[clauseNo] = true;
+    state.dirtyClauses[noteKey(clauseNo, noteSeq != null ? noteSeq : state.noteSeq)] = true;
   }
 
-  function clearDirtyClause(clauseNo) {
-    if (clauseNo && state.dirtyClauses[clauseNo]) {
-      delete state.dirtyClauses[clauseNo];
+  function clearDirtyClause(clauseNo, noteSeq) {
+    const k = noteKey(clauseNo, noteSeq != null ? noteSeq : state.noteSeq);
+    if (clauseNo && state.dirtyClauses[k]) {
+      delete state.dirtyClauses[k];
     }
   }
 
@@ -52,8 +60,14 @@
 
   function clauseNavClass(c) {
     const parts = ["aud-nav-btn"];
-    if (c.clause_no === state.clauseNo && state.view === "clause") parts.push("active");
-    if (state.dirtyClauses[c.clause_no]) parts.push("is-dirty");
+    const seq = c.note_seq || 1;
+    if (
+      c.clause_no === state.clauseNo &&
+      seq === (state.noteSeq || 1) &&
+      state.view === "clause"
+    )
+      parts.push("active");
+    if (state.dirtyClauses[noteKey(c.clause_no, seq)]) parts.push("is-dirty");
     else if (isClauseSaved(c)) parts.push("is-saved");
     return parts.join(" ");
   }
@@ -84,9 +98,11 @@
     const ed = $("audit-note-editor");
     const list = $("reports-list-wrap");
     if (ed) {
-      ed.style.display = show ? "block" : "none";
+      /* flex: portal.css 3-pane shell (sticky sides + center doc-wrap scroll) */
+      ed.style.display = show ? "flex" : "none";
       ed.setAttribute("aria-hidden", show ? "false" : "true");
       ed.classList.toggle("is-preview", !!(show && state.preview));
+      document.body.classList.toggle("aud-note-open", !!show);
     }
     if (list) list.style.display = show ? "none" : "block";
   }
@@ -109,7 +125,36 @@
 
   function currentClause() {
     if (!state.session || !state.clauseNo) return null;
-    return (state.session.clauses || []).find((c) => c.clause_no === state.clauseNo) || null;
+    const seq = state.noteSeq || 1;
+    return (
+      (state.session.clauses || []).find(
+        (c) => c.clause_no === state.clauseNo && (c.note_seq || 1) === seq
+      ) || null
+    );
+  }
+
+  function dash(v) {
+    const s = v == null ? "" : String(v).trim();
+    return s || "—";
+  }
+
+  function formatAuditDate(data) {
+    if (!data) return "—";
+    const start = data.audit_date ? String(data.audit_date).slice(0, 10) : "";
+    const end = data.audit_period_end ? String(data.audit_period_end).slice(0, 10) : "";
+    if (start && end && end !== start) return start + " ~ " + end;
+    return start || "—";
+  }
+
+  function standardsLabel(data) {
+    if (!data) return "—";
+    if (data.standards_label) return data.standards_label;
+    const items = data.standards || [];
+    const bits = items
+      .map((s) => s.display_code || s.standard_code || s.standard_key)
+      .filter(Boolean);
+    if (bits.length) return bits.join(" · ");
+    return data.process_standard_code || data.standard_key || "—";
   }
 
   function cleanTitle(clauseNo, title) {
@@ -167,17 +212,163 @@
   }
 
   function cmpClauseNo(a, b) {
+    /* Natural ISO order: 4 → 4.1 → 4.1.1 → 5 → … → 9 → 10 (parents before children). */
     const ka = clauseNoSortKey(a);
     const kb = clauseNoSortKey(b);
     const n = Math.max(ka.length, kb.length);
     for (let i = 0; i < n; i++) {
-      const xa = ka[i] || [2, ""];
-      const xb = kb[i] || [2, ""];
+      if (i >= ka.length) return -1; // a is parent prefix of b
+      if (i >= kb.length) return 1;
+      const xa = ka[i];
+      const xb = kb[i];
       if (xa[0] !== xb[0]) return xa[0] - xb[0];
       if (xa[1] < xb[1]) return -1;
       if (xa[1] > xb[1]) return 1;
     }
     return 0;
+  }
+
+  function clauseNumParts(clauseNo) {
+    const parts = [];
+    String(clauseNo || "")
+      .split(/[./\s]+/)
+      .forEach((p) => {
+        if (/^\d+$/.test(p)) parts.push(p);
+      });
+    return parts;
+  }
+
+  function clauseDepth(clauseNo) {
+    return clauseNumParts(clauseNo).length;
+  }
+
+  function mainClauseKey(clauseNo) {
+    /* HLS-level key: 5.1.2 → 5.1 ; 4.1 → 4.1 ; chapter-only 4 → null */
+    const parts = clauseNumParts(clauseNo);
+    if (parts.length < 2) return null;
+    return parts[0] + "." + parts[1];
+  }
+
+  function isMainHlsClause(clauseNo) {
+    return clauseDepth(clauseNo) === 2;
+  }
+
+  function isChapterClause(clauseNo) {
+    return clauseDepth(clauseNo) === 1;
+  }
+
+  function sortedClauses(clauses) {
+    return (clauses || []).slice().sort((a, b) => {
+      const cmp = cmpClauseNo(a.clause_no, b.clause_no);
+      if (cmp !== 0) return cmp;
+      return (a.note_seq || 1) - (b.note_seq || 1);
+    });
+  }
+
+  function chapterSortRank(chap) {
+    const n = Number(chap);
+    return Number.isFinite(n) ? n : 999;
+  }
+
+  function navChildKey(mainKey) {
+    return String(mainKey || "");
+  }
+
+  function isNavExpanded(mainKey) {
+    return !!state.navExpanded[navChildKey(mainKey)];
+  }
+
+  function toggleNavExpanded(mainKey) {
+    const k = navChildKey(mainKey);
+    state.navExpanded[k] = !state.navExpanded[k];
+  }
+
+  function guideKey(clauseNo, noteSeq) {
+    return noteKey(clauseNo, noteSeq);
+  }
+
+  function isGuideOpen(clauseNo, noteSeq) {
+    return !!state.guideOpen[guideKey(clauseNo, noteSeq)];
+  }
+
+  function toggleGuideOpen(clauseNo, noteSeq) {
+    const k = guideKey(clauseNo, noteSeq);
+    state.guideOpen[k] = !state.guideOpen[k];
+  }
+
+  function renderNavBtn(c, extraClass) {
+    const seq = c.note_seq || 1;
+    const cls =
+      clauseNavClass(c) + (extraClass ? " " + extraClass : "");
+    const mark = c.verdict
+      ? `<span class="v">${esc(verdictLabel(c.verdict))}</span>`
+      : "";
+    const extra =
+      seq > 1 ? `<span class="v">추가 ${esc(seq)}</span>` : "";
+    return `<button type="button" class="${cls}" data-clause="${esc(
+      c.clause_no
+    )}" data-note-seq="${esc(seq)}" data-hls-code="${esc(
+      c.hls_code || ""
+    )}" data-process-group-id="${esc(
+      c.process_group_id || ""
+    )}"><span class="cno">${esc(c.clause_no)}</span> <span class="ctitle">${esc(
+      clauseTopic(c)
+    )}</span>${extra}${mark}</button>`;
+  }
+
+  function buildMainClauseTree(clauses) {
+    /* Top-level = HLS main (4.1, 5.1…); deeper under parent; chapter rows → headers. */
+    const sorted = sortedClauses(clauses);
+    const chapterTitles = {};
+    sorted.forEach((c) => {
+      if (isChapterClause(c.clause_no)) {
+        const ch = majorChapter(c.clause_no);
+        if (ch && !chapterTitles[ch]) chapterTitles[ch] = clauseTopic(c) || "";
+      }
+    });
+    const mains = [];
+    const childrenByMain = {};
+    const orphans = [];
+    sorted.forEach((c) => {
+      if (isChapterClause(c.clause_no)) return;
+      const mainKey = mainClauseKey(c.clause_no);
+      if (!mainKey) {
+        orphans.push(c);
+        return;
+      }
+      if (isMainHlsClause(c.clause_no)) {
+        mains.push(c);
+        if (!childrenByMain[mainKey]) childrenByMain[mainKey] = [];
+      } else {
+        if (!childrenByMain[mainKey]) childrenByMain[mainKey] = [];
+        childrenByMain[mainKey].push(c);
+      }
+    });
+    /* Ensure parent slot exists when only sub-clauses are in scope */
+    Object.keys(childrenByMain).forEach((mk) => {
+      if (!mains.some((m) => mainClauseKey(m.clause_no) === mk)) {
+        const kids = childrenByMain[mk];
+        if (kids && kids.length) {
+          /* synthetic nav parent from first child meta */
+          const base = kids[0];
+          mains.push(
+            Object.assign({}, base, {
+              clause_no: mk,
+              note_seq: 1,
+              clause_topic: clauseTopic(base) || mk,
+              clause_title: clauseTopic(base) || mk,
+              _synthetic_main: true,
+            })
+          );
+        }
+      }
+    });
+    mains.sort((a, b) => {
+      const cmp = cmpClauseNo(a.clause_no, b.clause_no);
+      if (cmp !== 0) return cmp;
+      return (a.note_seq || 1) - (b.note_seq || 1);
+    });
+    return { mains, childrenByMain, chapterTitles, orphans, sorted };
   }
 
   function kpiIdOf(k) {
@@ -270,6 +461,7 @@
     }
     state.teamMeeting = !!on;
     state.clauseNo = null;
+    state.noteSeq = 1;
     clearDirty();
     syncViewButtons();
     if (state.preview || !state.contractId) return;
@@ -659,6 +851,7 @@
     state.noteMethod = m;
     state.view = "clause";
     state.clauseNo = null;
+    state.noteSeq = 1;
     clearDirty();
     syncMethodTabs();
     if (state.preview || !state.contractId) {
@@ -678,6 +871,59 @@
       /* soft */
     }
     await loadSession(state.contractId, state.standardKey, false, { forceMethod: true });
+  }
+
+  function renderMainBranch(mains, childrenByMain, opts) {
+    /* Shared accordion branch for clause + process nav (main HLS only). */
+    opts = opts || {};
+    let html = "";
+    let lastChap = null;
+    mains.forEach((c) => {
+      if (c._synthetic_main && !(childrenByMain[mainClauseKey(c.clause_no)] || []).length) {
+        return;
+      }
+      const chap = majorChapter(c.clause_no) || "기타";
+      if (opts.showChapter !== false && chap !== lastChap) {
+        const title = (opts.chapterTitles && opts.chapterTitles[chap]) || "";
+        html +=
+          `<div class="grp grp-chapter">제${esc(chap)}장` +
+          (title ? ` <span class="grp-chapter-title">${esc(title)}</span>` : "") +
+          `</div>`;
+        lastChap = chap;
+      }
+      const mainKey = mainClauseKey(c.clause_no) || c.clause_no;
+      const kids = (childrenByMain[mainKey] || []).slice().sort((a, b) => {
+        const cmp = cmpClauseNo(a.clause_no, b.clause_no);
+        if (cmp !== 0) return cmp;
+        return (a.note_seq || 1) - (b.note_seq || 1);
+      });
+      const expanded = c._synthetic_main || isNavExpanded(mainKey);
+      html += `<div class="aud-nav-main-wrap">`;
+      if (!c._synthetic_main) {
+        html += renderNavBtn(c, opts.btnClass || "");
+      } else {
+        html += `<div class="aud-nav-synth-main"><span class="cno">${esc(
+          mainKey
+        )}</span> <span class="ctitle muted">하위 조항</span></div>`;
+      }
+      if (kids.length) {
+        html +=
+          `<button type="button" class="aud-nav-toggle" data-nav-toggle="${esc(
+            mainKey
+          )}" aria-expanded="${expanded ? "true" : "false"}">` +
+          (expanded ? "▲ 하위 조항 접기" : "▼ 하위 조항 펼치기") +
+          ` <span class="aud-nav-toggle-n">${kids.length}</span></button>`;
+        if (expanded) {
+          html += `<div class="aud-nav-children">`;
+          kids.forEach((ch) => {
+            html += renderNavBtn(ch, "nav-child" + (opts.btnClass ? " " + opts.btnClass : ""));
+          });
+          html += `</div>`;
+        }
+      }
+      html += `</div>`;
+    });
+    return html;
   }
 
   function renderNav() {
@@ -708,61 +954,61 @@
 
     let html =
       '<div class="aud-nav-mode-label">' +
-      (isClause
-        ? "조항심사 · 장/조항 순번"
-        : "프로세스심사 · 공정그룹 → HLS") +
+      (isClause ? "조항심사" : "프로세스심사") +
       "</div>";
 
     if (isClause) {
-      const sorted = clauses.slice().sort((a, b) => cmpClauseNo(a.clause_no, b.clause_no));
-      let lastChap = null;
-      sorted.forEach((c) => {
-        const chap = majorChapter(c.clause_no) || "기타";
-        if (chap !== lastChap) {
-          html +=
-            `<div class="grp grp-chapter">제${esc(chap)}장 · 조항순</div>`;
-          lastChap = chap;
-        }
-        const cls = clauseNavClass(c);
-        const mark = c.verdict
-          ? `<span class="v">${esc(verdictLabel(c.verdict))}</span>`
-          : "";
-        html += `<button type="button" class="${cls}" data-clause="${esc(
-          c.clause_no
-        )}" data-hls-code="${esc(c.hls_code || "")}" data-process-group-id="${esc(
-          c.process_group_id || ""
-        )}"><span class="cno">${esc(c.clause_no)}</span> <span class="ctitle">${esc(
-          clauseTopic(c)
-        )}</span>${mark}</button>`;
+      const tree = buildMainClauseTree(clauses);
+      html += renderMainBranch(tree.mains, tree.childrenByMain, {
+        chapterTitles: tree.chapterTitles,
       });
+      if (tree.orphans.length) {
+        html += `<div class="grp grp-chapter">기타</div>`;
+        sortedClauses(tree.orphans).forEach((c) => {
+          html += renderNavBtn(c, "");
+        });
+      }
     } else {
-      let lastGrp = null;
-      let lastHls = null;
-      clauses.forEach((c) => {
-        const g = processGroupName(c) || "프로세스그룹";
-        if (g !== lastGrp) {
-          html += `<div class="grp grp-process" data-process-group-id="${esc(
-            c.process_group_id || ""
-          )}">${esc(g)}</div>`;
-          lastGrp = g;
-          lastHls = null;
+      /* Process: PG groups ordered by earliest ISO chapter (4 first), main-clause accordion inside */
+      const byPg = {};
+      const pgMeta = {};
+      sortedClauses(clauses).forEach((c) => {
+        if (isChapterClause(c.clause_no)) return;
+        const gid = c.process_group_id || processGroupName(c) || "PG";
+        if (!byPg[gid]) byPg[gid] = [];
+        byPg[gid].push(c);
+        if (!pgMeta[gid]) {
+          pgMeta[gid] = {
+            id: c.process_group_id || "",
+            name: processGroupName(c) || "프로세스그룹",
+          };
         }
-        const hls = (c.hls_code || "").trim();
-        if (hls && hls !== lastHls) {
-          html += `<div class="grp-hls">HLS ${esc(hls)}</div>`;
-          lastHls = hls;
-        }
-        const cls = clauseNavClass(c) + " nav-under-process";
-        const mark = c.verdict
-          ? `<span class="v">${esc(verdictLabel(c.verdict))}</span>`
-          : "";
-        html += `<button type="button" class="${cls}" data-clause="${esc(
-          c.clause_no
-        )}" data-hls-code="${esc(c.hls_code || "")}" data-process-group-id="${esc(
-          c.process_group_id || ""
-        )}"><span class="cno">${esc(c.clause_no)}</span> <span class="ctitle">${esc(
-          clauseTopic(c)
-        )}</span>${mark}</button>`;
+      });
+      const pgOrder = Object.keys(byPg).sort((a, b) => {
+        const minA = byPg[a].reduce(
+          (m, c) => (cmpClauseNo(c.clause_no, m) < 0 ? c.clause_no : m),
+          byPg[a][0].clause_no
+        );
+        const minB = byPg[b].reduce(
+          (m, c) => (cmpClauseNo(c.clause_no, m) < 0 ? c.clause_no : m),
+          byPg[b][0].clause_no
+        );
+        const ca = chapterSortRank(majorChapter(minA));
+        const cb = chapterSortRank(majorChapter(minB));
+        if (ca !== cb) return ca - cb;
+        return cmpClauseNo(minA, minB);
+      });
+      pgOrder.forEach((gid) => {
+        const meta = pgMeta[gid];
+        html += `<div class="grp grp-process" data-process-group-id="${esc(
+          meta.id
+        )}">${esc(meta.name)}</div>`;
+        const tree = buildMainClauseTree(byPg[gid]);
+        html += renderMainBranch(tree.mains, tree.childrenByMain, {
+          showChapter: true,
+          chapterTitles: tree.chapterTitles,
+          btnClass: "nav-under-process",
+        });
       });
     }
     box.innerHTML = html;
@@ -787,6 +1033,7 @@
         "</span></div>";
       return;
     }
+    const noteSeq = c.note_seq || 1;
     const isoKpis =
       c.iso_audit_kpis && c.iso_audit_kpis.length
         ? c.iso_audit_kpis
@@ -811,11 +1058,45 @@
       `</div>`;
 
     const cps = c.checkpoints || [];
-    const cpHtml = cps.length
-      ? `<div class="aud-cp"><div class="aud-cp-hd">참고 가이드 <span class="muted">(체크포인트 · 검증 게이트 아님)</span></div><ul>${cps
-          .map((x) => `<li>${esc(x.title || "")}${x.hint ? ` <span class="muted">— ${esc(x.hint)}</span>` : ""}</li>`)
-          .join("")}</ul></div>`
+    const guideOpen = isGuideOpen(c.clause_no, noteSeq);
+    const hasGuideBody = !!(c.question && String(c.question).trim()) || cps.length > 0;
+    const cpList = cps.length
+      ? `<ul class="aud-cp-list">${cps
+          .map(
+            (x) =>
+              `<li>${esc(x.title || "")}${
+                x.hint ? ` <span class="muted">— ${esc(x.hint)}</span>` : ""
+              }</li>`
+          )
+          .join("")}</ul>`
       : "";
+    const guideInner = `
+      <div class="aud-guide-body">
+        ${
+          c.question && String(c.question).trim()
+            ? `<div class="q aud-guide-q">${esc(c.question)}</div>`
+            : `<div class="q aud-guide-q muted">등록된 가이드 질문이 없습니다.</div>`
+        }
+        ${
+          cps.length
+            ? `<div class="aud-cp-hd">체크포인트 <span class="muted">(참고 · 검증 게이트 아님)</span></div>${cpList}`
+            : `<p class="muted aud-cp-empty">연결된 체크포인트 없음</p>`
+        }
+      </div>`;
+    const guideHtml = hasGuideBody
+      ? `<div class="aud-guide-acc">
+          <button type="button" class="aud-guide-toggle" id="aud-guide-toggle" aria-expanded="${
+            guideOpen ? "true" : "false"
+          }">${
+            guideOpen
+              ? "▲ 상세 가이드 및 체크포인트 접기"
+              : "▼ 상세 가이드 및 체크포인트 펼치기"
+          }</button>
+          <div class="aud-guide-panel" id="aud-guide-panel" style="display:${
+            guideOpen ? "block" : "none"
+          }">${guideInner}</div>
+        </div>`
+      : `<div class="aud-guide-acc"><p class="muted aud-cp-empty">상세 가이드/체크포인트 없음</p></div>`;
 
     const previewBanner = state.preview
       ? `<div class="aud-preview-banner">미리보기 (배정 없음) — 저장은 DB에 반영되지 않습니다.</div>`
@@ -828,51 +1109,71 @@
       `<div class="aud-method-banner ${
         state.noteMethod === "clause" ? "is-clause" : "is-process"
       }">심사방식: ${
-        state.noteMethod === "clause"
-          ? "조항심사 (장·조항 순번)"
-          : "프로세스심사 (공정그룹 → HLS)"
-      }</div>`;
+        state.noteMethod === "clause" ? "조항심사" : "프로세스심사"
+      }${noteSeq > 1 ? " · 추가 노트 " + noteSeq : ""}</div>`;
     const metaBits = [
       c.standard_code ? "standard_code: " + c.standard_code : "",
       state.noteMethod === "process" && c.process_group_id
         ? "process_group_id: " + c.process_group_id
         : "",
       c.hls_code ? "hls_code: " + c.hls_code : "",
+      noteSeq > 1 ? "note_seq: " + noteSeq : "",
       c.plan_dept ? "계획서 부서/공정: " + c.plan_dept : "",
     ]
       .filter(Boolean)
       .join(" · ");
+    const addNoteBtn =
+      state.noteMethod === "process"
+        ? `<button type="button" class="btn ghost" id="aud-btn-add-note">심사노트 추가</button>`
+        : "";
+    const ncrBadge = c.ncr_grade
+      ? `<span class="aud-ncr-badge">${esc(
+          c.ncr_grade === "major"
+            ? "Major"
+            : c.ncr_grade === "observation"
+              ? "OBS"
+              : "Minor"
+        )}</span>`
+      : "";
 
     box.innerHTML = `
       ${previewBanner}
       ${teamBanner}
       ${methodBanner}
-      <h3><span class="cno">${esc(c.clause_no)}</span> <span class="ctitle">${esc(clauseTopic(c))}</span></h3>
+      <h3><span class="cno">${esc(c.clause_no)}</span> <span class="ctitle">${esc(clauseTopic(c))}</span>${
+        noteSeq > 1 ? ` <span class="muted">(추가 ${esc(noteSeq)})</span>` : ""
+      }${ncrBadge}</h3>
       ${metaBits ? `<p class="muted aud-clause-meta">${esc(metaBits)}</p>` : ""}
-      <div class="q">${esc(c.question || "질문이 등록되지 않은 조항입니다.")}</div>
-      ${cpHtml}
+      ${guideHtml}
       ${kpiHtml}
       <h4 class="aud-sec-hd">심사 노트</h4>
       <textarea id="aud-note-text" rows="7" placeholder="현장 관찰·확인 내용을 자유롭게 기록하세요.">${esc(c.note_text || "")}</textarea>
       <div class="aud-judge">
-        <button type="button" class="btn" id="aud-btn-nc">부적합/관찰 작성</button>
+        <button type="button" class="btn" id="aud-btn-nc" data-clause-no="${esc(
+          c.clause_no
+        )}">부적합/관찰 작성</button>
         <button type="button" class="btn ghost" id="aud-btn-ok">적합</button>
         <button type="button" class="btn ghost" id="aud-btn-save">저장</button>
+        ${addNoteBtn}
       </div>
       <div class="aud-save-msg" id="aud-save-msg"></div>
     `;
 
     $("aud-note-text")?.addEventListener("input", () => {
-      markDirty(c.clause_no);
+      markDirty(c.clause_no, noteSeq);
       renderNav();
     });
     box.querySelectorAll(".aud-kpi-row input").forEach((el) => {
       el.addEventListener("input", () => {
-        markDirty(c.clause_no);
+        markDirty(c.clause_no, noteSeq);
         renderNav();
       });
     });
-    $("aud-btn-nc")?.addEventListener("click", openNcModal);
+    $("aud-guide-toggle")?.addEventListener("click", () => {
+      toggleGuideOpen(c.clause_no, noteSeq);
+      renderMain();
+    });
+    $("aud-btn-nc")?.addEventListener("click", () => openNcModal());
     $("aud-btn-ok")?.addEventListener("click", () => saveClause({ verdict: "적합" }));
     $("aud-btn-save")?.addEventListener("click", () => {
       const v = c.verdict && c.verdict !== "적합" ? c.verdict : "적합";
@@ -887,6 +1188,78 @@
               : null);
       saveClause({ verdict: v, ncr_grade: grade, ncr_fact: c.ncr_fact || "" });
     });
+    $("aud-btn-add-note")?.addEventListener("click", addExtraProcessNote);
+  }
+
+  function addExtraProcessNote() {
+    if (state.noteMethod !== "process") {
+      toast("추가 심사노트는 프로세스심사에서만 사용할 수 있습니다.");
+      return;
+    }
+    const c = currentClause();
+    if (!c || !state.session) return;
+    const clauses = state.session.clauses || [];
+    const same = clauses.filter((x) => x.clause_no === c.clause_no);
+    let maxSeq = 1;
+    same.forEach((x) => {
+      const s = x.note_seq || 1;
+      if (s > maxSeq) maxSeq = s;
+    });
+    const next = maxSeq + 1;
+    const clone = {
+      id: -(Date.now()),
+      standard_key: c.standard_key,
+      standard_code: c.standard_code || null,
+      family_code: c.family_code || null,
+      clause_no: c.clause_no,
+      clause_topic: c.clause_topic || c.clause_title || "",
+      clause_title: c.clause_topic || c.clause_title || "",
+      question: c.question || "",
+      default_kpis: (c.default_kpis || []).slice(),
+      iso_audit_kpis: (c.iso_audit_kpis || []).slice(),
+      esg_kpis: (c.esg_kpis || []).slice(),
+      checkpoints: (c.checkpoints || []).slice(),
+      process_group_id: c.process_group_id || null,
+      process_group_name: c.process_group_name || c.group_name || null,
+      group_name: c.process_group_name || c.group_name || null,
+      hls_code: c.hls_code || null,
+      source: c.source || null,
+      sort_order: c.sort_order || 0,
+      note_seq: next,
+      clause_row_id: null,
+      is_extra: true,
+      plan_dept: c.plan_dept || null,
+      plan_process: c.plan_process || null,
+      verdict: null,
+      note_text: "",
+      kpi_values: {},
+      ncr_grade: null,
+      ncr_fact: null,
+      ncr_requirement: null,
+      ncr_root_cause: null,
+      ncr_audit_date: null,
+      ncr_auditor_name: null,
+      ncr_dept: null,
+      ncr_request_date: null,
+      ncr_due_date: null,
+      ncr_esg_tags: [],
+      saved_at: null,
+    };
+    let insertAt = clauses.length;
+    for (let i = clauses.length - 1; i >= 0; i--) {
+      if (clauses[i].clause_no === c.clause_no) {
+        insertAt = i + 1;
+        break;
+      }
+    }
+    clauses.splice(insertAt, 0, clone);
+    state.session.clauses = clauses;
+    state.clauseNo = c.clause_no;
+    state.noteSeq = next;
+    state.view = "clause";
+    renderNav();
+    renderMain();
+    toast("추가 심사노트를 만들었습니다. 작성 후 저장하세요.");
   }
 
   function collectKpis() {
@@ -901,6 +1274,8 @@
   async function saveClause(opts) {
     const c = currentClause();
     if (!c) return;
+
+    const noteSeq = c.note_seq || state.noteSeq || 1;
 
     // Preview / no assignment: soft-save locally + toast (no DB write)
     if (state.preview || !state.contractId) {
@@ -922,7 +1297,7 @@
         c.kpi_values[k.kpi_id || k.key] = k.value || "";
       });
       c.saved_at = c.saved_at || new Date().toISOString();
-      clearDirtyClause(c.clause_no);
+      clearDirtyClause(c.clause_no, noteSeq);
       renderNav();
       toast("미리보기(배정 없음)");
       return;
@@ -940,6 +1315,8 @@
       clause_title: c.clause_topic || c.clause_title || "",
       process_group_id: c.process_group_id || null,
       hls_code: c.hls_code || null,
+      note_seq: noteSeq,
+      clause_row_id: c.clause_row_id || null,
       note_text: noteText,
       verdict: opts.verdict || "적합",
       ncr_grade: opts.ncr_grade || null,
@@ -969,14 +1346,18 @@
       c.ncr_fact = body.ncr_fact;
       c.ncr_auditor_name = body.ncr_auditor_name;
       c.ncr_dept = body.ncr_dept;
+      c.note_seq = noteSeq;
+      if (data.clause_row_id) c.clause_row_id = data.clause_row_id;
       c.saved_at = new Date().toISOString();
       c.kpi_values = {};
       (body.kpi_values || []).forEach((k) => {
         c.kpi_values[k.kpi_id || k.key] = k.value || "";
       });
-      clearDirtyClause(c.clause_no);
+      clearDirtyClause(c.clause_no, noteSeq);
       renderNav();
-      if (msg) msg.textContent = data.message || "저장되었습니다.";
+      renderMain();
+      const msg2 = $("aud-save-msg");
+      if (msg2) msg2.textContent = data.message || "저장되었습니다.";
     } catch (e) {
       if (msg) msg.textContent = e.message || "저장 실패";
     }
@@ -1263,27 +1644,65 @@
     hydrateInterviewData(data);
 
     if (!state.clauseNo && data.clauses && data.clauses.length) {
-      state.clauseNo = data.clauses[0].clause_no;
-    } else if (state.clauseNo && !(data.clauses || []).some((c) => c.clause_no === state.clauseNo)) {
-      state.clauseNo = data.clauses && data.clauses[0] ? data.clauses[0].clause_no : null;
+      const sorted = sortedClauses(data.clauses);
+      const first =
+        sorted.find((c) => isMainHlsClause(c.clause_no)) ||
+        sorted.find((c) => !isChapterClause(c.clause_no)) ||
+        sorted[0];
+      state.clauseNo = first.clause_no;
+      state.noteSeq = first.note_seq || 1;
+    } else if (
+      state.clauseNo &&
+      !(data.clauses || []).some(
+        (c) =>
+          c.clause_no === state.clauseNo && (c.note_seq || 1) === (state.noteSeq || 1)
+      )
+    ) {
+      const sorted = sortedClauses(data.clauses || []);
+      const hit =
+        sorted.find((c) => c.clause_no === state.clauseNo) ||
+        sorted.find((c) => isMainHlsClause(c.clause_no)) ||
+        sorted.find((c) => !isChapterClause(c.clause_no)) ||
+        sorted[0] ||
+        null;
+      state.clauseNo = hit ? hit.clause_no : null;
+      state.noteSeq = hit ? hit.note_seq || 1 : 1;
     }
+
+    const companyName = state.preview
+      ? dash(data.company_name)
+      : dash(data.company_name || (data.contract_id ? "계약 #" + data.contract_id : null));
+    const stdLabel = standardsLabel(data);
+    const cbLabel = dash(data.cb_name);
+    const dateLabel = formatAuditDate(data);
+    const typeLabel = dash(
+      data.audit_stage_label || data.audit_type_label || data.audit_type
+    );
+
+    const setHdr = (id, val) => {
+      const el = $(id);
+      if (el) el.textContent = val;
+    };
+    setHdr("aud-hdr-company", companyName);
+    setHdr("aud-hdr-standards", stdLabel);
+    setHdr("aud-hdr-cb", cbLabel);
+    setHdr("aud-hdr-date", dateLabel);
+    setHdr("aud-hdr-type", typeLabel);
 
     const company = $("aud-note-company");
     const sub = $("aud-note-sub");
-    if (company) {
-      company.textContent = state.preview
-        ? "미리보기 (배정 없음)"
-        : data.company_name || ("계약 #" + data.contract_id);
-    }
+    if (company) company.textContent = companyName;
     const methodLabel = state.noteMethod === "clause" ? "조항심사" : "프로세스심사";
     const modeLabel = data.audit_mode_label || "";
     if (sub) {
       const src =
-        data.clause_source === "process_group"
-          ? "프로세스그룹"
-          : data.clause_source === "iso_clauses"
-            ? "iso_clauses"
-            : "";
+        data.clause_source === "standard_clause_masters"
+          ? "표준조항마스터"
+          : data.clause_source === "process_group"
+            ? "프로세스그룹"
+            : data.clause_source === "iso_clauses"
+              ? "iso_clauses"
+              : "";
       const bits = [];
       if (state.preview) {
         bits.push("미리보기 · DB 미저장");
@@ -1301,12 +1720,9 @@
 
     const navCo = $("aud-note-nav-company");
     const navMeta = $("aud-note-nav-meta");
-    if (navCo) navCo.textContent = company ? company.textContent : (data.company_name || "—");
+    if (navCo) navCo.textContent = companyName;
     if (navMeta) {
-      let src =
-        state.noteMethod === "clause"
-          ? "조항심사 · 장/조항 순번"
-          : "프로세스심사 · 공정→HLS";
+      let src = state.noteMethod === "clause" ? "조항심사" : "프로세스심사";
       if (state.teamMeeting) src = "팀 전체 배정 · " + src;
       else if (!state.preview && data.scope_mode === "assigned")
         src = "내 배정 · " + src;
@@ -1319,6 +1735,10 @@
 
     const badge = $("aud-note-preview-badge");
     if (badge) badge.style.display = state.preview ? "inline-flex" : "none";
+    const rptBtn = $("aud-open-result-report");
+    if (rptBtn) {
+      rptBtn.style.display = state.preview || !state.contractId ? "none" : "";
+    }
     syncAuditModeBadge();
 
     const filterHint = $("aud-std-filter-hint");
@@ -1422,7 +1842,12 @@
       state.contractId = null;
       state.session = {
         preview: true,
-        company_name: "미리보기 (배정 없음)",
+        company_name: null,
+        cb_name: null,
+        standards_label: "ISO 9001:2015",
+        audit_date: null,
+        audit_type: null,
+        audit_stage_label: null,
         standard_key: standardKey || DEFAULT_STANDARD,
         standards: [
           {
@@ -1454,6 +1879,7 @@
     state.preview = false;
     state.session = null;
     state.clauseNo = null;
+    state.noteSeq = 1;
     const url = new URL(location.href);
     url.searchParams.set("tab", "reports");
     url.searchParams.delete("contract");
@@ -1522,9 +1948,18 @@
       setNoteMethod(modeBtn.getAttribute("data-method"));
       return;
     }
+    const navToggle = evt.target.closest("#aud-note-nav [data-nav-toggle]");
+    if (navToggle) {
+      evt.preventDefault();
+      toggleNavExpanded(navToggle.getAttribute("data-nav-toggle"));
+      renderNav();
+      return;
+    }
     const navBtn = evt.target.closest("#aud-note-nav [data-clause]");
     if (navBtn) {
       state.clauseNo = navBtn.getAttribute("data-clause");
+      const seqRaw = navBtn.getAttribute("data-note-seq");
+      state.noteSeq = seqRaw ? Number(seqRaw) || 1 : 1;
       state.view = "clause";
       renderNav();
       renderActiveView();
@@ -1596,6 +2031,16 @@
     state.view = state.view === "matrix" ? "clause" : "matrix";
     renderActiveView();
   });
+  $("aud-open-result-report")?.addEventListener("click", () => {
+    if (!state.contractId || state.preview) return;
+    if (window.AuditorPortal && typeof window.AuditorPortal.openResultReport === "function") {
+      window.AuditorPortal.openResultReport(state.contractId);
+    } else {
+      location.href =
+        "/auditor-portal?tab=reports&view=report&contract=" +
+        encodeURIComponent(state.contractId);
+    }
+  });
   $("aud-team-meeting-btn")?.addEventListener("click", () => {
     setTeamMeeting(!state.teamMeeting);
   });
@@ -1630,11 +2075,13 @@
     setTeamMeeting: setTeamMeeting,
   };
 
-  // Deep link: ?tab=reports[&contract=123|&preview=1]
+  // Deep link: ?tab=reports[&contract=123|&preview=1|&view=report]
+  // view=report is handled by AuditorPortal; notes open only when not report view
   document.addEventListener("DOMContentLoaded", () => {
     const url = new URL(location.href);
     const tab = url.searchParams.get("tab") || "";
     if (tab !== "reports") return;
+    if (url.searchParams.get("view") === "report") return;
     const contract = url.searchParams.get("contract");
     const standard = url.searchParams.get("standard");
     const wantPreview = url.searchParams.get("preview") === "1" || !contract;

@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>전환심사 문서 세트 — IAF MD2 / ISO/IEC 17021-1</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="/static/css/main.css?v=20260807docs1">
+<link rel="stylesheet" href="/static/css/portal.css?v=20260807theme1">
+<link rel="stylesheet" href="/static/css/style.css?v=20260807cal1">
+<link rel="stylesheet" href="/static/css/admin_doc_theme.css?v=20260807theme1">
+<style>
+:root{
+  --blue:#1a5fa8;--blue2:#e8f0fb;--blue3:#c5d8f5;
+  --green:#1e7a4a;--green2:#e6f5ec;
+  --amber:#8a5c00;--amber2:#fff8e1;--amber3:#fde68a;
+  --red:#b71c1c;--red2:#fce8e8;--red3:#fca5a5;
+  --purple:#4527a0;--purple2:#ede7f6;
+  --text1:#1a1a2e;--text2:#5a6072;--text3:#9098aa;
+  --border:#dde1e7;--bg:#fff;--bg2:#f7f8fa;--card:#fff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
+     background:var(--bg2);color:var(--text1);font-size:12px}
+
+/* ── 헤더 ── */
+#hdr{background:var(--blue);color:#fff;padding:10px 20px;
+     display:flex;align-items:center;justify-content:space-between;gap:10px;
+     position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.logo{font-size:14px;font-weight:800}
+.logo small{font-size:10px;font-weight:400;opacity:.7;margin-left:5px}
+.hdr-r{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.hbtn{padding:5px 13px;font-size:10px;font-weight:600;border:1px solid rgba(255,255,255,.4);
+      border-radius:6px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;transition:.15s}
+.hbtn:hover{background:rgba(255,255,255,.28)}
+.hbtn.pri{background:#fff;color:var(--blue)}
+
+/* ── 탭 ── */
+#tab-bar{background:var(--card);border-bottom:2px solid var(--border);
+         padding:0 20px;display:flex;gap:0;overflow-x:auto}
+.tab{padding:11px 18px;font-size:11px;font-weight:600;cursor:pointer;
+     border-bottom:3px solid transparent;color:var(--text2);white-space:nowrap;
+     transition:.15s;background:none;border-top:none;border-left:none;border-right:none}
+.tab:hover{color:var(--blue);background:var(--blue2)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+/* ── 페이지 ── */
+#pg{max-width:860px;margin:0 auto;padding:20px 14px 60px}
+.doc-page{display:none}
+.doc-page.active{display:block}
+
+/* ── 문서 공통 ── */
+.doc-wrap{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:30px 36px}
+
+/* ── 문서 헤더 ── */
+.doc-hd{border-bottom:3px solid var(--blue);padding-bottom:18px;margin-bottom:22px}
+.doc-tag{font-size:9px;font-weight:700;color:var(--blue);letter-spacing:1px;
+         text-transform:uppercase;margin-bottom:5px}
+.doc-title{font-size:20px;font-weight:800;margin-bottom:4px;line-height:1.2}
+.doc-sub{font-size:11px;color:var(--text2);margin-bottom:14px}
+.doc-meta{display:inline-grid;grid-template-columns:auto auto;gap:3px 18px;
+          font-size:10px;background:var(--bg2);padding:9px 16px;
+          border-radius:7px;border:1px solid var(--border)}
+.dm-lbl{color:var(--text3);font-weight:600}
+.dm-val{font-weight:700}
+
+/* ── 섹션 ── */
+.sec{margin-bottom:22px}
+.sec-title{font-size:12px;font-weight:800;color:var(--blue);
+           border-bottom:2px solid var(--blue3);padding-bottom:5px;
+           margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.sec-no{background:var(--blue);color:#fff;font-size:9px;font-weight:700;
+        padding:2px 7px;border-radius:10px}
+
+/* ── 입력 테이블 ── */
+.form-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.form-tbl td{padding:7px 10px;border:1px solid var(--border);vertical-align:top}
+.form-tbl td.lbl{background:var(--bg2);font-weight:600;width:140px;color:var(--text2);
+                 white-space:nowrap}
+.form-tbl td.lbl2{background:var(--bg2);font-weight:600;width:100px;color:var(--text2)}
+.inp{width:100%;border:none;background:transparent;font-size:11px;font-family:inherit;
+     color:var(--text1);outline:none;padding:0;min-height:20px}
+.inp.underline{border-bottom:1px solid var(--border2);padding:1px 0;display:block}
+.ta{width:100%;border:none;background:transparent;font-size:11px;font-family:inherit;
+    color:var(--text1);outline:none;padding:0;resize:vertical;min-height:40px;line-height:1.5}
+.inp:focus,.ta:focus{background:var(--blue2);border-radius:2px;padding:2px 4px}
+
+/* ── 체크리스트 ── */
+.cl-section{margin-bottom:14px}
+.cl-section-title{font-size:11px;font-weight:700;color:var(--text1);
+                  background:var(--bg2);padding:6px 10px;border-radius:5px;
+                  margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.cl-item{display:flex;align-items:flex-start;gap:10px;padding:7px 8px;
+         border-bottom:1px solid var(--border);font-size:10px}
+.cl-item:last-child{border-bottom:none}
+.cl-item-ref{font-size:9px;color:var(--text3);width:80px;flex-shrink:0;margin-top:1px}
+.cl-item-text{flex:1;line-height:1.5}
+.cl-result{display:flex;gap:4px;flex-shrink:0;margin-left:6px}
+.result-btn{padding:2px 8px;border-radius:4px;border:1px solid var(--border);
+            background:var(--bg2);font-size:9px;font-weight:600;cursor:pointer;transition:.15s}
+.result-btn:hover{border-color:var(--border2)}
+.result-btn.ok{background:var(--green2);border-color:#86efac;color:var(--green)}
+.result-btn.ng{background:var(--red2);border-color:var(--red3);color:var(--red)}
+.result-btn.na{background:var(--bg2);border-color:var(--border);color:var(--text3)}
+.cl-remark{margin-top:3px;width:100%}
+.cl-remark-inp{width:100%;border:none;border-bottom:1px dashed var(--border);
+               background:transparent;font-size:10px;font-family:inherit;
+               color:var(--text2);outline:none;padding:1px 0}
+
+/* ── 판정 박스 ── */
+.verdict-box{border-radius:8px;padding:13px 16px;margin-bottom:14px;
+             display:flex;align-items:flex-start;gap:12px}
+.vb-proceed{background:var(--green2);border:1px solid #86efac}
+.vb-new-client{background:var(--red2);border:1px solid var(--red3)}
+.vb-conditional{background:var(--amber2);border:1px solid var(--amber3)}
+.vb-icon{font-size:26px;flex-shrink:0}
+.vb-body h3{font-size:13px;font-weight:800;margin-bottom:3px}
+.vb-body p{font-size:11px;opacity:.85;line-height:1.5}
+
+/* ── 서명란 ── */
+.sig-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.sig-box{padding:8px 0}
+.sig-role{font-size:9px;color:var(--text3);font-weight:600;margin-bottom:4px}
+.sig-line{border-bottom:1px solid var(--text1);min-height:28px;padding:3px 0;
+          font-size:12px;font-weight:700}
+.sig-date{font-size:10px;color:var(--text3);margin-top:4px}
+
+/* ── 심사 범위 계획 ── */
+.scope-row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;
+           padding:6px 0;border-bottom:1px solid var(--border)}
+.scope-check{width:16px;height:16px;cursor:pointer}
+.scope-std{font-size:10px;font-weight:600}
+.scope-note{font-size:10px;color:var(--text3)}
+
+/* ── NC 목록 ── */
+.nc-row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;
+        padding:7px 0;border-bottom:1px solid var(--border);align-items:start;font-size:10px}
+.nc-add-btn{padding:4px 12px;border-radius:5px;border:1px dashed var(--blue);
+            background:var(--blue2);color:var(--blue);font-size:10px;font-weight:600;
+            cursor:pointer;margin-top:6px}
+
+/* ── 인증 결정 ── */
+.cert-decision-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.cd-btn{padding:7px 16px;border-radius:8px;border:2px solid var(--border);
+        background:var(--bg2);cursor:pointer;font-size:11px;font-weight:700;transition:.15s}
+.cd-btn:hover{border-color:var(--blue)}
+.cd-btn.sel-proceed{border-color:var(--green);background:var(--green2);color:var(--green)}
+.cd-btn.sel-new{border-color:var(--red);background:var(--red2);color:var(--red)}
+.cd-btn.sel-cond{border-color:var(--amber);background:var(--amber2);color:var(--amber)}
+
+/* ── 심사 일정표 ── */
+.schedule-row{display:grid;grid-template-columns:100px 1fr 80px 80px;gap:8px;
+              padding:6px 0;border-bottom:1px solid var(--border);font-size:10px}
+
+/* ── 유틸 ── */
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.field-group{display:flex;flex-direction:column;gap:3px}
+.field-lbl{font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.field-inp{padding:6px 9px;border:1px solid var(--border);border-radius:6px;
+           font-size:11px;background:var(--bg);color:var(--text1);
+           font-family:inherit;outline:none;width:100%}
+.field-inp:focus{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue2)}
+.field-ta{width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;
+          font-size:11px;resize:vertical;background:var(--bg);color:var(--text1);
+          font-family:inherit;outline:none;min-height:60px;line-height:1.5}
+.field-ta:focus{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue2)}
+.notice{padding:9px 12px;background:var(--amber2);border-radius:6px;
+        font-size:10px;color:var(--amber);line-height:1.6;margin-bottom:12px}
+.notice.blue{background:var(--blue2);color:var(--blue)}
+.notice.green{background:var(--green2);color:var(--green)}
+.badge{font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px}
+.badge-ref{background:var(--purple2);color:var(--purple)}
+
+@media print{
+  #hdr .hdr-r,#tab-bar,#save-notice,.no-print{display:none!important}
+  #hdr{position:static}
+  #pg{padding:4px 0}
+  .doc-page{display:block!important}
+  .doc-wrap{border:none;padding:0}
+  .tab-title-print{display:block!important;font-size:14px;font-weight:800;
+                   color:var(--blue);margin-bottom:16px;padding-bottom:8px;
+                   border-bottom:2px solid var(--blue)}
+  .page-break{page-break-before:always;margin-top:30px}
+}
+.tab-title-print{display:none}
+@page{margin:15mm 13mm}
+</style>
+<style id="admin-doc-theme-overrides">
+/* Modern admin tokens win over page :root aliases */
+:root {
+  --admin-primary: #0F172A;
+  --admin-primary-light: #1E293B;
+  --admin-accent: #2563EB;
+  --admin-accent-bg: #EFF6FF;
+  --admin-bg: #F8FAFC;
+  --admin-card: #FFFFFF;
+  --admin-border: #E2E8F0;
+  --admin-text: #1E293B;
+  --admin-text-muted: #64748B;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --bg: var(--admin-card);
+  --bg2: var(--admin-bg);
+  --card: var(--admin-card);
+  --border: var(--admin-border);
+  --text1: var(--admin-text);
+  --text2: var(--admin-text-muted);
+  --text3: #94A3B8;
+  --blue: var(--admin-accent);
+  --blue2: var(--admin-accent-bg);
+  --indigo: var(--admin-primary);
+  --indigo2: #E2E8F0;
+  --green: var(--success);
+  --green2: #ECFDF5;
+  --red: var(--danger);
+  --red2: #FEF2F2;
+  --amber: #B45309;
+  --amber2: #FFFBEB;
+  --purple: #3730A3;
+  --purple2: #EEF2FF;
+  --teal: #0F766E;
+  --teal2: #F0FDFA;
+}
+</style>
+
+</head>
+<body class="portal-page admin-page">
+
+<!-- 헤더 -->
+<div id="hdr">
+  <div class="logo">ComplAIs <small>전환심사 문서 세트 — IAF MD2:2023 / ISO/IEC 17021-1</small></div>
+  <div class="hdr-r">
+    <button class="hbtn" onclick="saveAll()">💾 저장</button>
+    <button class="hbtn pri no-print" onclick="window.print()">🖨️ 전체 인쇄</button>
+  </div>
+</div>
+
+<!-- 탭 -->
+<div id="tab-bar">
+  <button class="tab active" onclick="showTab(0)">① 전환심사 신청서</button>
+  <button class="tab" onclick="showTab(1)">② 사전검토 체크리스트</button>
+  <button class="tab" onclick="showTab(2)">③ 전환심사 계획서</button>
+  <button class="tab" onclick="showTab(3)">④ 전환심사 보고서</button>
+</div>
+
+<div id="save-notice" class="no-print" style="background:var(--green2);color:var(--green);
+  font-size:10px;font-weight:700;text-align:center;padding:5px;display:none">
+  ✅ 저장 완료 — 브라우저 새로고침 후에도 데이터 유지됩니다
+</div>
+
+<div id="pg">
+
+<!-- ════════════════════════════════════════════════════
+     ① 전환심사 신청서
+     ════════════════════════════════════════════════════ -->
+<div class="doc-page active" id="page-0">
+<div class="doc-wrap">
+  <div class="tab-title-print">① 전환심사 신청서</div>
+
+  <div class="doc-hd">
+    <div class="doc-tag">IAF MD2:2023 §3 · ISO/IEC 17021-1 §9.1.1 · 전환심사(Transfer of Certification)</div>
+    <div class="doc-title">전환심사 신청서</div>
+    <div class="doc-sub">Application for Transfer of Accredited Management System Certification</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">문서 번호</span>
+      <span><input class="inp underline" id="d1-rno" placeholder="예) TCA-2025-001" style="width:160px"></span>
+      <span class="dm-lbl">신청일</span>
+      <span><input class="inp underline" type="date" id="d1-date" style="width:130px"></span>
+    </div>
+  </div>
+
+  <!-- §1 신청 조직 정보 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">1</span> 신청 조직 정보 <span class="badge badge-ref">§9.1.1 a)b)</span></div>
+    <table class="form-tbl">
+      <tr><td class="lbl">조직명 (법인명)</td>
+          <td><input class="inp" id="d1-org" placeholder="법인등기 상 정식 명칭"></td></tr>
+      <tr><td class="lbl">사업자등록번호</td>
+          <td><input class="inp" id="d1-bizno" placeholder="000-00-00000"></td>
+          </tr>
+      <tr><td class="lbl">대표자</td>
+          <td><input class="inp" id="d1-ceo" placeholder="대표이사 성명"></td></tr>
+      <tr><td class="lbl">본사 주소</td>
+          <td><input class="inp" id="d1-addr" placeholder="도로명 주소 (우편번호 포함)"></td></tr>
+      <tr><td class="lbl">심사 대상 사이트</td>
+          <td><textarea class="ta" id="d1-sites" rows="3"
+            placeholder="심사 대상 사이트 전체 목록 (사이트별 주소, 인원 기재)&#10;예) 본사: 경기 성남시 분당구 ... (300명)&#10;    제1공장: 인천광역시 ... (150명)"></textarea></td></tr>
+      <tr><td class="lbl">업종 / NACE 코드</td>
+          <td><input class="inp" id="d1-nace" placeholder="예) 자동차 부품 제조 / C29.32"></td></tr>
+      <tr><td class="lbl">총 종업원 수</td>
+          <td><input class="inp" id="d1-emp" placeholder="예) 450명 (정규직 380, 계약직 70)"></td></tr>
+      <tr><td class="lbl">담당자 (연락처)</td>
+          <td><input class="inp" id="d1-contact" placeholder="성명 / 직책 / 전화 / 이메일"></td></tr>
+    </table>
+  </div>
+
+  <!-- §2 현재 인증 정보 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">2</span> 현재 인증 정보 (이관 인증기관) <span class="badge badge-ref">IAF MD2 §3.1</span></div>
+    <div class="notice">
+      ⚠️ <b>전환 요건:</b> IAF·지역 MLA 서명기관의 인정을 받은 유효한 인증서만 전환 가능합니다.
+      인정마크(KAB, DAkkS, UKAS 등)가 없는 인증서는 신규 고객으로 처리됩니다.
+      <span style="font-size:9px;color:var(--amber)">(IAF MD2:2023 §3.1)</span>
+    </div>
+    <table class="form-tbl">
+      <tr><td class="lbl">현 인증기관명 (이관기관)</td>
+          <td><input class="inp" id="d1-issuing-cb" placeholder="인증기관 정식 명칭"></td></tr>
+      <tr><td class="lbl">인정기관 및 인정번호</td>
+          <td><input class="inp" id="d1-ab" placeholder="예) KAB-QM-0123 (한국인정지원센터)"></td></tr>
+      <tr><td class="lbl">인증서 번호</td>
+          <td><input class="inp" id="d1-cert-no" placeholder="현 인증서 번호 (모든 표준 포함)"></td></tr>
+      <tr><td class="lbl">인증 대상 표준</td>
+          <td><textarea class="ta" id="d1-stds" rows="2"
+            placeholder="예) ISO 14001:2015, ISO 45001:2018"></textarea></td></tr>
+      <tr><td class="lbl">인증 범위 (Scope)</td>
+          <td><textarea class="ta" id="d1-scope" rows="2"
+            placeholder="현 인증서에 기재된 인증 범위"></textarea></td></tr>
+      <tr><td class="lbl">최초인증일</td>
+          <td><input class="inp" id="d1-cert-initial" type="date"></td></tr>
+      <tr><td class="lbl">현 인증서 유효기간</td>
+          <td><input class="inp" id="d1-cert-expiry" placeholder="예) 2025.09.30 (만료 6개월 전 이상 잔여 권장)"></td></tr>
+      <tr><td class="lbl">최근 심사 종류</td>
+          <td><select id="d1-last-audit" style="width:100%;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:11px;background:var(--bg)">
+            <option value="">선택</option>
+            <option>갱신심사(재인증)</option>
+            <option>사후심사 1차</option>
+            <option>사후심사 2차</option>
+            <option>최초심사</option>
+          </select></td></tr>
+      <tr><td class="lbl">최근 심사 완료일</td>
+          <td><input class="inp" id="d1-last-audit-date" type="date"></td></tr>
+      <tr><td class="lbl">다음 예정 심사</td>
+          <td><input class="inp" id="d1-next-audit" placeholder="예) 사후심사 2차 — 2026.03"></td></tr>
+      <tr><td class="lbl">미결 부적합 현황</td>
+          <td><textarea class="ta" id="d1-open-nc" rows="2"
+            placeholder="미해소 부적합이 있는 경우 건수 및 내용 기재 (없으면 '없음')"></textarea></td></tr>
+    </table>
+  </div>
+
+  <!-- §3 전환 사유 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">3</span> 전환 신청 사유 <span class="badge badge-ref">IAF MD2 §3.2 (ii)</span></div>
+    <textarea class="field-ta" id="d1-reason" rows="4"
+      placeholder="전환 사유를 구체적으로 기재하세요&#10;(예: 인증기관 서비스 불만족 / 가격 경쟁력 / 기관 통합 / 이관기관 인정 철회 등)"></textarea>
+  </div>
+
+  <!-- §4 컨설팅 이력 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">4</span> 경영시스템 컨설팅 이력 <span class="badge badge-ref">§9.1.1 e)</span></div>
+    <div class="notice">
+      ISO/IEC 17021-1 §9.1.1 e) — 인증 신청 시 컨설팅 이력 공개가 필수입니다. 컨설팅 여부에 따라 공정성 검토가 이루어집니다.
+    </div>
+    <div class="row-2">
+      <div class="field-group">
+        <div class="field-lbl">컨설팅 이력 여부</div>
+        <select class="field-inp" id="d1-consulting">
+          <option value="no">없음</option>
+          <option value="yes">있음</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">컨설팅 기관명 (있는 경우)</div>
+        <input class="field-inp" id="d1-consulting-org" placeholder="컨설팅 기관명">
+      </div>
+    </div>
+  </div>
+
+  <!-- §5 외주 프로세스 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">5</span> 외주 프로세스 <span class="badge badge-ref">§9.1.1 c)</span></div>
+    <textarea class="field-ta" id="d1-outsource" rows="3"
+      placeholder="인증 범위에 영향을 미치는 외주 처리 프로세스를 기재하세요&#10;(예: 시험·검사 외주, 설계 외주, 특수공정 외주 등 / 없는 경우 '없음')"></textarea>
+  </div>
+
+  <!-- §6 신청인 서명 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">6</span> 신청 확인 및 서명</div>
+    <div class="notice blue">
+      본 신청서에 기재된 모든 정보는 사실에 근거하며, 전환심사에 필요한 자료를 수임 인증기관에 제공하는 것에 동의합니다.
+      이관 인증기관에 수임 인증기관을 향한 정보 제공 권한 부여 의무(IAF MD2:2023 §3.3)를 이행하겠습니다.
+    </div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-role">신청 조직 대표 (또는 위임자)</div>
+        <div class="sig-line"><input class="inp" id="d1-sig-rep" placeholder="성명"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="d1-sig-date" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">수임 인증기관 접수 담당자</div>
+        <div class="sig-line"><input class="inp" id="d1-sig-cb" placeholder="성명 / 직책"></div>
+        <div class="sig-date">접수일: <input class="inp" type="date" id="d1-sig-cb-date" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">수임 인증기관 계약 담당</div>
+        <div class="sig-line"></div>
+        <div class="sig-date">계약일:</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- doc-wrap -->
+</div><!-- page-0 -->
+
+<!-- ════════════════════════════════════════════════════
+     ② 사전검토 체크리스트 (Pre-Transfer Review)
+     ════════════════════════════════════════════════════ -->
+<div class="doc-page page-break" id="page-1">
+<div class="doc-wrap">
+  <div class="tab-title-print">② 사전검토 체크리스트</div>
+
+  <div class="doc-hd">
+    <div class="doc-tag">IAF MD2:2023 §3.2 · Pre-Transfer Review · 전환 사전검토</div>
+    <div class="doc-title">사전검토 체크리스트</div>
+    <div class="doc-sub">Pre-Transfer Review Checklist — 수임 인증기관이 전환 가능 여부를 검토하는 문서</div>
+    <div class="notice">
+      ⚠️ <b>주의:</b> 사전검토는 심사(Audit)가 아닙니다. 이 단계에서 현장 방문이 이루어질 경우에도 공식 심사 절차가 아님을 명확히 해야 합니다.
+      <span style="font-size:9px">(IAF MD2:2023 §3.2 Note)</span>
+    </div>
+    <div class="doc-meta">
+      <span class="dm-lbl">신청 조직</span>
+      <span><input class="inp underline" id="d2-org" placeholder="조직명" style="width:180px"></span>
+      <span class="dm-lbl">검토 일자</span>
+      <span><input class="inp underline" type="date" id="d2-date" style="width:130px"></span>
+      <span class="dm-lbl">검토 담당자</span>
+      <span><input class="inp underline" id="d2-reviewer" placeholder="성명 / 직책" style="width:180px"></span>
+    </div>
+  </div>
+
+  <!-- 체크리스트 항목들 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">1</span> 전환 적격성 검토 <span class="badge badge-ref">IAF MD2 §3.1</span></div>
+
+    <div id="checklist-1">
+      <!-- JS로 렌더 -->
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">2</span> 인증서 및 심사 이력 검토 <span class="badge badge-ref">IAF MD2 §3.2 (iii)(iv)</span></div>
+    <div id="checklist-2"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">3</span> 부적합 및 불만 처리 이력 <span class="badge badge-ref">IAF MD2 §3.2 (v)</span></div>
+    <div id="checklist-3"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">4</span> 심사 프로그램 및 잔여 주기 <span class="badge badge-ref">IAF MD2 §3.2 (vi) + §3.3</span></div>
+    <div id="checklist-4"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">5</span> 규제 당국 관련 사항 <span class="badge badge-ref">IAF MD2 §3.2 (vii)</span></div>
+    <div id="checklist-5"></div>
+  </div>
+
+  <!-- 사전검토 결론 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">6</span> 사전검토 결론 및 처리 방향</div>
+    <div class="cert-decision-row" id="pretransfer-decision-row">
+      <button class="cd-btn" id="pt-proceed" onclick="setPTDecision('proceed')">
+        ✅ 전환 진행 — 전환심사 계획 수립
+      </button>
+      <button class="cd-btn" id="pt-new" onclick="setPTDecision('new')">
+        ❌ 신규 고객 처리 — 최초심사 진행
+      </button>
+      <button class="cd-btn" id="pt-cond" onclick="setPTDecision('cond')">
+        ⚠️ 조건부 진행 — 추가 자료 요청 후 재검토
+      </button>
+    </div>
+    <div style="margin-top:10px">
+      <div class="field-lbl" style="margin-bottom:4px">사전검토 의견 / 근거</div>
+      <textarea class="field-ta" id="d2-opinion" rows="4"
+        placeholder="결론 근거 및 주요 검토 사항을 기재하세요"></textarea>
+    </div>
+    <div style="margin-top:10px">
+      <div class="field-lbl" style="margin-bottom:4px">미결 부적합 처리 계획 (있는 경우)</div>
+      <textarea class="field-ta" id="d2-nc-plan" rows="3"
+        placeholder="이관기관에서 미해소된 부적합에 대한 시정조치 계획 및 처리 방법"></textarea>
+    </div>
+  </div>
+
+  <!-- 서명 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">7</span> 서명</div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-role">사전검토 담당자</div>
+        <div class="sig-line"><input class="inp" id="d2-sig1" placeholder="성명 / 자격"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="d2-sig1-date" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">심사프로그램 관리자 승인</div>
+        <div class="sig-line"><input class="inp" id="d2-sig2" placeholder="성명 / 직책"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="d2-sig2-date" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">신청 조직 대표</div>
+        <div class="sig-line"></div>
+        <div class="sig-date">일자:</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- doc-wrap -->
+</div><!-- page-1 -->
+
+<!-- ════════════════════════════════════════════════════
+     ③ 전환심사 계획서
+     ════════════════════════════════════════════════════ -->
+<div class="doc-page page-break" id="page-2">
+<div class="doc-wrap">
+  <div class="tab-title-print">③ 전환심사 계획서</div>
+
+  <div class="doc-hd">
+    <div class="doc-tag">ISO/IEC 17021-1 §9.2 · §9.5.3.3 · 전환심사 계획</div>
+    <div class="doc-title">전환심사 계획서</div>
+    <div class="doc-sub">Transfer Audit Plan — 전환심사의 목적·범위·기준·일정·팀 구성</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">계획서 번호</span>
+      <span><input class="inp underline" id="d3-rno" placeholder="예) TAP-2025-001" style="width:160px"></span>
+      <span class="dm-lbl">작성일</span>
+      <span><input class="inp underline" type="date" id="d3-date" style="width:130px"></span>
+    </div>
+  </div>
+
+  <!-- §1 심사 기본 정보 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">1</span> 심사 기본 정보 <span class="badge badge-ref">§9.2.1, §9.2.3</span></div>
+    <table class="form-tbl">
+      <tr><td class="lbl">피심사 조직</td>
+          <td><input class="inp" id="d3-org"></td></tr>
+      <tr><td class="lbl">심사 유형</td>
+          <td><strong>전환심사 (Transfer Audit)</strong>
+              <span style="font-size:10px;color:var(--text3);margin-left:8px">ISO/IEC 17021-1 §9.5.3.3 / IAF MD2:2023</span></td></tr>
+      <tr><td class="lbl">심사 목적</td>
+          <td style="font-size:10px;line-height:1.6">
+            a) 현 인증기관의 인증 유효성 및 경영시스템 지속 이행 확인<br>
+            b) 미해소 부적합 시정조치 이행 검증<br>
+            c) 심사 프로그램 잔여 주기 내 인증 연속성 유지<br>
+            d) 이관 후 심사 프로그램 재수립
+          </td></tr>
+      <tr><td class="lbl">심사 기준</td>
+          <td><textarea class="ta" id="d3-criteria" rows="2"
+            placeholder="예) ISO 14001:2015, ISO 45001:2018 및 관련 법규·규제 요건"></textarea></td></tr>
+      <tr><td class="lbl">인증 범위 (Scope)</td>
+          <td><textarea class="ta" id="d3-scope" rows="2"></textarea></td></tr>
+      <tr><td class="lbl">심사 방법</td>
+          <td>
+            <label style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:11px">
+              <input type="checkbox" id="d3-onsite"> 현장심사 (On-site)
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:11px">
+              <input type="checkbox" id="d3-remote"> 원격심사 (Remote, ICT)
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px">
+              <input type="checkbox" id="d3-doc"> 문서 검토 (Document Review)
+            </label>
+          </td></tr>
+    </table>
+  </div>
+
+  <!-- §2 심사 일정 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">2</span> 심사 일정 <span class="badge badge-ref">§9.2.3.2 d)e)</span></div>
+    <div class="row-3" style="margin-bottom:10px">
+      <div class="field-group">
+        <div class="field-lbl">심사 시작일</div>
+        <input class="field-inp" type="date" id="d3-start">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">심사 종료일</div>
+        <input class="field-inp" type="date" id="d3-end">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">총 심사 일수 (IAF MD5 기준)</div>
+        <input class="field-inp" id="d3-days" placeholder="예) 2.0인일">
+      </div>
+    </div>
+    <table class="form-tbl">
+      <tr style="background:var(--bg2)">
+        <td style="font-weight:700;font-size:10px">일시</td>
+        <td style="font-weight:700;font-size:10px">심사 내용</td>
+        <td style="font-weight:700;font-size:10px;width:80px">담당 심사원</td>
+        <td style="font-weight:700;font-size:10px;width:80px">장소/방법</td>
+      </tr>
+      <tr>
+        <td><input class="inp" id="d3-sch1-time" placeholder="날짜 / 시간"></td>
+        <td><input class="inp" id="d3-sch1-content" placeholder="개회의 / 미결 부적합 검증"></td>
+        <td><input class="inp" id="d3-sch1-auditor"></td>
+        <td><input class="inp" id="d3-sch1-loc" placeholder="현장/원격"></td>
+      </tr>
+      <tr>
+        <td><input class="inp" id="d3-sch2-time"></td>
+        <td><input class="inp" id="d3-sch2-content" placeholder="경영시스템 현장 확인"></td>
+        <td><input class="inp" id="d3-sch2-auditor"></td>
+        <td><input class="inp" id="d3-sch2-loc"></td>
+      </tr>
+      <tr>
+        <td><input class="inp" id="d3-sch3-time"></td>
+        <td><input class="inp" id="d3-sch3-content" placeholder="내부심사·경영검토 이행 확인"></td>
+        <td><input class="inp" id="d3-sch3-auditor"></td>
+        <td><input class="inp" id="d3-sch3-loc"></td>
+      </tr>
+      <tr>
+        <td><input class="inp" id="d3-sch4-time"></td>
+        <td><input class="inp" id="d3-sch4-content" placeholder="종결회의 / 심사 결과 발표"></td>
+        <td><input class="inp" id="d3-sch4-auditor"></td>
+        <td><input class="inp" id="d3-sch4-loc"></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- §3 심사팀 구성 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">3</span> 심사팀 구성 <span class="badge badge-ref">§9.2.2</span></div>
+    <table class="form-tbl">
+      <tr><td class="lbl">심사팀장</td>
+          <td><input class="inp" id="d3-lead" placeholder="성명 / 자격번호 / 전문 표준"></td></tr>
+      <tr><td class="lbl">심사원</td>
+          <td><input class="inp" id="d3-auditor" placeholder="성명 / 자격번호 / 전문 표준 (없으면 '해당없음')"></td></tr>
+      <tr><td class="lbl">기술전문가</td>
+          <td><input class="inp" id="d3-te" placeholder="성명 / 전문분야 (없으면 '해당없음')"></td></tr>
+      <tr><td class="lbl">옵저버</td>
+          <td><input class="inp" id="d3-observer" placeholder="성명 / 소속 (없으면 '해당없음')"></td></tr>
+      <tr><td class="lbl">피심사 측 안내자</td>
+          <td><input class="inp" id="d3-guide" placeholder="성명 / 직책"></td></tr>
+    </table>
+    <div class="notice blue" style="margin-top:8px;font-size:10px">
+      ℹ️ 전환심사 팀은 해당 인증 범위에 적합한 기술 역량을 보유해야 합니다. (§9.2.2.1.2 c))
+      옵저버 참여는 피심사 조직과 사전 합의 필요. (§9.2.2.2.1)
+    </div>
+  </div>
+
+  <!-- §4 전환심사 중점 확인 사항 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">4</span> 전환심사 중점 확인 사항 <span class="badge badge-ref">IAF MD2 §3.2(iv) + §9.1.3.4</span></div>
+    <div style="margin-bottom:10px;font-size:10px;color:var(--text2);line-height:1.6;
+      padding:8px 12px;background:var(--bg2);border-radius:6px">
+      전환심사에서는 다음 사항을 반드시 확인합니다:<br>
+      ① 미결 부적합(중부적합 포함) 시정조치 완료 검증 &nbsp;·&nbsp;
+      ② 최근 내부심사 및 경영검토 이행 여부 &nbsp;·&nbsp;
+      ③ 법규 준수 현황 &nbsp;·&nbsp;
+      ④ 인증 범위 내 운용 통제 지속성 &nbsp;·&nbsp;
+      ⑤ 이관기관 심사 프로그램 잔여 주기 반영
+    </div>
+    <textarea class="field-ta" id="d3-focus" rows="5"
+      placeholder="사전검토 결과 도출된 집중 심사 영역을 기재하세요&#10;예)&#10;- OBS-01 관찰사항 (환경목표 달성률) 후속 확인&#10;- 신규 법규 (화학물질관리법 개정) 준수 현황&#10;- 원청 변경에 따른 환경측면 재평가 이행"></textarea>
+  </div>
+
+  <!-- §5 잔여 인증 주기 계획 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">5</span> 전환 후 심사 프로그램 <span class="badge badge-ref">IAF MD2 §3.3 + §9.1.3.2</span></div>
+    <table class="form-tbl">
+      <tr><td class="lbl">현 인증 만료일</td>
+          <td><input class="inp" id="d3-expiry"></td></tr>
+      <tr><td class="lbl">전환 후 다음 심사</td>
+          <td><input class="inp" id="d3-next1" placeholder="예) 사후심사 1차 — 2025.09 (잔여 주기 내 계획)"></td></tr>
+      <tr><td class="lbl">갱신심사 예정일</td>
+          <td><input class="inp" id="d3-recert" placeholder="인증 만료 전 갱신심사 예정일"></td></tr>
+      <tr><td class="lbl">인증서 발행 계획</td>
+          <td><textarea class="ta" id="d3-cert-plan" rows="2"
+            placeholder="수임 인증기관의 인증서 발행 시점 및 번호 부여 계획"></textarea></td></tr>
+    </table>
+    <div class="notice green" style="margin-top:8px;font-size:10px">
+      ✅ <b>인증 연속성:</b> 수임 인증기관은 전환심사 결과에 근거하여 인증 결정을 내리기 전, 어떠한 사후심사 또는 갱신심사도 수행할 수 없습니다. (IAF MD2:2023 §3.3)
+    </div>
+  </div>
+
+  <!-- 서명 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">6</span> 계획서 승인</div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-role">심사팀장</div>
+        <div class="sig-line"><input class="inp" id="d3-sig1"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="d3-sig1-date" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">심사프로그램 관리자</div>
+        <div class="sig-line"><input class="inp" id="d3-sig2"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="d3-sig2-date" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">피심사 조직 확인</div>
+        <div class="sig-line"></div>
+        <div class="sig-date">일자:</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div><!-- page-2 -->
+
+<!-- ════════════════════════════════════════════════════
+     ④ 전환심사 보고서
+     ════════════════════════════════════════════════════ -->
+<div class="doc-page page-break" id="page-3">
+<div class="doc-wrap">
+  <div class="tab-title-print">④ 전환심사 보고서</div>
+
+  <div class="doc-hd">
+    <div class="doc-tag">ISO/IEC 17021-1 §9.4.10 · §9.5 · IAF MD2:2023 §3.3 · 전환심사 보고서</div>
+    <div class="doc-title">전환심사 보고서</div>
+    <div class="doc-sub">Transfer Audit Report — 심사 결과 및 인증 결정</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">보고서 번호</span>
+      <span><input class="inp underline" id="d4-rno" placeholder="예) TAR-2025-001" style="width:160px"></span>
+      <span class="dm-lbl">심사 일자</span>
+      <span><input class="inp underline" type="date" id="d4-date" style="width:130px"></span>
+    </div>
+  </div>
+
+  <!-- §1 심사 개요 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">1</span> 심사 개요 <span class="badge badge-ref">§9.4.10</span></div>
+    <table class="form-tbl">
+      <tr><td class="lbl">피심사 조직</td>
+          <td><input class="inp" id="d4-org"></td></tr>
+      <tr><td class="lbl">심사 유형</td>
+          <td><strong>전환심사 (Transfer Audit)</strong>
+              <span style="font-size:10px;color:var(--text3);margin-left:8px">IAF MD2:2023 / ISO/IEC 17021-1 §9.5.3.3</span></td></tr>
+      <tr><td class="lbl">인증 기준</td>
+          <td><input class="inp" id="d4-criteria"></td></tr>
+      <tr><td class="lbl">인증 범위</td>
+          <td><textarea class="ta" id="d4-scope" rows="2"></textarea></td></tr>
+      <tr><td class="lbl">심사 일자</td>
+          <td><input class="inp" id="d4-period"></td></tr>
+      <tr>
+        <td class="lbl">심사팀장</td>
+        <td><input class="inp" id="d4-lead"></td>
+      </tr>
+      <tr>
+        <td class="lbl">심사원</td>
+        <td><input class="inp" id="d4-auditor"></td>
+      </tr>
+      <tr>
+        <td class="lbl">피심사 측 대표</td>
+        <td><input class="inp" id="d4-rep" placeholder="직책 / 성명"></td>
+      </tr>
+      <tr>
+        <td class="lbl">이관기관 (이전 CB)</td>
+        <td><input class="inp" id="d4-issuing-cb"></td>
+      </tr>
+      <tr>
+        <td class="lbl">이관기관 인증서 번호</td>
+        <td><input class="inp" id="d4-prev-cert"></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- §2 전환심사 목적 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">2</span> 전환심사 목적 <span class="badge badge-ref">ISO/IEC 17021-1 §9.2.1.2 / IAF MD2</span></div>
+    <table class="form-tbl" style="font-size:10px">
+      <tr><td class="lbl2">a)</td><td>기존 인증기관이 부여한 인증의 유효성 및 인증 범위 지속성 확인</td></tr>
+      <tr><td class="lbl2">b)</td><td>미해소 부적합(중부적합 포함)에 대한 시정조치 이행 완료 검증</td></tr>
+      <tr><td class="lbl2">c)</td><td>경영시스템의 지속적 이행 — 내부심사·경영검토·법규준수 현황 확인</td></tr>
+      <tr><td class="lbl2">d)</td><td>인증 범위 내 운용 통제의 현장 이행 확인</td></tr>
+      <tr><td class="lbl2">e)</td><td>이관 후 잔여 심사 주기에 따른 새로운 심사 프로그램 수립 근거 확보</td></tr>
+    </table>
+  </div>
+
+  <!-- §3 미결 부적합 검증 결과 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">3</span> 미결 부적합 시정조치 검증 <span class="badge badge-ref">IAF MD2 §3.2(iv) + §3.3(ii)</span></div>
+    <div class="notice">
+      ⚠️ <b>중요:</b> 중부적합(Major NC)이 있는 경우, 수임 인증기관은 시정조치 완료를 검증한 후에만 인증서를 발행할 수 있습니다. (IAF MD2:2023 §3.3)
+    </div>
+    <div id="nc-verify-section">
+      <table class="form-tbl" style="margin-bottom:6px">
+        <tr style="background:var(--bg2)">
+          <td style="font-weight:700;font-size:10px;width:60px">구분</td>
+          <td style="font-weight:700;font-size:10px">조항 / 부적합 내용</td>
+          <td style="font-weight:700;font-size:10px;width:80px">원 등급</td>
+          <td style="font-weight:700;font-size:10px;width:100px">시정 완료 여부</td>
+          <td style="font-weight:700;font-size:10px">검증 내용</td>
+        </tr>
+        <tr id="nc-row-1">
+          <td><input class="inp" id="d4-nc1-no" placeholder="NC-01"></td>
+          <td><input class="inp" id="d4-nc1-content" placeholder="조항 및 내용"></td>
+          <td><select id="d4-nc1-grade" style="width:100%;font-size:10px;border:none;background:transparent">
+            <option>중부적합</option><option>경부적합</option><option>관찰사항</option>
+          </select></td>
+          <td><select id="d4-nc1-status" style="width:100%;font-size:10px;border:none;background:transparent">
+            <option>완료 확인</option><option>미완료</option><option>해당없음</option>
+          </select></td>
+          <td><input class="inp" id="d4-nc1-verify" placeholder="검증 방법 및 결과"></td>
+        </tr>
+        <tr id="nc-row-2">
+          <td><input class="inp" id="d4-nc2-no" placeholder="NC-02"></td>
+          <td><input class="inp" id="d4-nc2-content"></td>
+          <td><select id="d4-nc2-grade" style="width:100%;font-size:10px;border:none;background:transparent">
+            <option>중부적합</option><option>경부적합</option><option>관찰사항</option>
+          </select></td>
+          <td><select id="d4-nc2-status" style="width:100%;font-size:10px;border:none;background:transparent">
+            <option>완료 확인</option><option>미완료</option><option>해당없음</option>
+          </select></td>
+          <td><input class="inp" id="d4-nc2-verify"></td>
+        </tr>
+      </table>
+    </div>
+    <div style="font-size:10px;color:var(--text3)">미결 부적합이 없는 경우 "해당없음" 선택</div>
+  </div>
+
+  <!-- §4 심사 결과 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">4</span> 전환심사 발견사항 <span class="badge badge-ref">§9.4.5, §9.4.9</span></div>
+    <div class="row-3" style="margin-bottom:10px">
+      <div class="field-group">
+        <div class="field-lbl">새 중부적합 (Major NC)</div>
+        <input class="field-inp" id="d4-new-major" placeholder="건수 (없으면 0)" type="number" min="0" value="0">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">새 경부적합 (Minor NC)</div>
+        <input class="field-inp" id="d4-new-minor" placeholder="건수" type="number" min="0" value="0">
+      </div>
+      <div class="field-group">
+        <div class="field-lbl">관찰사항 (Observation)</div>
+        <input class="field-inp" id="d4-new-obs" placeholder="건수" type="number" min="0" value="0">
+      </div>
+    </div>
+    <textarea class="field-ta" id="d4-findings" rows="5"
+      placeholder="전환심사에서 새로 발견된 부적합 및 관찰사항을 기재하세요.&#10;발견사항이 없는 경우 '전환심사 결과 새로운 부적합 사항 없음' 으로 기재."></textarea>
+  </div>
+
+  <!-- §5 인증 결정 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">5</span> 인증 결정 <span class="badge badge-ref">§9.5 / IAF MD2 §3.3</span></div>
+    <div class="cert-decision-row" id="cert-decision-row">
+      <button class="cd-btn" id="cd-proceed" onclick="setCertDecision('proceed')">
+        ✅ 인증 전환 승인<br><small style="font-weight:400">잔여 주기 인증서 발행</small>
+      </button>
+      <button class="cd-btn" id="cd-cond" onclick="setCertDecision('cond')">
+        ⚠️ 조건부 승인<br><small style="font-weight:400">경부적합 시정계획 수락 후</small>
+      </button>
+      <button class="cd-btn" id="cd-new" onclick="setCertDecision('new')">
+        ❌ 신규 처리<br><small style="font-weight:400">최초심사부터 재진행</small>
+      </button>
+    </div>
+    <div style="margin-top:10px">
+      <div class="field-lbl" style="margin-bottom:4px">인증 결정 근거 및 조건</div>
+      <textarea class="field-ta" id="d4-cert-basis" rows="4"
+        placeholder="인증 결정의 근거를 명확히 기재하세요.&#10;예) 미결 부적합 3건 중 2건(경부적합) 완료 확인, 1건(경부적합) 시정계획 수락, 새로운 부적합 없음 → 조건부 승인"></textarea>
+    </div>
+    <div style="margin-top:10px">
+      <div class="field-lbl" style="margin-bottom:4px">신규 인증 주기 계획</div>
+      <textarea class="field-ta" id="d4-new-cycle" rows="3"
+        placeholder="전환 후 심사 프로그램:&#10;• 다음 사후심사: ___년 ___월 (사후 _차)&#10;• 갱신심사 예정: ___년 ___월&#10;• 신규 인증서 유효기간: ___부터 ___까지"></textarea>
+    </div>
+  </div>
+
+  <!-- §6 심사팀 종합 의견 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">6</span> 심사팀 종합 의견 <span class="badge badge-ref">§9.4.10</span></div>
+    <textarea class="field-ta" id="d4-opinion" rows="5"
+      placeholder="전환심사 전반에 대한 심사팀 의견을 기재하세요.&#10;&#10;• 경영시스템 이행 수준&#10;• 이관기관 심사 이력과의 연속성&#10;• 개선 권고 사항&#10;• 기타 특이사항"></textarea>
+  </div>
+
+  <!-- 서명 -->
+  <div class="sec">
+    <div class="sec-title"><span class="sec-no">7</span> 서명 <span class="badge badge-ref">§9.4.10</span></div>
+    <div class="notice">
+      본 보고서는 ISO/IEC 17021-1:2015 §9.4.10 및 IAF MD2:2023에 따라 작성되었습니다.
+      보고서의 소유권은 수임 인증기관에 있으며, 피심사 조직은 비밀 유지 의무가 있습니다.
+    </div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-role">심사팀장 (Lead Auditor)</div>
+        <div class="sig-line"><input class="inp" id="d4-sig1" placeholder="성명 / 자격번호"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="d4-sig1-date" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">심사원 (Auditor)</div>
+        <div class="sig-line"><input class="inp" id="d4-sig2" placeholder="성명 / 자격번호"></div>
+        <div class="sig-date">일자: <input class="inp" type="date" id="d4-sig2-date" style="width:120px;display:inline"></div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-role">피심사 조직 대표</div>
+        <div class="sig-line"></div>
+        <div class="sig-date">일자:</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div><!-- page-3 -->
+
+</div><!-- #pg -->
+
+<script>
+// ════════════════════════════════════════
+// 탭 전환
+// ════════════════════════════════════════
+function showTab(n){
+  document.querySelectorAll('.doc-page').forEach((p,i)=>p.classList.toggle('active',i===n));
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===n));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ════════════════════════════════════════
+// 사전검토 체크리스트 렌더
+// ════════════════════════════════════════
+const CHECKLISTS = {
+  1: [
+    {ref:'IAF MD2 §3.1', text:'전환 대상 인증이 IAF·지역 MLA 서명기관의 인정을 받은 인증인가?'},
+    {ref:'IAF MD2 §3.1', text:'인증서에 인정기관 인정마크(KAB, DAkkS, UKAS 등)가 표시되어 있는가?'},
+    {ref:'IAF MD2 §3.1', text:'현재 인증이 유효한가? (유효기간 내이며 정지되지 않았는가?)'},
+    {ref:'IAF MD2 §3.1', text:'인증이 정지(suspended) 상태가 아닌가?'},
+    {ref:'IAF MD2 §3.1', text:'전환하려는 인증이 수임 인증기관의 인정 범위(Accreditation Scope) 내에 포함되는가?'},
+    {ref:'IAF MD2 §3.1', text:'이관기관이 폐업하거나 인정이 만료·정지·취소된 경우, 6개월 이내 또는 인증 만료일 중 빠른 시점 내에 전환 완료가 가능한가?'},
+  ],
+  2: [
+    {ref:'IAF MD2 §3.2(i)', text:'신청 조직의 인증 범위가 이관기관 및 수임 인증기관의 인정 범위 내에 포함됨을 확인하였는가?'},
+    {ref:'IAF MD2 §3.2(iii)', text:'사이트별 유효한 인증 보유를 확인하였는가? (다수 사이트 포함)'},
+    {ref:'IAF MD2 §3.2(iv)', text:'최초심사 또는 최근 갱신심사 보고서를 입수하였는가?'},
+    {ref:'IAF MD2 §3.2(iv)', text:'최근 사후심사 보고서를 입수하였는가?'},
+    {ref:'§9.1.3.4', text:'입수한 보고서가 이관기관의 심사 프로그램에 따라 적시에 수행된 것임을 확인하였는가?'},
+    {ref:'IAF MD2 §3.2(iv)', text:'심사 보고서를 입수하지 못한 경우, 신규 고객으로 처리하는 것을 검토하였는가?'},
+  ],
+  3: [
+    {ref:'IAF MD2 §3.2(iv)', text:'미해소 부적합 현황 목록을 입수하였는가?'},
+    {ref:'IAF MD2 §3.2(iv)', text:'중부적합(Major NC)이 있는 경우, 시정조치 완료 여부를 확인하였는가?'},
+    {ref:'IAF MD2 §3.2(v)', text:'이관기관에 제기된 불만(Complaint) 목록 및 처리 결과를 입수하였는가?'},
+    {ref:'IAF MD2 §3.2(v)', text:'미해결 불만이 있는 경우, 그 내용을 파악하고 처리 방향을 검토하였는가?'},
+    {ref:'§9.1.3.4', text:'시정조치 이행 기록(수정 및 시정조치 문서)을 확보하였는가?'},
+  ],
+  4: [
+    {ref:'IAF MD2 §3.2(vi)', text:'이관기관의 심사 프로그램(3년 주기 계획)을 입수하여 검토하였는가?'},
+    {ref:'IAF MD2 §3.3', text:'잔여 심사 주기를 파악하였는가? (남은 사후심사 횟수, 갱신심사 예정일 등)'},
+    {ref:'IAF MD2 §3.3', text:'수임 인증기관이 전환심사 결과에 기반하여 인증 결정 전, 사후심사 또는 갱신심사를 수행하지 않을 것을 확인하였는가?'},
+    {ref:'IAF MD2 §3.3', text:'전환 인증서의 유효기간을 이관기관의 잔여 주기에 맞추어 설정할 계획이 수립되었는가?'},
+  ],
+  5: [
+    {ref:'IAF MD2 §3.2(vii)', text:'신청 조직이 인증 범위와 관련된 규제 당국과의 현안(조사, 제재, 처분 등)이 있는가?'},
+    {ref:'IAF MD2 §3.2(vii)', text:'있는 경우, 그 내용을 파악하고 심사 프로그램에 반영하였는가?'},
+    {ref:'§9.1.2.1 d)', text:'특별한 안전 조건이나 보안 요건이 있는가?'},
+  ],
+};
+
+function renderChecklists(){
+  Object.entries(CHECKLISTS).forEach(([sec, items])=>{
+    const el = document.getElementById('checklist-'+sec);
+    if(!el) return;
+    const saved = getSaved('checklist-'+sec) || {};
+    el.innerHTML = items.map((item,i)=>`
+      <div class="cl-item">
+        <div class="cl-item-ref">${item.ref}</div>
+        <div style="flex:1">
+          <div class="cl-item-text">${item.text}</div>
+          <input class="cl-remark-inp" id="cl-${sec}-${i}-remark"
+            value="${saved[i+'r']||''}" placeholder="비고 / 확인 내용"
+            oninput="saveChecklistRemark(${sec},${i},this.value)">
+        </div>
+        <div class="cl-result">
+          <button class="result-btn${saved[i]==='ok'?' ok':''}" onclick="setCheck(${sec},${i},'ok')">✓ 확인</button>
+          <button class="result-btn${saved[i]==='ng'?' ng':''}" onclick="setCheck(${sec},${i},'ng')">✗ 미비</button>
+          <button class="result-btn${saved[i]==='na'?' na':''}" onclick="setCheck(${sec},${i},'na')">— N/A</button>
+        </div>
+      </div>`).join('');
+  });
+}
+
+function setCheck(sec, idx, val){
+  let saved = getSaved('checklist-'+sec) || {};
+  saved[idx] = val;
+  setSaved('checklist-'+sec, saved);
+  renderChecklists();
+}
+
+function saveChecklistRemark(sec, idx, val){
+  let saved = getSaved('checklist-'+sec) || {};
+  saved[idx+'r'] = val;
+  setSaved('checklist-'+sec, saved);
+}
+
+// ════════════════════════════════════════
+// 인증 결정 버튼
+// ════════════════════════════════════════
+let ptDecision = null, certDecision = null;
+
+function setPTDecision(val){
+  ptDecision = val;
+  ['proceed','new','cond'].forEach(x=>{
+    document.getElementById('pt-'+x).className =
+      'cd-btn'+(x===val?` sel-${val==='proceed'?'proceed':val==='new'?'new':'cond'}`:'');
+  });
+  setSaved('ptDecision', val);
+}
+
+function setCertDecision(val){
+  certDecision = val;
+  ['proceed','cond','new'].forEach(x=>{
+    document.getElementById('cd-'+x).className =
+      'cd-btn'+(x===val?` sel-${val==='proceed'?'proceed':val==='new'?'new':'cond'}`:'');
+  });
+  setSaved('certDecision', val);
+}
+
+// ════════════════════════════════════════
+// 저장 / 복원
+// ════════════════════════════════════════
+function getSaved(key){ try{ const v=localStorage.getItem('transfer_'+key); return v?JSON.parse(v):null; }catch(e){ return null; } }
+function setSaved(key, val){ try{ localStorage.setItem('transfer_'+key, JSON.stringify(val)); }catch(e){} }
+
+function collectFields(){
+  const data={};
+  document.querySelectorAll('input[id],textarea[id],select[id]').forEach(el=>{
+    if(!el.id) return;
+    if(el.type==='checkbox') data[el.id]=el.checked;
+    else data[el.id]=el.value;
+  });
+  return data;
+}
+
+function restoreFields(data){
+  if(!data) return;
+  Object.entries(data).forEach(([id,val])=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    if(el.type==='checkbox') el.checked=val;
+    else el.value=val||'';
+  });
+}
+
+function saveAll(){
+  setSaved('fields', collectFields());
+  setSaved('ptDecision', ptDecision);
+  setSaved('certDecision', certDecision);
+  const notice = document.getElementById('save-notice');
+  notice.style.display='block';
+  setTimeout(()=>notice.style.display='none', 2500);
+}
+
+function loadAll(){
+  const fields = getSaved('fields');
+  restoreFields(fields);
+  const pt = getSaved('ptDecision');
+  if(pt) setPTDecision(pt);
+  const cd = getSaved('certDecision');
+  if(cd) setCertDecision(cd);
+}
+
+// ════════════════════════════════════════
+// 자동 저장 (3초 디바운스)
+// ════════════════════════════════════════
+let _saveTimer = null;
+document.addEventListener('input', ()=>{
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveAll, 2000);
+});
+
+// ════════════════════════════════════════
+// 초기화
+// ════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', ()=>{
+  // 오늘 날짜 기본값
+  const today = new Date().toISOString().slice(0,10);
+  ['d1-date','d2-date','d3-date','d4-date',
+   'd1-sig-date','d1-sig-cb-date',
+   'd2-sig1-date','d2-sig2-date',
+   'd3-sig1-date','d3-sig2-date',
+   'd4-sig1-date','d4-sig2-date'
+  ].forEach(id=>{ const el=document.getElementById(id); if(el&&!el.value) el.value=today; });
+
+  renderChecklists();
+  loadAll();
+});
+</script>
+<script src="/static/js/audit_doc_master.js?v=20260807demo1"></script>
+</body>
+</html>

@@ -78,6 +78,7 @@ _FAMILY_TO_PG_CODE = {
     "NSMS": "ISO19443",
     "PIMS": "ISO27701",
     "AIMS": "ISO42001",
+    "BCMS": "ISO22301",
 }
 
 # CREATE TABLE IF NOT EXISTS — mirrors alembic f4a5b6c7d8e9 (runtime safety net)
@@ -441,6 +442,12 @@ def ensure_audit_note_longtext(db: Session) -> None:
             "audit_note_clauses",
             "clause_topic",
             "VARCHAR(255) NULL COMMENT 'clause_topic from master'",
+        ),
+        (
+            "audit_note_clauses",
+            "note_seq",
+            "INT NOT NULL DEFAULT 1 "
+            "COMMENT '1=기본 조항노트, 2+=프로세스심사 추가노트'",
         ),
     ]
     for table, col, typ in additive:
@@ -815,48 +822,74 @@ def count_clauses_for_standard_pg(db: Session, standard_code: str) -> int:
     return len(list_clauses_for_standard_pg(db, standard_code))
 
 
+def _hls_ancestors(clause_no: str) -> List[str]:
+    """4.2.1 → ['4.2.1', '4.2', '4'] for process-group / KPI matching."""
+    parts = str(clause_no).split(".")
+    out = []
+    for i in range(len(parts), 0, -1):
+        out.append(".".join(parts[:i]))
+    return out
+
+
 def list_clauses_for_standard_pg(
     db: Session,
     standard_code: str,
     *,
     standard_key: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Build audit-note clause nav from process-group masters for one standard.
+    """Build audit-note clause nav for one standard.
 
-    Primary: process_group_hls_map × hls_master × standard_clause_map
-    Plus: standard_process_clause_map (standard-specific operational clauses)
-    Titles: clause_topic → HLS title fallback (never iso_clauses_master)
-    KPIs: audit_kpi_master by hls_code / range (empty values allowed at save time)
+    Authoritative titles/numbers: ``standard_clause_masters``
+    (seeded from 스토리보드 「표준별조항번호 및 제목」).
+
+    Enrichment (process group / HLS checkpoints / KPIs) still comes from
+    process-group Excel tables. Never use iso_clauses_master (환경심층 bleed).
     """
     ensure_process_group_tables(db)
     pg_code = to_process_standard_code(standard_code) or standard_code
-    if not pg_code or not _table_exists(db, "process_group_master"):
-        return []
 
-    groups = list_process_groups(db)
-    if not groups:
-        return []
+    # Resolve platform key for official title lookup
+    sk = standard_key
+    if not sk:
+        try:
+            from app.services.iso_clauses_master import resolve_standard_key
 
-    # HLS map rows + full hls_master checkpoint lookup (reference guide only)
-    hls_rows = []
+            sk = resolve_standard_key(standard_code) or resolve_standard_key(pg_code)
+        except Exception:
+            sk = None
+    sk = sk or standard_code
+
+    # Ensure official clause titles are present
+    try:
+        from app.services.standard_clause_titles import (
+            ensure_standard_clause_titles,
+            list_official_clauses,
+        )
+
+        ensure_standard_clause_titles(db)
+        official = list_official_clauses(db, sk)
+    except Exception:
+        logger.exception("official clause title load failed for %s", sk)
+        official = []
+
+    groups = list_process_groups(db) if _table_exists(db, "process_group_master") else []
+    pg_name = {g["process_group_id"]: g["process_group_name"] for g in groups}
+
     hls_cp_map: Dict[str, Optional[str]] = {}
+    hls_to_pg: Dict[str, str] = {}
     if _table_exists(db, "hls_master"):
         for hr in db.execute(
             text("SELECT hls_code, checkpoints_summary FROM hls_master")
         ).mappings().all():
             hls_cp_map[str(hr["hls_code"])] = hr.get("checkpoints_summary")
-    if _table_exists(db, "process_group_hls_map") and _table_exists(db, "hls_master"):
-        hls_rows = db.execute(
-            text(
-                "SELECT m.process_group_id, m.hls_code, h.checkpoints_summary "
-                "FROM process_group_hls_map m "
-                "JOIN hls_master h ON h.hls_code = m.hls_code "
-                "ORDER BY m.process_group_id, m.hls_code"
-            )
-        ).mappings().all()
+    if _table_exists(db, "process_group_hls_map"):
+        for hr in db.execute(
+            text("SELECT process_group_id, hls_code FROM process_group_hls_map")
+        ).mappings().all():
+            hls_to_pg.setdefault(str(hr["hls_code"]), hr["process_group_id"])
 
     clause_map: Dict[str, Dict[str, Any]] = {}
-    if _table_exists(db, "standard_clause_map"):
+    if pg_code and _table_exists(db, "standard_clause_map"):
         for r in db.execute(
             text(
                 "SELECT hls_code, actual_clause_no, status, "
@@ -867,28 +900,23 @@ def list_clauses_for_standard_pg(
         ).mappings().all():
             clause_map[r["hls_code"]] = dict(r)
 
-    proc_clauses = []
-    if _table_exists(db, "standard_process_clause_map"):
-        proc_clauses = [
-            dict(r)
-            for r in db.execute(
-                text(
-                    "SELECT process_group_id, actual_clause_no, clause_topic, guide_note "
-                    "FROM standard_process_clause_map WHERE standard_code = :std "
-                    "ORDER BY process_group_id, actual_clause_no"
-                ),
-                {"std": pg_code},
-            ).mappings().all()
-        ]
+    proc_by_clause: Dict[str, Dict[str, Any]] = {}
+    if pg_code and _table_exists(db, "standard_process_clause_map"):
+        for r in db.execute(
+            text(
+                "SELECT process_group_id, actual_clause_no, clause_topic, guide_note "
+                "FROM standard_process_clause_map WHERE standard_code = :std"
+            ),
+            {"std": pg_code},
+        ).mappings().all():
+            cno = (r["actual_clause_no"] or "").strip()
+            if cno:
+                proc_by_clause[cno] = dict(r)
+                # also index primary of combined labels
+                primary = cno.split("/")[0].strip()
+                proc_by_clause.setdefault(primary, dict(r))
 
-    kpis_all = list_audit_kpis(db, standard_code=pg_code)
-
-    # Titles come ONLY from process-group masters (clause_topic / HLS titles).
-    # Do NOT use iso_clauses_master — it injects EMS 환경심층 (6.1c TCFD 등) into other standards.
-    pg_name = {g["process_group_id"]: g["process_group_name"] for g in groups}
-    seen: set = set()
-    out: List[Dict[str, Any]] = []
-    sort_i = 0
+    kpis_all = list_audit_kpis(db, standard_code=pg_code) if pg_code else []
 
     def _kpis_for(hls_code: str, clause_no: str) -> List[Dict[str, str]]:
         items = []
@@ -906,115 +934,191 @@ def list_clauses_for_standard_pg(
                 )
         return items
 
-    def _title_for(clause_no: str, hls_code: str, topic: Optional[str]) -> str:
-        raw = (topic or "").strip()
-        if not raw:
-            raw = _HLS_TITLE_KO.get(hls_code) or _HLS_TITLE_KO.get(clause_no.split("/")[0].strip()) or ""
-        return _clean_clause_title(clause_no, raw)
-
-    def _cps_for(hls_code: str, summary: Optional[str], guide: Optional[str]) -> List[Dict[str, str]]:
-        """Checkpoints from hls_master.checkpoints_summary (+ optional guide_note)."""
+    def _cps_for(
+        hls_code: str, summary: Optional[str], guide: Optional[str]
+    ) -> List[Dict[str, str]]:
         raw = summary if summary is not None else hls_cp_map.get(hls_code)
         if raw is None and hls_code:
-            # parent digit.digit fallback e.g. 8.2 → 8.1 range keys already in map
-            head = hls_code.split("/")[0].strip()
-            raw = hls_cp_map.get(head)
+            for anc in _hls_ancestors(hls_code):
+                raw = hls_cp_map.get(anc)
+                if raw is not None:
+                    break
         cps = _split_checkpoints(raw)
         if guide and str(guide).strip():
             cps = [{"title": "표준별 가이드", "hint": str(guide).strip()}] + cps
         return _filter_checkpoints_for_standard(cps, pg_code)
 
-    # A) HLS-driven rows by process group
-    for r in hls_rows:
-        hls = r["hls_code"]
-        cmap = clause_map.get(hls) or {}
-        status = (cmap.get("status") or "DIRECT").upper()
-        if status == "INTEGRATED":
-            # Not a standalone clause for this standard
-            continue
-        clause_no = (cmap.get("actual_clause_no") or hls or "").strip()
-        if not clause_no or clause_no in seen:
-            continue
-        seen.add(clause_no)
-        sort_i += 1
-        guide = cmap.get("guide_note")
-        cps = _cps_for(hls, r.get("checkpoints_summary"), guide)
-        topic = _title_for(clause_no, hls, None)
-        pgid = r["process_group_id"]
-        out.append(
-            {
-                "id": sort_i,
-                "standard_key": standard_key or pg_code,
-                "standard_code": pg_code,
-                "family_code": None,
-                "clause_no": clause_no,
-                "clause_topic": topic,
-                "clause_title": topic,
-                "question": (guide or ""),
-                "default_kpis": _kpis_for(hls, clause_no),
-                "checkpoints": cps,
-                "process_group_name": pg_name.get(pgid) or pgid,
-                "group_name": pg_name.get(pgid) or pgid,
-                "process_group_id": pgid,
-                "hls_code": hls,
-                "sort_order": sort_i,
-                "source": "process_group",
-            }
-        )
+    def _resolve_pg_hls(clause_no: str) -> Tuple[Optional[str], str]:
+        for anc in _hls_ancestors(clause_no):
+            if anc in hls_to_pg:
+                return hls_to_pg[anc], anc
+            cmap = clause_map.get(anc)
+            if cmap and cmap.get("actual_clause_no"):
+                # reverse: hls whose actual maps near this clause
+                pass
+        # match via actual_clause_no containing this clause
+        for hls, cmap in clause_map.items():
+            actual = (cmap.get("actual_clause_no") or "").strip()
+            if not actual:
+                continue
+            parts = [p.strip() for p in re.split(r"[/]", actual)]
+            if clause_no in parts or any(
+                clause_no.startswith(p + ".") or p.startswith(clause_no) for p in parts
+            ):
+                return hls_to_pg.get(hls), hls
+        # chapter fallback
+        chap = clause_no.split(".")[0] if clause_no else ""
+        for hls, pgid in hls_to_pg.items():
+            if hls.startswith(chap + ".") or hls == chap:
+                return pgid, hls
+        return None, clause_no.split("/")[0].strip() if clause_no else ""
 
-    # B) Standard-specific process clauses (8.2/8.3/…) — also pull hls_master checkpoints
-    for r in proc_clauses:
-        clause_no = (r.get("actual_clause_no") or "").strip()
-        if not clause_no or clause_no in seen:
-            # If already present, enrich title/topic when empty
-            if clause_no in seen and r.get("clause_topic"):
-                for item in out:
-                    if item["clause_no"] == clause_no and not item.get("clause_topic"):
-                        item["clause_topic"] = r["clause_topic"]
-                        item["clause_title"] = r["clause_topic"]
-            continue
-        seen.add(clause_no)
-        sort_i += 1
-        hls = clause_no.split("/")[0].strip()
-        guide = r.get("guide_note")
-        cps = _cps_for(hls, None, guide)
-        topic = _title_for(clause_no, hls, r.get("clause_topic"))
-        pgid = r["process_group_id"]
-        out.append(
-            {
-                "id": sort_i,
-                "standard_key": standard_key or pg_code,
-                "standard_code": pg_code,
-                "family_code": None,
-                "clause_no": clause_no,
-                "clause_topic": topic,
-                "clause_title": topic,
-                "question": (guide or ""),
-                "default_kpis": _kpis_for(hls, clause_no),
-                "checkpoints": cps,
-                "process_group_name": pg_name.get(pgid) or pgid,
-                "group_name": pg_name.get(pgid) or pgid,
-                "process_group_id": pgid,
-                "hls_code": hls,
-                "sort_order": sort_i,
-                "source": "process_group",
-            }
-        )
+    out: List[Dict[str, Any]] = []
 
-    out.sort(
-        key=lambda x: (
-            x.get("process_group_id") or "",
-            _clause_sort_key(x.get("clause_no") or ""),
-        )
-    )
+    if official:
+        for i, oc in enumerate(official, start=1):
+            clause_no = oc["clause_no"]
+            topic = (oc.get("clause_title") or oc.get("clause_topic") or "").strip()
+            # Prefer official Excel title as-is (no inventing). Light de-dupe only
+            # when title literally repeats the same clause_no prefix.
+            topic = _clean_clause_title(clause_no, topic) or topic
+            proc = proc_by_clause.get(clause_no) or {}
+            pgid, hls = _resolve_pg_hls(clause_no)
+            if proc.get("process_group_id"):
+                pgid = proc["process_group_id"]
+            guide = proc.get("guide_note")
+            cmap = clause_map.get(hls) or {}
+            if not guide:
+                guide = cmap.get("guide_note")
+            cps = _cps_for(hls, None, guide)
+            out.append(
+                {
+                    "id": i,
+                    "standard_key": oc.get("standard_key") or sk,
+                    "standard_code": pg_code,
+                    "family_code": oc.get("family_code"),
+                    "clause_no": clause_no,
+                    "clause_topic": topic,
+                    "clause_title": topic,
+                    "question": (guide or ""),
+                    "default_kpis": _kpis_for(hls, clause_no),
+                    "checkpoints": cps,
+                    "process_group_name": pg_name.get(pgid) if pgid else None,
+                    "group_name": pg_name.get(pgid) if pgid else None,
+                    "process_group_id": pgid,
+                    "hls_code": hls,
+                    "sort_order": i,
+                    "source": "standard_clause_masters",
+                }
+            )
+    else:
+        # Fallback: legacy HLS-driven list (titles from process map / HLS KO)
+        if not pg_code or not groups:
+            return []
+        hls_rows = []
+        if _table_exists(db, "process_group_hls_map") and _table_exists(db, "hls_master"):
+            hls_rows = db.execute(
+                text(
+                    "SELECT m.process_group_id, m.hls_code, h.checkpoints_summary "
+                    "FROM process_group_hls_map m "
+                    "JOIN hls_master h ON h.hls_code = m.hls_code "
+                    "ORDER BY m.process_group_id, m.hls_code"
+                )
+            ).mappings().all()
+        seen: set = set()
+        sort_i = 0
+
+        def _title_for(clause_no: str, hls_code: str, topic: Optional[str]) -> str:
+            raw = (topic or "").strip()
+            if not raw:
+                raw = (
+                    _HLS_TITLE_KO.get(hls_code)
+                    or _HLS_TITLE_KO.get(clause_no.split("/")[0].strip())
+                    or ""
+                )
+            return _clean_clause_title(clause_no, raw)
+
+        for r in hls_rows:
+            hls = r["hls_code"]
+            cmap = clause_map.get(hls) or {}
+            status = (cmap.get("status") or "DIRECT").upper()
+            if status == "INTEGRATED":
+                continue
+            clause_no = (cmap.get("actual_clause_no") or hls or "").strip()
+            if not clause_no or clause_no in seen:
+                continue
+            seen.add(clause_no)
+            sort_i += 1
+            guide = cmap.get("guide_note")
+            cps = _cps_for(hls, r.get("checkpoints_summary"), guide)
+            topic = _title_for(clause_no, hls, None)
+            pgid = r["process_group_id"]
+            out.append(
+                {
+                    "id": sort_i,
+                    "standard_key": sk or pg_code,
+                    "standard_code": pg_code,
+                    "family_code": None,
+                    "clause_no": clause_no,
+                    "clause_topic": topic,
+                    "clause_title": topic,
+                    "question": (guide or ""),
+                    "default_kpis": _kpis_for(hls, clause_no),
+                    "checkpoints": cps,
+                    "process_group_name": pg_name.get(pgid) or pgid,
+                    "group_name": pg_name.get(pgid) or pgid,
+                    "process_group_id": pgid,
+                    "hls_code": hls,
+                    "sort_order": sort_i,
+                    "source": "process_group",
+                }
+            )
+        for cno, r in proc_by_clause.items():
+            if "/" not in cno and cno in seen:
+                continue
+            clause_no = (r.get("actual_clause_no") or cno or "").strip()
+            if not clause_no or clause_no in seen:
+                continue
+            seen.add(clause_no)
+            sort_i += 1
+            hls = clause_no.split("/")[0].strip()
+            guide = r.get("guide_note")
+            cps = _cps_for(hls, None, guide)
+            topic = _title_for(clause_no, hls, r.get("clause_topic"))
+            pgid = r["process_group_id"]
+            out.append(
+                {
+                    "id": sort_i,
+                    "standard_key": sk or pg_code,
+                    "standard_code": pg_code,
+                    "family_code": None,
+                    "clause_no": clause_no,
+                    "clause_topic": topic,
+                    "clause_title": topic,
+                    "question": (guide or ""),
+                    "default_kpis": _kpis_for(hls, clause_no),
+                    "checkpoints": cps,
+                    "process_group_name": pg_name.get(pgid) or pgid,
+                    "group_name": pg_name.get(pgid) or pgid,
+                    "process_group_id": pgid,
+                    "hls_code": hls,
+                    "sort_order": sort_i,
+                    "source": "process_group",
+                }
+            )
+
+    out.sort(key=lambda x: _clause_sort_key(x.get("clause_no") or ""))
     for i, item in enumerate(out, start=1):
         item["id"] = i
         item["sort_order"] = i
 
-    # Dual KPI panels: ISO (excel chapter + HLS audit_kpi) + ESG master
     try:
-        from app.services.iso_audit_kpis import enrich_clause_dual_kpis
+        from app.services.iso_audit_kpis import (
+            enrich_clause_dual_kpis,
+            ensure_esg_standard_kpi_links,
+        )
 
+        ensure_esg_standard_kpi_links(db)
         for item in out:
             enrich_clause_dual_kpis(db, item)
     except Exception:

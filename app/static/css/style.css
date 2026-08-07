@@ -1433,81 +1433,14 @@ body.cb-portal-page .cb-kpi-value {
   }
 }
 
-body.cb-portal-page .cb-calendar-wrap {
-  background: var(--admin-surface);
-  border: 1px solid var(--admin-border);
-  border-radius: var(--admin-radius-lg);
-  box-shadow: var(--admin-shadow);
-  padding: 12px 14px 16px;
-}
-
-body.cb-portal-page .cb-calendar-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-body.cb-portal-page .cal-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 4px;
-}
-
-body.cb-portal-page .cal-head {
-  text-align: center;
-  font: var(--font-caption);
-  color: var(--admin-muted);
-  padding: 4px 0;
-}
-
-body.cb-portal-page .cal-cell {
-  min-height: 64px;
-  border: 1px solid var(--admin-border);
-  border-radius: 8px;
-  padding: 4px;
-  background: #fbfdfb;
-}
-
-body.cb-portal-page .cal-cell.is-empty {
-  background: transparent;
-  border-color: transparent;
-}
-
-body.cb-portal-page .cal-cell.has-events {
-  background: #f3faf5;
-  border-color: var(--admin-border-strong, #c5ddd0);
-}
-
-body.cb-portal-page .cal-day {
-  font-size: 11px;
-  color: var(--admin-muted);
-  margin-bottom: 2px;
-}
-
+/* Month calendar chrome: shared in /static/css/portal.css
+   (.cb-calendar-wrap / .cal-grid / .cal-cell / …). Keep CB event clickable. */
 body.cb-portal-page .cal-event {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: 0;
-  background: transparent;
-  padding: 1px 0;
-  font-size: 10px;
-  line-height: 1.25;
-  color: var(--admin-primary, #1f6b4a);
+  pointer-events: auto;
   cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
-
 body.cb-portal-page .cal-event:hover {
   text-decoration: underline;
-}
-
-body.cb-portal-page .cal-more {
-  font-size: 10px;
-  color: var(--admin-faint);
 }
 
 body.cb-portal-page .cb-modal[hidden] {

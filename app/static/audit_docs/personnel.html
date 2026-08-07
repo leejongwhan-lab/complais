@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>심사원·공정성·이의·불만 — ISO/IEC 17021-1</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="/static/css/main.css?v=20260807docs1">
+<link rel="stylesheet" href="/static/css/portal.css?v=20260807theme1">
+<link rel="stylesheet" href="/static/css/style.css?v=20260807cal1">
+<link rel="stylesheet" href="/static/css/admin_doc_theme.css?v=20260807theme1">
+<style>
+:root{--blue:#1a5fa8;--blue2:#e8f0fb;--blue3:#c5d8f5;--green:#1e7a4a;--green2:#e6f5ec;--green3:#b8e2c8;--amber:#8a5c00;--amber2:#fff8e1;--amber3:#fde68a;--red:#b71c1c;--red2:#fce8e8;--red3:#fca5a5;--purple:#4527a0;--purple2:#ede7f6;--indigo:#3730a3;--indigo2:#e0e7ff;--text1:#1a1a2e;--text2:#5a6072;--text3:#9098aa;--border:#dde1e7;--bg:#fff;--bg2:#f7f8fa;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;background:var(--bg2);color:var(--text1);font-size:12px}
+#hdr{background:var(--indigo);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.22)}
+.logo{font-size:14px;font-weight:800}.logo small{font-size:10px;opacity:.75;font-weight:400;margin-left:5px}
+.hdr-r{display:flex;gap:6px;align-items:center}
+.hbtn{padding:5px 13px;font-size:10px;font-weight:600;border:1px solid rgba(255,255,255,.4);border-radius:6px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer}
+.hbtn.pri{background:#fff;color:var(--indigo)}
+#tab-bar{background:#fff;border-bottom:2px solid var(--border);padding:0 20px;display:flex;overflow-x:auto}
+.tab{padding:11px 18px;font-size:11px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;color:var(--text2);white-space:nowrap;transition:.15s;background:none;border-top:none;border-left:none;border-right:none}
+.tab:hover{color:var(--indigo);background:var(--indigo2)}.tab.active{color:var(--indigo);border-bottom-color:var(--indigo)}
+#save-notice{background:var(--green2);color:var(--green);font-size:10px;font-weight:700;text-align:center;padding:5px;display:none}
+#pg{max-width:900px;margin:0 auto;padding:20px 14px 60px}
+.doc-page{display:none}.doc-page.active{display:block}
+.doc-wrap{background:#fff;border-radius:10px;border:1px solid var(--border);padding:30px 36px}
+.doc-hd{border-bottom:3px solid var(--indigo);padding-bottom:18px;margin-bottom:22px}
+.doc-tag{font-size:9px;font-weight:700;color:var(--indigo);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
+.doc-title{font-size:20px;font-weight:800;margin-bottom:3px}
+.doc-sub{font-size:11px;color:var(--text2);margin-bottom:14px}
+.doc-meta{display:inline-grid;grid-template-columns:auto auto;gap:3px 18px;font-size:10px;background:var(--bg2);padding:9px 16px;border-radius:7px;border:1px solid var(--border)}
+.dm-lbl{color:var(--text3);font-weight:600}
+.sec{margin-bottom:22px}
+.sec-h{font-size:12px;font-weight:800;color:var(--indigo);border-bottom:2px solid var(--indigo2);padding-bottom:5px;margin-bottom:12px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.sec-no{background:var(--indigo);color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px}
+.badge-ref{font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--purple2);color:var(--purple)}
+.form-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.form-tbl td{padding:7px 10px;border:1px solid var(--border);vertical-align:top}
+.form-tbl td.lbl{background:var(--bg2);font-weight:600;width:140px;color:var(--text2);white-space:nowrap}
+.inp{width:100%;border:none;background:transparent;font-size:11px;font-family:inherit;color:var(--text1);outline:none;padding:0;min-height:20px}
+.inp:focus{background:var(--indigo2);border-radius:2px;padding:1px 3px}
+.ta{width:100%;border:none;background:transparent;font-size:11px;font-family:inherit;color:var(--text1);outline:none;resize:vertical;min-height:40px;line-height:1.5}
+.ta:focus{background:var(--indigo2);border-radius:2px;padding:2px 4px}
+.field-inp{padding:6px 9px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:#fff;color:var(--text1);font-family:inherit;outline:none;width:100%}
+.field-inp:focus{border-color:var(--indigo);box-shadow:0 0 0 2px var(--indigo2)}
+.field-ta{width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:11px;resize:vertical;background:#fff;color:var(--text1);font-family:inherit;outline:none;min-height:60px;line-height:1.5}
+.field-ta:focus{border-color:var(--indigo);box-shadow:0 0 0 2px var(--indigo2)}
+.field-lbl{font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+.field-group{display:flex;flex-direction:column;gap:3px}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.notice{padding:9px 12px;border-radius:6px;font-size:10px;line-height:1.6;margin-bottom:10px}
+.notice.indigo{background:var(--indigo2);color:var(--indigo)}
+.notice.amber{background:var(--amber2);color:var(--amber)}
+.notice.green{background:var(--green2);color:var(--green)}
+.notice.red{background:var(--red2);color:var(--red)}
+/* 심사원 대장 */
+.aud-tbl{width:100%;border-collapse:collapse;font-size:10px}
+.aud-tbl th{background:var(--indigo2);padding:6px 8px;border:1px solid var(--border);font-size:9px;font-weight:700;color:var(--indigo);text-align:left}
+.aud-tbl td{padding:6px 8px;border:1px solid var(--border);vertical-align:top}
+.aud-tbl tr:nth-child(even) td{background:#fafbfc}
+/* 역량 평가 항목 */
+.comp-item{display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid var(--border);font-size:10px}
+.comp-item:last-child{border-bottom:none}
+.comp-text{flex:1}
+.comp-btns{display:flex;gap:4px}
+.comp-btn{padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg2);font-size:9px;font-weight:600;cursor:pointer}
+.comp-btn.c-ok{background:var(--green2);border-color:var(--green3);color:var(--green)}
+.comp-btn.c-ng{background:var(--red2);border-color:var(--red3);color:var(--red)}
+/* 공정성 확인 항목 */
+.imp-item{display:flex;align-items:flex-start;gap:8px;padding:7px 8px;border-bottom:1px solid var(--border);font-size:10px}
+.imp-item:last-child{border-bottom:none}
+.imp-ref{font-size:9px;color:var(--text3);width:80px;flex-shrink:0;margin-top:1px}
+.imp-text{flex:1;line-height:1.5}
+/* 처리 상태 단계 */
+.process-flow{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:10px 0}
+.pf-step{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg2);font-size:10px;font-weight:600;color:var(--text3);cursor:pointer;transition:.15s}
+.pf-step.active{background:var(--indigo2);border-color:var(--indigo);color:var(--indigo)}
+.pf-arrow{color:var(--text3);font-size:12px}
+/* 서명 */
+.sig-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.sig-box{padding:8px 0}
+.sig-role{font-size:9px;color:var(--text3);font-weight:600;margin-bottom:4px}
+.sig-line{border-bottom:1px solid var(--text1);min-height:28px;padding:3px 0}
+.sig-date{font-size:10px;color:var(--text3);margin-top:4px}
+.add-btn{padding:4px 12px;border-radius:5px;border:1px dashed var(--indigo);background:var(--indigo2);color:var(--indigo);font-size:10px;font-weight:600;cursor:pointer;margin-top:6px}
+.dec-btns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.dec-btn{padding:7px 14px;border-radius:7px;border:2px solid var(--border);background:var(--bg2);cursor:pointer;font-size:11px;font-weight:700;transition:.15s}
+.dec-btn.sel-ok{border-color:var(--green);background:var(--green2);color:var(--green)}
+.dec-btn.sel-no{border-color:var(--red);background:var(--red2);color:var(--red)}
+.dec-btn.sel-partial{border-color:var(--amber);background:var(--amber2);color:var(--amber)}
+@media print{#hdr .hdr-r,#tab-bar,#save-notice,.no-print{display:none!important}#hdr{position:static}#pg{padding:4px 0;max-width:100%}.doc-page{display:block!important}.doc-wrap{border:none;padding:18px 0}.page-break{page-break-before:always;margin-top:24px}}
+@page{margin:15mm 13mm}
+</style>
+<style id="admin-doc-theme-overrides">
+/* Modern admin tokens win over page :root aliases */
+:root {
+  --admin-primary: #0F172A;
+  --admin-primary-light: #1E293B;
+  --admin-accent: #2563EB;
+  --admin-accent-bg: #EFF6FF;
+  --admin-bg: #F8FAFC;
+  --admin-card: #FFFFFF;
+  --admin-border: #E2E8F0;
+  --admin-text: #1E293B;
+  --admin-text-muted: #64748B;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --bg: var(--admin-card);
+  --bg2: var(--admin-bg);
+  --card: var(--admin-card);
+  --border: var(--admin-border);
+  --text1: var(--admin-text);
+  --text2: var(--admin-text-muted);
+  --text3: #94A3B8;
+  --blue: var(--admin-accent);
+  --blue2: var(--admin-accent-bg);
+  --indigo: var(--admin-primary);
+  --indigo2: #E2E8F0;
+  --green: var(--success);
+  --green2: #ECFDF5;
+  --red: var(--danger);
+  --red2: #FEF2F2;
+  --amber: #B45309;
+  --amber2: #FFFBEB;
+  --purple: #3730A3;
+  --purple2: #EEF2FF;
+  --teal: #0F766E;
+  --teal2: #F0FDFA;
+}
+</style>
+
+</head>
+<body class="portal-page admin-page">
+<div id="hdr">
+  <div class="logo">ComplAIs <small>심사원역량·공정성선언·이의제기·불만처리 — ISO/IEC 17021-1</small></div>
+  <div class="hdr-r">
+    <button class="hbtn" onclick="saveAll()">💾 저장</button>
+    <button class="hbtn pri no-print" onclick="window.print()">🖨️ 인쇄</button>
+  </div>
+</div>
+<div id="tab-bar">
+  <button class="tab active" onclick="showTab(0)">① 심사원 역량 관리대장</button>
+  <button class="tab" onclick="showTab(1)">② 공정성 선언서</button>
+  <button class="tab" onclick="showTab(2)">③ 이의 제기 처리 기록서</button>
+  <button class="tab" onclick="showTab(3)">④ 불만 처리 기록서</button>
+</div>
+<div id="save-notice">✅ 저장 완료</div>
+<div id="pg">
+
+<!-- ① 심사원 역량 관리대장 -->
+<div class="doc-page active" id="page-0">
+<div class="doc-wrap">
+  <div class="doc-hd">
+    <div class="doc-tag">ISO/IEC 17021-1 §7.1 · §7.2 · §7.4 · Auditor Competence Register</div>
+    <div class="doc-title">심사원 역량 관리대장</div>
+    <div class="doc-sub">Auditor Competence &amp; Qualification Register — ISO 19011 부속서 A 역량 기준 적용</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">최종 업데이트</span><span><input class="inp" type="date" id="aud-date" style="border-bottom:1px solid var(--border);width:130px"></span>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">1</span> 심사원 기본 정보 <span class="badge-ref">§7.4</span></div>
+    <table class="form-tbl">
+      <tr><td class="lbl">성명</td><td><input class="inp" id="aud-name"></td><td class="lbl" style="width:80px">등록번호</td><td><input class="inp" id="aud-no" placeholder="예) KAB-Q-1234"></td></tr>
+      <tr><td class="lbl">직책 / 소속</td><td><input class="inp" id="aud-pos"></td><td class="lbl">연락처</td><td><input class="inp" id="aud-contact"></td></tr>
+      <tr><td class="lbl">자격 유형</td><td><select id="aud-type" style="width:100%;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:4px 6px;background:#fff"><option>심사팀장 (Audit Team Leader)</option><option>심사원 (Auditor)</option><option>기술전문가 (Technical Expert)</option></select></td><td class="lbl">자격 취득일</td><td><input class="inp" type="date" id="aud-qual-date"></td></tr>
+      <tr><td class="lbl">인정 표준</td><td colspan="3"><textarea class="ta" id="aud-std" rows="2" placeholder="인정된 표준 목록: 예) ISO 14001, ISO 45001, ISO 9001"></textarea></td></tr>
+      <tr><td class="lbl">NACE 기술 분야</td><td colspan="3"><textarea class="ta" id="aud-nace" rows="2" placeholder="인정된 산업 분야(NACE 코드): 예) C29 자동차부품, C24 금속제조"></textarea></td></tr>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">2</span> 역량 기준 평가 <span class="badge-ref">§7.1.2 · §7.2.4~7.2.7 · ISO 19011 Annex A</span></div>
+    <div class="notice indigo">ℹ️ §7.1.2: 인증기관은 심사원 역량 기준을 수립해야 합니다. ISO 19011 부속서 A의 일반 역량 기준을 적용합니다.</div>
+    <table class="form-tbl" style="margin-bottom:8px">
+      <tr style="background:var(--indigo2)"><td style="font-weight:700;color:var(--indigo);font-size:10px">역량 영역</td><td style="font-weight:700;color:var(--indigo);font-size:10px;width:80px">평가</td><td style="font-weight:700;color:var(--indigo);font-size:10px">증거 / 비고</td></tr>
+      <tr><td style="font-size:10px">일반 심사 지식 — 심사 원칙·절차·방법 (ISO 19011)</td><td><select id="c1" style="width:100%;font-size:10px;border:none;background:transparent"><option>충족</option><option>부분 충족</option><option>미충족</option></select></td><td><input class="inp" id="c1-ev" placeholder="교육·이력 증거"></td></tr>
+      <tr><td style="font-size:10px">경영시스템 표준 지식 — 인정 표준 요구사항 이해</td><td><select id="c2" style="width:100%;font-size:10px;border:none;background:transparent"><option>충족</option><option>부분 충족</option><option>미충족</option></select></td><td><input class="inp" id="c2-ev"></td></tr>
+      <tr><td style="font-size:10px">기술 전문 지식 — 인정 NACE 분야 산업·기술 지식</td><td><select id="c3" style="width:100%;font-size:10px;border:none;background:transparent"><option>충족</option><option>부분 충족</option><option>미충족</option></select></td><td><input class="inp" id="c3-ev"></td></tr>
+      <tr><td style="font-size:10px">법규 지식 — 인정 분야 적용 법규·규제 요건</td><td><select id="c4" style="width:100%;font-size:10px;border:none;background:transparent"><option>충족</option><option>부분 충족</option><option>미충족</option></select></td><td><input class="inp" id="c4-ev"></td></tr>
+      <tr><td style="font-size:10px">심사 기술 — 인터뷰·관찰·증거 수집·보고서 작성</td><td><select id="c5" style="width:100%;font-size:10px;border:none;background:transparent"><option>충족</option><option>부분 충족</option><option>미충족</option></select></td><td><input class="inp" id="c5-ev"></td></tr>
+      <tr><td style="font-size:10px">공정성·윤리 — 객관성·비밀보장·공정성 유지</td><td><select id="c6" style="width:100%;font-size:10px;border:none;background:transparent"><option>충족</option><option>부분 충족</option><option>미충족</option></select></td><td><input class="inp" id="c6-ev"></td></tr>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">3</span> 교육훈련 이력 <span class="badge-ref">§7.2.7 · §7.2.8</span></div>
+    <table class="aud-tbl">
+      <tr><th style="width:100px">교육 일자</th><th>교육 내용</th><th style="width:80px">이수 시간</th><th style="width:80px">이수 확인</th></tr>
+      <tr><td><input class="inp" type="date" id="tr1-d"></td><td><input class="inp" id="tr1-c" placeholder="표준 업데이트 교육 / 심사 기법 교육 등"></td><td><input class="inp" id="tr1-h" placeholder="8시간"></td><td><input class="inp" id="tr1-cert" placeholder="수료증 번호"></td></tr>
+      <tr><td><input class="inp" type="date" id="tr2-d"></td><td><input class="inp" id="tr2-c"></td><td><input class="inp" id="tr2-h"></td><td><input class="inp" id="tr2-cert"></td></tr>
+      <tr><td><input class="inp" type="date" id="tr3-d"></td><td><input class="inp" id="tr3-c"></td><td><input class="inp" id="tr3-h"></td><td><input class="inp" id="tr3-cert"></td></tr>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">4</span> 심사원 모니터링 기록 <span class="badge-ref">§7.2.10 · §7.2.11</span></div>
+    <div class="notice indigo">ℹ️ §7.2.10: 심사원 모니터링은 현장 평가, 심사보고서 검토, 고객·피심사 조직 피드백의 조합을 포함해야 합니다.</div>
+    <table class="form-tbl">
+      <tr><td class="lbl">최근 현장 동반 평가일</td><td><input class="inp" type="date" id="mon-date"></td><td class="lbl" style="width:90px">평가자</td><td><input class="inp" id="mon-evaluator"></td></tr>
+      <tr><td class="lbl">평가 결과</td><td><select id="mon-result" style="width:100%;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:4px 6px;background:#fff"><option>적합 — 역량 확인됨</option><option>부분 적합 — 개선 필요</option><option>부적합 — 재교육 필요</option></select></td><td class="lbl">다음 평가 예정</td><td><input class="inp" type="date" id="mon-next"></td></tr>
+      <tr><td class="lbl">평가 의견</td><td colspan="3"><textarea class="ta" id="mon-note" rows="2" placeholder="심사 수행 역량 평가 의견 기재"></textarea></td></tr>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">5</span> 서명</div>
+    <div class="sig-grid">
+      <div class="sig-box"><div class="sig-role">해당 심사원</div><div class="sig-line"><input class="inp" id="aud-sig1"></div><div class="sig-date">일자: <input class="inp" type="date" id="aud-sig1-d" style="width:120px;display:inline"></div></div>
+      <div class="sig-box"><div class="sig-role">역량 평가 담당자</div><div class="sig-line"><input class="inp" id="aud-sig2"></div><div class="sig-date">일자: <input class="inp" type="date" id="aud-sig2-d" style="width:120px;display:inline"></div></div>
+      <div class="sig-box"><div class="sig-role">심사프로그램 관리자 확인</div><div class="sig-line"><input class="inp" id="aud-sig3"></div><div class="sig-date">일자: <input class="inp" type="date" id="aud-sig3-d" style="width:120px;display:inline"></div></div>
+    </div>
+  </div>
+</div></div>
+
+<!-- ② 공정성 선언서 -->
+<div class="doc-page page-break" id="page-1">
+<div class="doc-wrap">
+  <div class="doc-hd">
+    <div class="doc-tag">ISO/IEC 17021-1 §5.2 · §9.2.2.1 · Impartiality Declaration</div>
+    <div class="doc-title">공정성 선언서</div>
+    <div class="doc-sub">Impartiality &amp; Conflict of Interest Declaration — 심사 배정 전 공정성 확인</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">선언서 번호</span><span><input class="inp" id="imp-no" placeholder="IMP-2025-001" style="border-bottom:1px solid var(--border);width:155px"></span>
+      <span class="dm-lbl">작성일</span><span><input class="inp" type="date" id="imp-date" style="border-bottom:1px solid var(--border);width:130px"></span>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">1</span> 심사 및 심사팀 정보</div>
+    <table class="form-tbl">
+      <tr><td class="lbl">심사팀장</td><td><input class="inp" id="imp-lead" placeholder="성명 / 자격번호"></td><td class="lbl" style="width:80px">배정 역할</td><td><select id="imp-role" style="width:100%;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:4px 6px;background:#fff"><option>심사팀장 (Audit Team Leader)</option><option>심사원 (Auditor)</option><option>기술전문가 (Technical Expert)</option><option>참관인 (Observer)</option></select></td></tr>
+      <tr><td class="lbl">피심사 조직</td><td><input class="inp" id="imp-org"></td><td class="lbl">심사 유형</td><td><input class="inp" id="imp-audit-type"></td></tr>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">2</span> 이해충돌 확인 항목 <span class="badge-ref">§5.2 · §5.2.3~5.2.5</span></div>
+    <div class="notice indigo">ℹ️ §5.2: 인증기관은 이해충돌을 식별·관리해야 합니다. 아래 모든 항목에 답변해 주십시오.</div>
+    <table class="form-tbl">
+      <tr style="background:var(--indigo2)"><td style="font-weight:700;color:var(--indigo);font-size:10px">확인 항목</td><td style="font-weight:700;color:var(--indigo);font-size:10px;width:100px">해당 여부</td><td style="font-weight:700;color:var(--indigo);font-size:10px">설명 (해당 시)</td></tr>
+      <tr><td style="font-size:10px">최근 2년 이내 해당 조직의 경영시스템 구축·운영에 관한 컨설팅·조언을 제공한 적이 있는가? <span class="badge-ref" style="font-size:9px">§5.2.5</span></td>
+        <td><select id="imp1" style="width:100%;font-size:10px;border:none;background:transparent"><option>없음</option><option>있음</option></select></td><td><input class="inp" id="imp1-note"></td></tr>
+      <tr><td style="font-size:10px">피심사 조직과 소유·고용·재정적 이해관계가 있는가?</td>
+        <td><select id="imp2" style="width:100%;font-size:10px;border:none;background:transparent"><option>없음</option><option>있음</option></select></td><td><input class="inp" id="imp2-note"></td></tr>
+      <tr><td style="font-size:10px">피심사 조직 임직원과 개인적 친분·가족 관계가 있는가?</td>
+        <td><select id="imp3" style="width:100%;font-size:10px;border:none;background:transparent"><option>없음</option><option>있음</option></select></td><td><input class="inp" id="imp3-note"></td></tr>
+      <tr><td style="font-size:10px">동일 조직에 대한 심사원 연속 배정 기간이 인증기관 절차 기준을 초과하는가? <span class="badge-ref" style="font-size:9px">§7.2.11</span></td>
+        <td><select id="imp4" style="width:100%;font-size:10px;border:none;background:transparent"><option>없음(기준 이내)</option><option>있음(기준 초과)</option></select></td><td><input class="inp" id="imp4-note"></td></tr>
+      <tr><td style="font-size:10px">피심사 조직으로부터 금전적 이익(수수료 제외)을 받거나 받을 예정이 있는가?</td>
+        <td><select id="imp5" style="width:100%;font-size:10px;border:none;background:transparent"><option>없음</option><option>있음</option></select></td><td><input class="inp" id="imp5-note"></td></tr>
+      <tr><td style="font-size:10px">공정한 심사 수행에 영향을 미칠 수 있는 기타 이해충돌 관계가 있는가?</td>
+        <td><select id="imp6" style="width:100%;font-size:10px;border:none;background:transparent"><option>없음</option><option>있음</option></select></td><td><input class="inp" id="imp6-note"></td></tr>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">3</span> 공정성 선언</div>
+    <div style="padding:14px 18px;border:2px solid var(--indigo);border-radius:8px;background:var(--indigo2);font-size:10px;line-height:1.9;margin-bottom:12px">
+      본인은 다음을 선언합니다:<br>
+      ① 위 확인 항목에서 이해충돌 관계가 <strong>없음</strong>을 확인하며, 있는 경우 위에 성실히 기재하였습니다.<br>
+      ② 심사는 객관적 증거에 근거하여 공정하게 수행할 것을 약속합니다.<br>
+      ③ 심사 과정에서 취득한 피심사 조직의 모든 정보를 기밀로 유지할 것을 약속합니다. (§8.4)<br>
+      ④ 심사 수행 중 이해충돌이 발생하거나 공정성에 위협이 될 수 있는 상황이 발생하면 즉시 인증기관에 보고할 것을 약속합니다.
+    </div>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">4</span> 서명</div>
+    <div class="sig-grid">
+      <div class="sig-box"><div class="sig-role">선언자 (심사팀장·심사원)</div><div class="sig-line"><input class="inp" id="imp-sig1"></div><div class="sig-date">일자: <input class="inp" type="date" id="imp-sig1-d" style="width:120px;display:inline"></div></div>
+      <div class="sig-box"><div class="sig-role">심사프로그램 관리자 확인</div><div class="sig-line"><input class="inp" id="imp-sig2"></div><div class="sig-date">일자: <input class="inp" type="date" id="imp-sig2-d" style="width:120px;display:inline"></div></div>
+      <div class="sig-box"><div class="sig-role">비고</div><div style="font-size:10px;color:var(--text2);margin-top:4px;line-height:1.5">이해충돌 발견 시 인증기관은 심사팀을 재구성해야 합니다.</div></div>
+    </div>
+  </div>
+</div></div>
+
+<!-- ③ 이의 제기 처리 기록서 -->
+<div class="doc-page page-break" id="page-2">
+<div class="doc-wrap">
+  <div class="doc-hd">
+    <div class="doc-tag">ISO/IEC 17021-1 §9.7 · Appeal Handling Record</div>
+    <div class="doc-title">이의 제기 처리 기록서</div>
+    <div class="doc-sub">Appeal Handling Record — 인증 결정에 대한 이의 제기 처리 기록</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">이의 번호</span><span><input class="inp" id="ap-no" placeholder="APL-2025-001" style="border-bottom:1px solid var(--border);width:155px"></span>
+      <span class="dm-lbl">접수일</span><span><input class="inp" type="date" id="ap-date" style="border-bottom:1px solid var(--border);width:130px"></span>
+    </div>
+  </div>
+  <div class="notice indigo">ℹ️ <b>§9.7 이의 제기(Appeal) 정의:</b> 이의 제기는 인증기관의 결정(인증 부여·거절·정지·취소 등)에 대해 고객이 재심을 요청하는 것입니다. 불만(Complaint §9.8)과 구별됩니다.</div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">1</span> 이의 제기 접수 <span class="badge-ref">§9.7</span></div>
+    <table class="form-tbl">
+      <tr><td class="lbl">이의 제기자</td><td><input class="inp" id="ap-who" placeholder="조직명 / 담당자"></td><td class="lbl" style="width:90px">이의 제기일</td><td><input class="inp" type="date" id="ap-filed"></td></tr>
+      <tr><td class="lbl">이의 대상 결정</td><td colspan="3"><input class="inp" id="ap-decision" placeholder="예) 인증 정지 결정 (결정서 번호: CDD-2025-001)"></td></tr>
+      <tr><td class="lbl">이의 제기 내용</td><td colspan="3"><textarea class="ta" id="ap-content" rows="4" placeholder="이의 제기자가 주장하는 내용을 상세히 기재하세요."></textarea></td></tr>
+      <tr><td class="lbl">이의 제기 방법</td><td><select id="ap-method" style="width:100%;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:4px 6px;background:#fff"><option>서면</option><option>이메일</option><option>온라인 포털</option><option>기타</option></select></td><td class="lbl">처리 기한</td><td><input class="inp" type="date" id="ap-deadline"></td></tr>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">2</span> 처리 현황</div>
+    <div class="process-flow">
+      <button class="pf-step" id="ap-st-recv" onclick="setApStatus('recv')">접수 확인</button>
+      <span class="pf-arrow">→</span>
+      <button class="pf-step" id="ap-st-review" onclick="setApStatus('review')">독립 검토</button>
+      <span class="pf-arrow">→</span>
+      <button class="pf-step" id="ap-st-decide" onclick="setApStatus('decide')">결정</button>
+      <span class="pf-arrow">→</span>
+      <button class="pf-step" id="ap-st-notify" onclick="setApStatus('notify')">통보</button>
+      <span class="pf-arrow">→</span>
+      <button class="pf-step" id="ap-st-closed" onclick="setApStatus('closed')">종결</button>
+    </div>
+    <table class="form-tbl">
+      <tr><td class="lbl">독립 검토자</td><td colspan="3"><input class="inp" id="ap-reviewer" placeholder="심사에 관여하지 않은 독립적 검토자 성명 / 직책 (§9.7)"></td></tr>
+      <tr><td class="lbl">검토 의견</td><td colspan="3"><textarea class="ta" id="ap-review-note" rows="3" placeholder="이의 내용의 타당성 및 처리 방향에 대한 검토 의견"></textarea></td></tr>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">3</span> 이의 처리 결정</div>
+    <div class="dec-btns">
+      <button class="dec-btn" id="ap-dec-accept" onclick="setApDecision('accept')">✅ 이의 수용 — 결정 번복</button>
+      <button class="dec-btn" id="ap-dec-partial" onclick="setApDecision('partial')">⚠️ 부분 수용</button>
+      <button class="dec-btn" id="ap-dec-reject" onclick="setApDecision('reject')">❌ 이의 기각 — 원 결정 유지</button>
+    </div>
+    <div class="row-2" style="margin-top:8px">
+      <div class="field-group"><div class="field-lbl">처리 결정 근거</div>
+      <textarea class="field-ta" id="ap-basis" rows="3"></textarea></div>
+      <div class="field-group"><div class="field-lbl">이의 제기자 통보일</div>
+      <input class="field-inp" type="date" id="ap-notify-date">
+      <div class="field-lbl" style="margin-top:8px">종결일</div>
+      <input class="field-inp" type="date" id="ap-closed-date"></div>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">4</span> 서명</div>
+    <div class="sig-grid">
+      <div class="sig-box"><div class="sig-role">독립 검토자</div><div class="sig-line"><input class="inp" id="ap-sig1"></div><div class="sig-date">일자: <input class="inp" type="date" id="ap-sig1-d" style="width:120px;display:inline"></div></div>
+      <div class="sig-box"><div class="sig-role">인증기관 대표 (최종 결정)</div><div class="sig-line"><input class="inp" id="ap-sig2"></div><div class="sig-date">일자: <input class="inp" type="date" id="ap-sig2-d" style="width:120px;display:inline"></div></div>
+      <div class="sig-box"><div class="sig-role">이의 제기자 수령 확인</div><div class="sig-line"></div><div class="sig-date">일자:</div></div>
+    </div>
+  </div>
+</div></div>
+
+<!-- ④ 불만 처리 기록서 -->
+<div class="doc-page page-break" id="page-3">
+<div class="doc-wrap">
+  <div class="doc-hd">
+    <div class="doc-tag">ISO/IEC 17021-1 §9.8 · Complaint Handling Record</div>
+    <div class="doc-title">불만 처리 기록서</div>
+    <div class="doc-sub">Complaint Handling Record — 인증 활동에 관한 불만 접수·처리·종결</div>
+    <div class="doc-meta">
+      <span class="dm-lbl">불만 번호</span><span><input class="inp" id="cmp-no" placeholder="CMP-2025-001" style="border-bottom:1px solid var(--border);width:155px"></span>
+      <span class="dm-lbl">접수일</span><span><input class="inp" type="date" id="cmp-date" style="border-bottom:1px solid var(--border);width:130px"></span>
+    </div>
+  </div>
+  <div class="notice indigo">ℹ️ <b>§9.8 불만(Complaint) 정의:</b> 불만은 인증기관의 인증 활동에 대해 고객 또는 제3자가 제기하는 것입니다. 심사 결과에 대한 이의 제기(§9.7)와 구별됩니다. 인증된 고객의 경영시스템에 관한 불만도 포함됩니다.</div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">1</span> 불만 접수 <span class="badge-ref">§9.8</span></div>
+    <table class="form-tbl">
+      <tr><td class="lbl">불만 제기자</td><td><input class="inp" id="cmp-who"></td><td class="lbl" style="width:90px">제기자 유형</td><td><select id="cmp-who-type" style="width:100%;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:4px 6px;background:#fff"><option>인증 고객</option><option>고객의 고객 (제3자)</option><option>규제기관</option><option>이해관계자</option><option>익명</option></select></td></tr>
+      <tr><td class="lbl">불만 대상</td><td><input class="inp" id="cmp-target" placeholder="인증기관 활동 / 인증된 고객명"></td><td class="lbl">접수 방법</td><td><select id="cmp-method" style="width:100%;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:4px 6px;background:#fff"><option>이메일</option><option>서면</option><option>전화 (기록)</option><option>온라인</option></select></td></tr>
+      <tr><td class="lbl">불만 내용</td><td colspan="3"><textarea class="ta" id="cmp-content" rows="4" placeholder="불만 내용을 상세히 기재하세요.&#10;&#10;예 1) 인증기관 활동 불만: 심사팀 전문성 부족, 심사 계획 미통보 등&#10;예 2) 인증 고객 불만: 인증된 조직의 경영시스템 미이행 의혹 등"></textarea></td></tr>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">2</span> 불만 처리 절차 <span class="badge-ref">§9.8 a)~e)</span></div>
+    <div class="process-flow">
+      <button class="pf-step" id="cmp-st-recv" onclick="setCmpStatus('recv')">a) 접수 확인</button>
+      <span class="pf-arrow">→</span>
+      <button class="pf-step" id="cmp-st-info" onclick="setCmpStatus('info')">b) 정보 수집</button>
+      <span class="pf-arrow">→</span>
+      <button class="pf-step" id="cmp-st-review" onclick="setCmpStatus('review')">c) 심사 검토</button>
+      <span class="pf-arrow">→</span>
+      <button class="pf-step" id="cmp-st-notify" onclick="setCmpStatus('notify')">d) 결과 통보</button>
+      <span class="pf-arrow">→</span>
+      <button class="pf-step" id="cmp-st-closed" onclick="setCmpStatus('closed')">e) 공식 종결</button>
+    </div>
+    <table class="form-tbl">
+      <tr><td class="lbl">접수 확인 통보일</td><td><input class="inp" type="date" id="cmp-ack-date"></td><td class="lbl" style="width:100px">처리 담당자</td><td><input class="inp" id="cmp-handler"></td></tr>
+      <tr><td class="lbl">불만 유효성 검토</td><td colspan="3"><div class="dec-btns" style="margin:4px 0">
+        <button class="dec-btn" id="cmp-v-valid" onclick="setCmpValidity('valid')">타당한 불만</button>
+        <button class="dec-btn" id="cmp-v-partial" onclick="setCmpValidity('partial')">부분 타당</button>
+        <button class="dec-btn" id="cmp-v-invalid" onclick="setCmpValidity('invalid')">타당하지 않음</button>
+      </div></td></tr>
+      <tr><td class="lbl">심사 연관 불만 여부</td><td colspan="3">
+        <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;margin-right:16px"><input type="radio" name="cmp-audit-rel" value="yes"> 예 — 심사팀 및 인증 결정 검토 필요 (§9.8 c)</label>
+        <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px"><input type="radio" name="cmp-audit-rel" value="no"> 아니요 — 운영 불만</label>
+      </td></tr>
+      <tr><td class="lbl">정보 수집 결과</td><td colspan="3"><textarea class="ta" id="cmp-info" rows="2" placeholder="불만 관련 수집한 정보 및 사실 기재"></textarea></td></tr>
+      <tr><td class="lbl">심사 검토 결과<br>(해당 시 §9.8 c)</td><td colspan="3"><textarea class="ta" id="cmp-audit-review" rows="2" placeholder="심사 연관 불만인 경우: 심사팀 구성, 심사 수행 절차, 인증 결정에 관한 검토 결과"></textarea></td></tr>
+      <tr><td class="lbl">처리 결과</td><td colspan="3"><textarea class="ta" id="cmp-result" rows="3" placeholder="불만에 대한 처리 결과 및 조치 내용 기재"></textarea></td></tr>
+    </table>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">3</span> 불만 제기자 통보 및 종결 <span class="badge-ref">§9.8 d)e)</span></div>
+    <div class="row-2">
+      <div class="field-group"><div class="field-lbl">불만 제기자 통보일</div><input class="field-inp" type="date" id="cmp-notify-date"></div>
+      <div class="field-group"><div class="field-lbl">공식 종결일</div><input class="field-inp" type="date" id="cmp-closed-date"></div>
+    </div>
+    <div class="field-group" style="margin-top:8px"><div class="field-lbl" style="margin-bottom:4px">통보 내용 요약</div>
+    <textarea class="field-ta" id="cmp-notify-note" rows="2" placeholder="불만 제기자에게 통보한 처리 결과 요약"></textarea></div>
+  </div>
+  <div class="sec">
+    <div class="sec-h"><span class="sec-no">4</span> 서명</div>
+    <div class="sig-grid">
+      <div class="sig-box"><div class="sig-role">불만 처리 담당자</div><div class="sig-line"><input class="inp" id="cmp-sig1"></div><div class="sig-date">일자: <input class="inp" type="date" id="cmp-sig1-d" style="width:120px;display:inline"></div></div>
+      <div class="sig-box"><div class="sig-role">심사프로그램 관리자</div><div class="sig-line"><input class="inp" id="cmp-sig2"></div><div class="sig-date">종결일: <input class="inp" type="date" id="cmp-sig2-d" style="width:120px;display:inline"></div></div>
+      <div class="sig-box"><div class="sig-role">비고</div><div style="font-size:10px;color:var(--text2);margin-top:4px;line-height:1.5">§9.8: 불만 처리 기록은 §9.9에 따라 유지해야 합니다.</div></div>
+    </div>
+  </div>
+</div></div>
+
+</div>
+<script>
+let apStatus=null, apDecision=null, cmpStatus=null, cmpValidity=null;
+function setApStatus(v){apStatus=v;['recv','review','decide','notify','closed'].forEach(s=>{const b=document.getElementById('ap-st-'+s);if(b)b.className='pf-step'+(s===v?' active':'');});saveAll();}
+function setApDecision(v){apDecision=v;const map={accept:'sel-ok',partial:'sel-partial',reject:'sel-no'};['accept','partial','reject'].forEach(x=>{const b=document.getElementById('ap-dec-'+x);if(b)b.className='dec-btn'+(x===v?' '+map[x]:'');});saveAll();}
+function setCmpStatus(v){cmpStatus=v;['recv','info','review','notify','closed'].forEach(s=>{const b=document.getElementById('cmp-st-'+s);if(b)b.className='pf-step'+(s===v?' active':'');});saveAll();}
+function setCmpValidity(v){cmpValidity=v;const map={valid:'sel-ok',partial:'sel-partial',invalid:'sel-no'};['valid','partial','invalid'].forEach(x=>{const b=document.getElementById('cmp-v-'+x);if(b)b.className='dec-btn'+(x===v?' '+map[x]:'');});saveAll();}
+function showTab(n){document.querySelectorAll('.doc-page').forEach((p,i)=>p.classList.toggle('active',i===n));document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===n));window.scrollTo({top:0,behavior:'smooth'});}
+function getSaved(k){try{const v=localStorage.getItem('pers_'+k);return v?JSON.parse(v):null;}catch(e){return null;}}
+function setSaved(k,v){try{localStorage.setItem('pers_'+k,JSON.stringify(v));}catch(e){}}
+function collectFields(){const d={};document.querySelectorAll('input[id],textarea[id],select[id]').forEach(el=>{if(!el.id)return;if(el.type==='radio')return;if(el.type==='checkbox')d[el.id]=el.checked;else d[el.id]=el.value;});['cmp-audit-rel'].forEach(name=>{const el=document.querySelector(`input[name="${name}"]:checked`);if(el)d['radio-'+name]=el.value;});return d;}
+function restoreFields(d){if(!d)return;Object.entries(d).forEach(([id,val])=>{if(id.startsWith('radio-')){const name=id.replace('radio-','');const el=document.querySelector(`input[name="${name}"][value="${val}"]`);if(el)el.checked=true;return;}const el=document.getElementById(id);if(!el||el.type==='radio')return;if(el.type==='checkbox')el.checked=val;else el.value=val||'';});}
+function saveAll(){setSaved('fields',collectFields());setSaved('aps',apStatus);setSaved('apd',apDecision);setSaved('cmps',cmpStatus);setSaved('cmpv',cmpValidity);const n=document.getElementById('save-notice');if(n){n.style.display='block';clearTimeout(n._t);n._t=setTimeout(()=>n.style.display='none',2000);}}
+let _at=null;document.addEventListener('input',()=>{clearTimeout(_at);_at=setTimeout(saveAll,1500);});document.addEventListener('change',()=>{clearTimeout(_at);_at=setTimeout(saveAll,1500);});
+document.addEventListener('DOMContentLoaded',()=>{
+  const today=new Date().toISOString().slice(0,10);
+  document.querySelectorAll('input[type="date"]').forEach(el=>{if(!el.value)el.value=today;});
+  const f=getSaved('fields');if(f)restoreFields(f);
+  const aps=getSaved('aps');if(aps)setApStatus(aps);
+  const apd=getSaved('apd');if(apd)setApDecision(apd);
+  const cmps=getSaved('cmps');if(cmps)setCmpStatus(cmps);
+  const cmpv=getSaved('cmpv');if(cmpv)setCmpValidity(cmpv);
+});
+</script>
+<script src="/static/js/audit_doc_master.js?v=20260807demo1"></script>
+</body></html>

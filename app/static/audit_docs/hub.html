@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>complAIs — 인증심사 문서세트 데모</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+  <link rel="stylesheet" href="/static/css/main.css?v=20260807docs1">
+  <link rel="stylesheet" href="/static/css/portal.css?v=20260807theme1">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260807cal1">
+  <link rel="stylesheet" href="/static/css/admin_doc_theme.css?v=20260807theme1">
+  <style>
+    body.portal-page { font-family: "Pretendard", var(--font-family-main, system-ui), sans-serif; margin: 0; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 28px 20px 64px; }
+    .pill { display: inline-block; background: var(--admin-card, #fff); border: 1px solid var(--admin-border, #e3ebe4);
+      border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; margin: 0 8px 8px 0; }
+    .pill strong { color: var(--admin-accent, #2563EB); }
+    .grid { display: grid; gap: 10px; }
+    a.card { display: block; background: var(--admin-card, #fff); border: 1px solid var(--admin-border, #e3ebe4);
+      border-radius: 10px; padding: 14px 16px; text-decoration: none; color: inherit; }
+    a.card:hover { border-color: var(--admin-accent, #2563EB); }
+    a.card h3 { margin: 0 0 4px; font-size: 1rem; }
+    a.card p { margin: 0; color: var(--admin-muted, #5f7264); font-size: 0.82rem; word-break: break-all; }
+    h2 { font-size: 1.05rem; margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--admin-border, #e3ebe4); }
+    .flow { font-size: 0.85rem; color: var(--admin-muted, #5f7264); background: var(--admin-card, #fff);
+      border: 1px solid var(--admin-border, #e3ebe4); border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; line-height: 1.55; }
+  </style>
+</head>
+<body class="portal-page admin-page">
+  <div class="wrap">
+    <h1 style="font: var(--font-h1); margin: 0 0 6px;">인증심사 문서세트 데모</h1>
+    <p class="muted" style="margin:0 0 18px;">Admin 공통 스타일 · Master DB · 포털 패널 진입 권장</p>
+    <div class="flow">
+      <strong>권장 진입</strong>
+      <a href="/auditor-portal?tab=docs&demo=1&contract_id=1">/auditor-portal?tab=docs</a>
+      (심사원 포털 문서 탭 · 결과보고서/노트와 동일 셸)<br>
+      흐름: 신청·계약 → 계획서 → 1단계 준비성 → 1·2단계 보고서 / 노트 → 결과보고서 → 검증·심의 · 갱신/전환/특별
+    </div>
+    <div id="meta" style="margin-bottom:18px;"><span class="pill">불러오는 중…</span></div>
+    <div id="groups"></div>
+    <h2>포털 딥링크</h2>
+    <div class="grid" id="portal-list"></div>
+  </div>
+  <script>
+  (function () {
+    var qs = new URLSearchParams(location.search);
+    var cid = qs.get("contract_id") || "1";
+    var q = "demo=1&contract_id=" + encodeURIComponent(cid);
+    function esc(s) {
+      return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+    fetch("/api/v1/demo/audit-docs/context?" + q)
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (ctx) {
+        var m = ctx.master || {};
+        document.getElementById("meta").innerHTML =
+          '<span class="pill"><strong>company</strong> #' + esc(m.company_id) + " " + esc(m.company_name) + "</span>" +
+          '<span class="pill"><strong>contract</strong> #' + esc(m.contract_id) + " " + esc(m.contract_no) + "</span>" +
+          '<span class="pill"><strong>standards</strong> ' + esc((m.standard_keys || []).join(", ")) + "</span>" +
+          '<span class="pill"><strong>CB</strong> ' + esc(m.cb_name || "—") + "</span>";
+        var order = [], map = {};
+        (ctx.pages || []).forEach(function (p) {
+          var g = p.group || "other";
+          if (!map[g]) { map[g] = { label: p.group_label || g, pages: [] }; order.push(g); }
+          map[g].pages.push(p);
+        });
+        var html = "";
+        order.forEach(function (g) {
+          html += "<h2>" + esc(map[g].label) + "</h2><div class='grid'>";
+          map[g].pages.forEach(function (p) {
+            var portalUrl = "/auditor-portal?tab=docs&doc=" + encodeURIComponent(p.slug) + "&" + q;
+            html += '<a class="card" href="' + esc(portalUrl) + '"><h3>' + esc(p.title) +
+              "</h3><p>포털 패널 · " + esc(portalUrl) + "</p></a>";
+          });
+          html += "</div>";
+        });
+        document.getElementById("groups").innerHTML = html;
+        var portal = [
+          { t: "포털 문서 탭", u: "/auditor-portal?tab=docs&" + q },
+          { t: "심사노트", u: "/auditor-portal?tab=reports&" + q },
+          { t: "결과보고서", u: "/auditor-portal?tab=reports&view=report&" + q },
+          { t: "일정", u: "/auditor-portal?tab=schedules&demo=1" },
+          { t: "API context", u: "/api/v1/demo/audit-docs/context?" + q },
+        ];
+        document.getElementById("portal-list").innerHTML = portal.map(function (p) {
+          return '<a class="card" href="' + esc(p.u) + '"><h3>' + esc(p.t) + "</h3><p>" + esc(p.u) + "</p></a>";
+        }).join("");
+      })
+      .catch(function (e) {
+        document.getElementById("meta").innerHTML = '<span class="pill" style="color:var(--admin-danger,#b91c1c)">로드 실패: ' + esc(e.message) + "</span>";
+      });
+  })();
+  </script>
+</body>
+</html>

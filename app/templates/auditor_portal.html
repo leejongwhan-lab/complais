@@ -6,8 +6,9 @@
   <title>complAIs — 심사원 포털</title>
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
   <link rel="stylesheet" href="/static/css/main.css?v=20260807aud12">
-  <link rel="stylesheet" href="/static/css/portal.css?v=20260807aud14">
-  <link rel="stylesheet" href="/static/css/style.css?v=20260807aud12">
+  <link rel="stylesheet" href="/static/css/portal.css?v=20260807theme1">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260807cal1">
+  <link rel="stylesheet" href="/static/css/admin_doc_theme.css?v=20260807theme1">
   <style>
     body.auditor-portal-page { font-family: "Pretendard", var(--font-family-main, system-ui), sans-serif; }
     .auditor-kpi-grid {
@@ -168,20 +169,37 @@
       display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
       margin-bottom: 12px;
     }
-    .aud-note-meta { flex: 1; min-width: 160px; }
+    .aud-note-meta { flex: 1; min-width: 220px; }
     .aud-note-meta strong { display: block; font-size: 1.05rem; }
+    .aud-note-hdr-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 6px 14px;
+      margin: 0 0 4px;
+    }
+    .aud-note-hdr-fields > div { min-width: 0; }
+    .aud-note-hdr-fields dt {
+      margin: 0; font-size: 0.68rem; font-weight: 650; color: #64748b; letter-spacing: 0.01em;
+    }
+    .aud-note-hdr-fields dd {
+      margin: 1px 0 0; font-size: 0.86rem; font-weight: 650; color: #1e293b;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .aud-note-company-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
     .aud-note-std-label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; }
     .aud-note-std-label select {
       min-width: 180px; padding: 8px 10px; border: 1px solid #d0d7e2; border-radius: 8px;
       font-family: inherit;
     }
     .aud-note-editor { min-height: 70vh; }
+    /* 3-pane sticky/scroll shell: see portal.css (--aud-note-header-offset) */
     .aud-note-grid {
       display: grid;
       grid-template-columns: 230px minmax(0, 1fr) 250px;
       gap: 0; min-height: 68vh;
       border: 1px solid var(--admin-border, #e3ebe4);
-      border-radius: 10px; overflow: hidden; background: #fff;
+      border-radius: 10px; overflow: visible; background: #fff;
+      align-items: start;
     }
     @media (max-width: 1100px) {
       .aud-note-grid { grid-template-columns: 1fr; }
@@ -211,8 +229,9 @@
       display: flex; flex-direction: column; gap: 3px;
       overflow: auto; flex: 1; padding: 6px 6px 10px; max-height: none;
     }
-    .aud-note-main {
-      padding: 16px 18px; overflow: auto; max-height: 72vh;
+    .aud-note-main,
+    .aud-note-main.doc-wrap {
+      padding: 16px 18px;
       font-size: 0.94rem; line-height: 1.5; color: #1e293b;
     }
     .aud-note-ai {
@@ -293,6 +312,10 @@
     }
     .aud-note-nav .grp-chapter {
       color: #3730a3; border-bottom: 1px solid #e0e7ff; padding-bottom: 3px;
+      display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline;
+    }
+    .aud-note-nav .grp-chapter-title {
+      font-weight: 550; color: #6366f1; font-size: 0.7rem;
     }
     .aud-note-nav .grp-process {
       color: #065f46; background: #f0fdf6; border-radius: 4px;
@@ -303,6 +326,52 @@
       font-size: 0.68rem; font-weight: 650; color: #64748b;
     }
     .aud-note-nav--process button.nav-under-process { padding-left: 18px; }
+    .aud-nav-main-wrap { margin: 0 0 2px; }
+    .aud-nav-synth-main {
+      padding: 6px 10px; font-size: 0.82rem; color: #64748b;
+    }
+    body.auditor-portal-page .aud-note-nav button.aud-nav-toggle {
+      display: block; width: 100%; text-align: left; border: 0;
+      background: transparent; padding: 3px 10px 5px 18px; margin: 0;
+      border-radius: 4px; cursor: pointer; font-family: inherit;
+      font-size: 0.68rem; font-weight: 650; color: #64748b;
+      box-shadow: none; filter: none;
+    }
+    body.auditor-portal-page .aud-note-nav button.aud-nav-toggle:hover {
+      background: #f1f5f4; color: #334155;
+    }
+    .aud-nav-toggle-n {
+      display: inline-block; margin-left: 4px; min-width: 1.2em;
+      text-align: center; color: #94a3b8;
+    }
+    .aud-nav-children {
+      margin: 0 0 4px 8px; padding: 0 0 0 6px;
+      border-left: 2px solid #e2e8f0;
+    }
+    body.auditor-portal-page .aud-note-nav button.aud-nav-btn.nav-child {
+      padding-left: 14px; font-size: 0.8rem;
+    }
+    .aud-guide-acc { margin: 0 0 14px; }
+    .aud-guide-toggle {
+      display: block; width: 100%; text-align: left;
+      padding: 9px 12px; border: 1px dashed #c5d0c8; border-radius: 8px;
+      background: #fafbfa; color: #3f5a48; font-family: inherit;
+      font-size: 0.84rem; font-weight: 650; cursor: pointer;
+    }
+    .aud-guide-toggle:hover { background: #f1f5f4; border-color: #9db5a4; }
+    .aud-guide-panel {
+      margin-top: 8px; padding: 10px 12px; background: #fafbfa;
+      border-radius: 8px; border: 1px dashed #d5ddd7; font-size: 0.85rem;
+    }
+    .aud-guide-panel .aud-guide-q { margin-bottom: 10px; }
+    .aud-cp-list { margin: 6px 0 0; padding-left: 18px; color: #5f7264; }
+    .aud-cp-empty { margin: 0; font-size: 0.82rem; }
+    .aud-ncr-badge {
+      display: inline-block; margin-left: 8px; padding: 2px 7px;
+      border-radius: 5px; font-size: 0.7rem; font-weight: 700;
+      background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+      vertical-align: middle;
+    }
     .aud-kpi-dual {
       display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 14px;
     }
@@ -449,120 +518,7 @@
     }
     .aud-matrix-badge.miss { background: #ffedd5; color: #9a3412; }
     .aud-matrix-badge.done { background: #d1fae5; color: #047857; }
-    /* Calendar (CB portal style) */
-    body.auditor-portal-page .aud-calendar-wrap {
-      background: #fff;
-      border: 1px solid var(--admin-border, #e3ebe4);
-      border-radius: 10px;
-      padding: 12px 14px 16px;
-      margin-bottom: 14px;
-    }
-    body.auditor-portal-page .aud-calendar-nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-      gap: 8px;
-    }
-    body.auditor-portal-page .aud-calendar-nav h3 {
-      margin: 0;
-      font-size: 1.05rem;
-      font-weight: 700;
-    }
-    body.auditor-portal-page .cal-grid {
-      display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 4px;
-    }
-    body.auditor-portal-page .cal-head {
-      text-align: center;
-      font-size: 0.75rem;
-      color: var(--admin-muted, #5f7264);
-      padding: 4px 0;
-      font-weight: 600;
-    }
-    body.auditor-portal-page .cal-cell {
-      min-height: 72px;
-      border: 1px solid var(--admin-border, #e3ebe4);
-      border-radius: 8px;
-      padding: 4px;
-      background: #fbfdfb;
-      cursor: pointer;
-      text-align: left;
-    }
-    body.auditor-portal-page .cal-cell.is-empty {
-      background: transparent;
-      border-color: transparent;
-      cursor: default;
-    }
-    body.auditor-portal-page .cal-cell.has-events {
-      background: #f3faf5;
-      border-color: #c5ddd0;
-    }
-    body.auditor-portal-page .cal-cell.is-selected {
-      outline: 2px solid var(--admin-accent, #2f6f4e);
-      outline-offset: -1px;
-    }
-    body.auditor-portal-page .cal-cell.is-today .cal-day { color: var(--admin-accent, #2f6f4e); font-weight: 700; }
-    body.auditor-portal-page .cal-day {
-      font-size: 11px;
-      color: var(--admin-muted, #5f7264);
-      margin-bottom: 2px;
-    }
-    body.auditor-portal-page .cal-event {
-      display: block;
-      width: 100%;
-      text-align: left;
-      border: 0;
-      background: transparent;
-      padding: 1px 0;
-      font-size: 10px;
-      line-height: 1.25;
-      color: var(--admin-primary, #1f6b4a);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      pointer-events: none;
-    }
-    body.auditor-portal-page .cal-more {
-      font-size: 10px;
-      color: #8a9a8e;
-    }
-    body.auditor-portal-page .aud-day-detail {
-      background: #fff;
-      border: 1px solid var(--admin-border, #e3ebe4);
-      border-radius: 10px;
-      padding: 16px 18px;
-    }
-    body.auditor-portal-page .aud-day-detail h3 {
-      margin: 0 0 12px;
-      font-size: 1rem;
-      font-weight: 700;
-    }
-    body.auditor-portal-page .aud-detail-card {
-      border-top: 1px solid #eef3ef;
-      padding: 14px 0;
-    }
-    body.auditor-portal-page .aud-detail-card:first-of-type { border-top: 0; padding-top: 0; }
-    body.auditor-portal-page .aud-detail-card h4 {
-      margin: 0 0 10px;
-      font-size: 0.98rem;
-      font-weight: 700;
-      color: var(--admin-ink, #1f2d24);
-    }
-    body.auditor-portal-page .aud-dl {
-      display: grid;
-      grid-template-columns: 110px 1fr;
-      gap: 6px 12px;
-      margin: 0;
-      font-size: 0.9rem;
-    }
-    body.auditor-portal-page .aud-dl dt {
-      margin: 0;
-      color: var(--admin-muted, #5f7264);
-      font-weight: 600;
-    }
-    body.auditor-portal-page .aud-dl dd { margin: 0; color: var(--admin-ink, #1f2d24); }
+    /* Calendar + day-detail: /static/css/portal.css (shared portal tokens) */
     body.auditor-portal-page .mypage-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -571,8 +527,7 @@
       font-size: 0.92rem;
     }
     @media (max-width: 720px) {
-      body.auditor-portal-page .mypage-grid,
-      body.auditor-portal-page .aud-dl { grid-template-columns: 1fr; }
+      body.auditor-portal-page .mypage-grid { grid-template-columns: 1fr; }
     }
     body.auditor-portal-page .mypage-grid dt {
       margin: 0;
@@ -698,6 +653,7 @@
         <li><a href="#" class="sidebar-menu-item active" data-tab="dashboard">대시보드</a></li>
         <li><a href="#" class="sidebar-menu-item" data-tab="schedules">심사 일정 관리</a></li>
         <li><a href="#" class="sidebar-menu-item" data-tab="reports">심사 보고서 작성</a></li>
+        <li><a href="#" class="sidebar-menu-item" data-tab="docs">인증심사 문서</a></li>
         <li><a href="#" class="sidebar-menu-item" data-tab="ncrs">시정조치(NCR) 검토</a></li>
         <li><a href="#" class="sidebar-menu-item" data-tab="mypage">마이페이지</a></li>
         <li><a href="#" class="sidebar-menu-item" data-tab="profile">자격 및 소속 관리</a></li>
@@ -784,13 +740,13 @@
 
     <!-- Schedules (month calendar) -->
     <section id="tab-schedules" class="tab-panel">
-      <div class="aud-calendar-wrap">
-        <div class="aud-calendar-nav">
+      <div class="aud-calendar-wrap portal-cal-wrap">
+        <div class="aud-calendar-nav portal-cal-nav">
           <button type="button" class="btn ghost" id="aud-cal-prev" aria-label="이전 달">‹</button>
           <h3 id="aud-cal-title">—</h3>
           <button type="button" class="btn ghost" id="aud-cal-next" aria-label="다음 달">›</button>
         </div>
-        <p class="muted" style="margin:0 0 10px;font-size:0.85rem;">날짜를 선택하면 해당 일 배정 일정이 아래에 표시됩니다.</p>
+        <p class="portal-cal-hint muted">날짜를 선택하면 해당 일 배정 일정이 아래에 표시됩니다.</p>
         <div class="aud-calendar" id="aud-calendar" aria-label="심사 일정 달력"></div>
       </div>
       <div class="aud-day-detail" id="aud-day-detail">
@@ -831,19 +787,70 @@
       </div>
     </section>
 
+    <!-- Certification audit documents — portal panel (reference HTML = UX only) -->
+    <section id="tab-docs" class="tab-panel">
+      <div class="aud-block" id="docs-list-wrap">
+        <h3>인증심사 문서세트</h3>
+        <p class="muted" style="margin:0 0 12px;">
+          Admin 공통 CSS(<code>main.css</code>·<code>portal.css</code>·<code>style.css</code>·<code>admin_doc_theme.css</code>) ·
+          Master DB(<code>companies</code>·<code>contracts</code>·<code>standard_masters</code>) ·
+          참고 HTML은 배치만 · <code>contract_id</code>로 노트/결과보고서 연동.
+        </p>
+        <div id="docs-hub-list"><div class="aud-empty">불러오는 중…</div></div>
+      </div>
+
+      <div id="audit-doc-viewer" class="aud-block" style="display:none;" aria-hidden="true">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;">
+          <button type="button" class="btn ghost" id="aud-doc-back">목록</button>
+          <strong id="aud-doc-title">문서</strong>
+          <span class="muted" id="aud-doc-sub"></span>
+          <span style="flex:1"></span>
+          <a class="btn ghost" id="aud-doc-open-notes" href="#">심사노트</a>
+          <a class="btn ghost" id="aud-doc-open-report" href="#">결과보고서</a>
+          <a class="btn ghost" id="aud-doc-open-plan" href="#">심사계획서</a>
+          <a class="btn ghost" id="aud-doc-external" href="#" target="_blank" rel="noopener">새 탭</a>
+        </div>
+        <iframe id="aud-doc-frame" title="인증심사 문서" style="width:100%;min-height:72vh;border:1px solid var(--admin-border,#e3ebe4);border-radius:10px;background:var(--admin-card,#fff);"></iframe>
+      </div>
+    </section>
+
     <!-- Reports / 심사노트 -->
     <section id="tab-reports" class="tab-panel">
       <div class="aud-block" id="reports-list-wrap">
         <h3>심사 보고서 · 심사노트</h3>
-        <p class="muted" style="margin:0 0 12px;">배정이 없어도 미리보기로 3-pane 심사노트 UI를 열 수 있습니다. 일정에서 [심사노트/보고서 작성]을 눌러도 동일합니다.</p>
+        <p class="muted" style="margin:0 0 12px;">계획서 확정 → 심사노트 저장 → 결과보고서(조항/NCR/매트릭스) 순으로 contract_id 기준 연동됩니다. 마스터 DB가 기준입니다.</p>
         <div id="reports-list"><div class="aud-empty">불러오는 중…</div></div>
+      </div>
+
+      <div id="audit-result-report" class="aud-block" style="display:none;" aria-hidden="true">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;">
+          <button type="button" class="btn ghost" id="aud-report-back">목록</button>
+          <strong id="aud-report-title">심사결과보고서</strong>
+          <span class="muted" id="aud-report-sub"></span>
+          <span style="flex:1"></span>
+          <button type="button" class="btn ghost" id="aud-report-open-notes">심사노트 열기</button>
+          <a class="btn ghost" id="aud-report-open-plan" href="#" target="_blank" rel="noopener">심사계획서</a>
+        </div>
+        <div class="aud-report-tabs" id="aud-report-tabs" style="display:flex;gap:0;border-bottom:2px solid #e3ebe4;margin-bottom:14px;">
+          <button type="button" class="btn ghost aud-rpt-tab active" data-rpt-tab="clauses">② 조항별 심사 결과</button>
+          <button type="button" class="btn ghost aud-rpt-tab" data-rpt-tab="ncrs">③ 부적합 및 관찰사항</button>
+          <button type="button" class="btn ghost aud-rpt-tab" data-rpt-tab="matrix">⑤ 심사 매트릭스</button>
+        </div>
+        <div id="aud-report-body"><div class="aud-empty">불러오는 중…</div></div>
       </div>
 
       <div id="audit-note-editor" class="aud-note-editor" style="display:none;" aria-hidden="true">
         <div class="aud-note-toolbar">
           <button type="button" class="btn ghost" id="aud-note-back">목록</button>
-          <div class="aud-note-meta">
-            <strong id="aud-note-company">—</strong>
+          <div class="aud-note-meta" id="aud-note-session-header">
+            <dl class="aud-note-hdr-fields">
+              <div><dt>피심사조직명</dt><dd id="aud-hdr-company">—</dd></div>
+              <div><dt>표준정보</dt><dd id="aud-hdr-standards">—</dd></div>
+              <div><dt>해당인증원명</dt><dd id="aud-hdr-cb">—</dd></div>
+              <div><dt>심사일자</dt><dd id="aud-hdr-date">—</dd></div>
+              <div><dt>심사유형</dt><dd id="aud-hdr-type">—</dd></div>
+            </dl>
+            <strong id="aud-note-company" class="aud-note-company-sr" hidden>—</strong>
             <span class="muted" id="aud-note-sub">심사노트</span>
             <span class="aud-audit-mode-badge" id="aud-audit-mode-badge"></span>
             <span class="aud-note-preview-badge" id="aud-note-preview-badge">미리보기</span>
@@ -851,17 +858,18 @@
           <button type="button" class="btn ghost" id="aud-team-meeting-btn" style="display:none;">심사팀회의 (전체)</button>
           <button type="button" class="btn ghost" id="aud-iv-toggle-btn">면담 작성</button>
           <button type="button" class="btn ghost" id="aud-matrix-toggle-btn">심사매트릭스</button>
+          <button type="button" class="btn" id="aud-open-result-report" style="display:none;">결과보고서</button>
         </div>
         <div class="aud-note-grid">
           <aside class="aud-note-nav-pane">
             <div class="aud-note-nav-top">
               <div class="aud-note-co-card">
                 <div class="aud-note-co-name" id="aud-note-nav-company">—</div>
-                <div class="aud-note-co-meta" id="aud-note-nav-meta">프로세스그룹 조항</div>
+                <div class="aud-note-co-meta" id="aud-note-nav-meta">프로세스심사</div>
               </div>
               <div class="aud-mode-tabs" id="aud-mode-tabs">
-                <button type="button" class="aud-mode-tab" data-method="clause" id="aud-mode-clause" title="장·조항 순번 목록">조항심사 · 순번</button>
-                <button type="button" class="aud-mode-tab active" data-method="process" id="aud-mode-process" title="공정그룹 → HLS 트리">프로세스 · 트리</button>
+                <button type="button" class="aud-mode-tab" data-method="clause" id="aud-mode-clause" title="장·조항 목록">조항심사</button>
+                <button type="button" class="aud-mode-tab active" data-method="process" id="aud-mode-process" title="공정그룹 → HLS">프로세스심사</button>
               </div>
               <div class="aud-note-std-select-area">
                 <div class="aud-note-std-sel-title">심사 표준 선택 <span class="muted" id="aud-std-filter-hint"></span></div>
@@ -879,7 +887,7 @@
               <div id="aud-iv-nav-body"></div>
             </div>
           </aside>
-          <div class="aud-note-main" id="aud-note-main">
+          <div class="aud-note-main doc-wrap" id="aud-note-main">
             <div class="aud-empty">좌측에서 조항을 선택하세요.</div>
           </div>
           <aside class="aud-note-ai" id="aud-note-ai-panel">
@@ -1129,7 +1137,7 @@
     </div>
   </div>
 
-  <script src="/static/js/auditor_portal.js?v=20260807aud12"></script>
-  <script src="/static/js/auditor_audit_notes.js?v=20260807aud14"></script>
+  <script src="/static/js/auditor_portal.js?v=20260807theme1"></script>
+  <script src="/static/js/auditor_audit_notes.js?v=20260807theme1"></script>
 </body>
 </html>

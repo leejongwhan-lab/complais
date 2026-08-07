@@ -1,6 +1,7 @@
 """심사원 포털 — 심사노트(조항 단위) API.
 
-- 조항 마스터: process-group Excel tables (standard_clause_map / hls / process_group); NOT iso_clauses_master
+- 조항 마스터: standard_clause_masters (스토리보드 「표준별조항번호 및 제목」)
+  + process-group enrichment (HLS/KPI/checkpoints); NOT iso_clauses_master
 - 저장: audit_notes(헤더) + audit_note_clauses + audit_note_ncr
 - KPI: 선택 입력 — 빈 값이어도 저장 성공
 - AI: OPENAI_API_KEY 있을 때 문장 정형화 (없으면 graceful stub)
@@ -122,6 +123,201 @@ def _parse_esg_tags(raw: Any) -> List[str]:
         except Exception:
             pass
     return [p.strip() for p in s.replace(";", ",").split(",") if p.strip()]
+
+
+def _ymd(val: Any) -> Optional[str]:
+    if val is None:
+        return None
+    if hasattr(val, "isoformat"):
+        try:
+            return str(val.isoformat())[:10]
+        except Exception:
+            pass
+    s = str(val).strip()
+    return s[:10] if s else None
+
+
+def _audit_type_label(raw: Optional[str]) -> Optional[str]:
+    if not raw:
+        return None
+    key = str(raw).strip().lower().replace(" ", "").replace("_", "")
+    mapping = {
+        "initial": "최초심사",
+        "최초": "최초심사",
+        "최초심사": "최초심사",
+        "surveillance": "사후심사",
+        "surveillance1": "사후1차",
+        "surveillance2": "사후2차",
+        "sa1": "사후1차",
+        "sa2": "사후2차",
+        "사후": "사후심사",
+        "사후1": "사후1차",
+        "사후1차": "사후1차",
+        "사후2": "사후2차",
+        "사후2차": "사후2차",
+        "recertification": "갱신심사",
+        "renewal": "갱신심사",
+        "갱신": "갱신심사",
+        "갱신심사": "갱신심사",
+        "special": "특별심사",
+        "transfer": "전환심사",
+        "전환": "전환심사",
+        "전환심사": "전환심사",
+        "stage1": "1단계",
+        "stage2": "2단계",
+    }
+    return mapping.get(key, str(raw))
+
+
+def _audit_stage_label(raw: Optional[str]) -> Optional[str]:
+    """심사유형 → 단계 표기 (최초: 1·2단계 / 사후·갱신: 2단계)."""
+    if not raw:
+        return None
+    key = str(raw).strip().lower().replace(" ", "").replace("_", "")
+    type_label = _audit_type_label(raw) or str(raw)
+    if key in {"initial", "최초", "최초심사", "stage1"}:
+        return f"{type_label} · 1단계 준비성 검토 / 2단계 심사"
+    if key in {
+        "surveillance",
+        "surveillance1",
+        "surveillance2",
+        "sa1",
+        "sa2",
+        "사후",
+        "사후1",
+        "사후1차",
+        "사후2",
+        "사후2차",
+        "사후심사",
+        "recertification",
+        "renewal",
+        "갱신",
+        "갱신심사",
+        "stage2",
+    }:
+        return f"{type_label} · 2단계 심사"
+    if key in {"transfer", "전환", "전환심사"}:
+        return f"{type_label} · 2단계 심사"
+    if key in {"special", "특별심사"}:
+        return f"{type_label} · 2단계 심사"
+    return type_label
+
+
+def _standards_label(items: List[AuditNoteStandardItem]) -> Optional[str]:
+    bits: List[str] = []
+    for s in items or []:
+        label = (s.display_code or s.standard_code or s.standard_key or "").strip()
+        if label and label not in bits:
+            bits.append(label)
+    return " · ".join(bits) if bits else None
+
+
+def _cb_name_for_contract(db: Session, contract: Any) -> Tuple[Optional[int], Optional[str]]:
+    cb_id = getattr(contract, "cb_id", None)
+    if not cb_id or not _table_exists(db, "certification_bodies"):
+        return (int(cb_id) if cb_id else None, None)
+    try:
+        row = db.execute(
+            text("SELECT id, name FROM certification_bodies WHERE id=:id LIMIT 1"),
+            {"id": int(cb_id)},
+        ).first()
+        if row:
+            return (int(row[0]), (row[1] or "").strip() or None)
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    return (int(cb_id), None)
+
+
+def _attach_extra_notes(
+    clauses: List[AuditNoteClauseItem],
+    extras_by_clause: Dict[str, List[Any]],
+    ncr_map: Dict[str, Any],
+) -> List[AuditNoteClauseItem]:
+    """Inject note_seq>1 rows after their parent, scoped to plan-filtered parents only."""
+    if not extras_by_clause:
+        return clauses
+    out: List[AuditNoteClauseItem] = []
+    for c in clauses:
+        out.append(c)
+        cno = (c.clause_no or "").strip()
+        extras = extras_by_clause.get(cno) or []
+        for sr in sorted(extras, key=lambda r: int(r.get("note_seq") or 2)):
+            seq = int(sr.get("note_seq") or 2)
+            if seq <= 1:
+                continue
+            kpi_values: Dict[str, str] = {}
+            if sr.get("kpi_json"):
+                try:
+                    parsed = json.loads(sr["kpi_json"])
+                    if isinstance(parsed, dict):
+                        kpi_values = {
+                            str(k): ("" if v is None else str(v))
+                            for k, v in parsed.items()
+                        }
+                except Exception:
+                    pass
+            ncr = ncr_map.get(cno)
+            topic = (
+                (sr.get("clause_topic") or sr.get("clause_label") or c.clause_topic or "")
+                .strip()
+            )
+            out.append(
+                AuditNoteClauseItem(
+                    id=-(int(sr["id"])) if sr.get("id") else -(seq * 100000 + abs(c.id)),
+                    standard_key=c.standard_key,
+                    standard_code=sr.get("standard_code") or c.standard_code,
+                    family_code=c.family_code,
+                    clause_no=cno,
+                    clause_topic=topic,
+                    clause_title=topic,
+                    question=c.question,
+                    default_kpis=list(c.default_kpis or []),
+                    iso_audit_kpis=list(c.iso_audit_kpis or []),
+                    esg_kpis=list(c.esg_kpis or []),
+                    checkpoints=list(c.checkpoints or []),
+                    process_group_id=sr.get("process_group_id") or c.process_group_id,
+                    process_group_name=c.process_group_name,
+                    group_name=c.group_name,
+                    hls_code=sr.get("hls_code") or c.hls_code,
+                    source=c.source,
+                    sort_order=c.sort_order,
+                    note_seq=seq,
+                    clause_row_id=int(sr["id"]) if sr.get("id") else None,
+                    is_extra=True,
+                    plan_dept=c.plan_dept,
+                    plan_process=c.plan_process,
+                    verdict=sr.get("verdict"),
+                    note_text=sr.get("finding") or sr.get("evidence"),
+                    kpi_values=kpi_values,
+                    ncr_grade=(ncr.get("grade") if ncr else None),
+                    ncr_fact=(ncr.get("description") if ncr else None),
+                    ncr_requirement=(ncr.get("requirement") if ncr else None),
+                    ncr_root_cause=(ncr.get("root_cause") if ncr else None),
+                    ncr_audit_date=(
+                        str(ncr.get("reported_at"))[:10]
+                        if ncr and ncr.get("reported_at")
+                        else None
+                    ),
+                    ncr_auditor_name=(ncr.get("auditor_name") if ncr else None),
+                    ncr_dept=(ncr.get("dept") if ncr else None),
+                    ncr_request_date=(
+                        str(ncr.get("request_date"))[:10]
+                        if ncr and ncr.get("request_date")
+                        else None
+                    ),
+                    ncr_due_date=(
+                        str(ncr.get("due_date"))[:10]
+                        if ncr and ncr.get("due_date")
+                        else None
+                    ),
+                    ncr_esg_tags=_parse_esg_tags(ncr.get("esg_tags") if ncr else None),
+                    saved_at=sr.get("updated_at"),
+                )
+            )
+    return out
 
 
 def _require_auditor(current_user: CurrentUser) -> CurrentUser:
@@ -556,15 +752,58 @@ def _clause_no_sort_key(clause_no: str) -> Tuple:
 def _apply_note_method_order(
     clauses: List[AuditNoteClauseItem], note_method: str
 ) -> List[AuditNoteClauseItem]:
-    """clause=조항 순번(장 단위), process=프로세스그룹→HLS 마스터 순서 유지.
+    """Reorder for nav: ISO chapter natural order 4→5→…→9→10 (never bury ch.4).
 
-    Frontend builds distinct nav trees from note_method; here we only reorder.
-    Do not overwrite process_group_name (validator syncs group_name ← process_group).
+    - clause: pure clause_no natural sort
+    - process: process groups ordered by earliest clause chapter in the group,
+      then clauses inside by clause_no (parents before children)
     """
-    if note_method != "clause":
-        # Keep process-group / HLS master order from list_clauses_for_standard_pg
-        return list(clauses)
-    return sorted(clauses, key=lambda c: _clause_no_sort_key(c.clause_no))
+    keyed = list(clauses)
+    if note_method == "clause":
+        return sorted(
+            keyed,
+            key=lambda c: (
+                _clause_no_sort_key(c.clause_no),
+                int(getattr(c, "note_seq", 1) or 1),
+            ),
+        )
+
+    # process: stable PG buckets by min chapter, then natural clause order
+    from collections import defaultdict
+
+    buckets: Dict[str, List[AuditNoteClauseItem]] = defaultdict(list)
+    pg_label: Dict[str, str] = {}
+    for c in keyed:
+        gid = (getattr(c, "process_group_id", None) or "").strip() or (
+            getattr(c, "process_group_name", None)
+            or getattr(c, "group_name", None)
+            or "PG"
+        )
+        buckets[str(gid)].append(c)
+        if str(gid) not in pg_label:
+            pg_label[str(gid)] = (
+                getattr(c, "process_group_name", None)
+                or getattr(c, "group_name", None)
+                or str(gid)
+            )
+
+    def _pg_sort_key(gid: str):
+        members = buckets[gid]
+        mins = [_clause_no_sort_key(m.clause_no) for m in members]
+        return (min(mins) if mins else ((1, gid),), pg_label.get(gid, gid))
+
+    out: List[AuditNoteClauseItem] = []
+    for gid in sorted(buckets.keys(), key=_pg_sort_key):
+        out.extend(
+            sorted(
+                buckets[gid],
+                key=lambda c: (
+                    _clause_no_sort_key(c.clause_no),
+                    int(getattr(c, "note_seq", 1) or 1),
+                ),
+            )
+        )
+    return out
 
 
 def _load_note_method(db: Session, note_id: int) -> str:
@@ -665,10 +904,16 @@ def list_note_standards(
             seed_process_group_masters(db)
     except Exception:
         logger.exception("process_group seed on standards list failed")
+    try:
+        from app.services.standard_clause_titles import ensure_standard_clause_titles
+
+        ensure_standard_clause_titles(db)
+    except Exception:
+        logger.exception("standard_clause_titles ensure on standards list failed")
     items = []
     for s in list_operating_standards():
         pg = to_process_standard_code(s["standard_key"])
-        n_pg = count_clauses_for_standard_pg(db, pg) if pg else 0
+        n_pg = count_clauses_for_standard_pg(db, pg or s["standard_key"])
         items.append(
             AuditNoteStandardItem(
                 standard_key=s["standard_key"],
@@ -689,13 +934,19 @@ def list_note_clauses(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """표준별 조항 — process-group Excel masters only (no iso_clauses_master)."""
+    """표준별 조항 — standard_clause_masters + process-group enrichment."""
     _require_auditor(current_user)
     sk = resolve_standard_key(standard_key) or standard_key
     pg_code = to_process_standard_code(sk) or to_process_standard_code(standard_key)
     rows: List[Dict[str, Any]] = []
-    if pg_code:
-        rows = list_clauses_for_standard_pg(db, pg_code, standard_key=sk)
+    try:
+        from app.services.standard_clause_titles import ensure_standard_clause_titles
+
+        ensure_standard_clause_titles(db)
+    except Exception:
+        logger.exception("ensure standard_clause_titles failed")
+    if pg_code or sk:
+        rows = list_clauses_for_standard_pg(db, pg_code or sk, standard_key=sk)
     return [
         AuditNoteClauseItem(
             id=r["id"],
@@ -783,11 +1034,20 @@ def _row_to_clause_item(
     note_text = None
     verdict = None
     saved_at = None
+    clause_row_id = None
     if saved:
         note_text = saved.get("finding") or saved.get("evidence")
         verdict = saved.get("verdict")
         saved_at = saved.get("updated_at")
-    topic = r.get("clause_topic") or r.get("clause_title") or ""
+        if saved.get("id") is not None:
+            try:
+                clause_row_id = int(saved["id"])
+            except (TypeError, ValueError):
+                clause_row_id = None
+    # Official title from standard_clause_masters wins over stale saved topic
+    topic = (r.get("clause_topic") or r.get("clause_title") or "").strip()
+    if not topic and saved:
+        topic = (saved.get("clause_topic") or "").strip()
     pg_name = r.get("process_group_name") or r.get("group_name")
     autofill = resolve_plan_autofill(
         plan_items or [],
@@ -795,10 +1055,14 @@ def _row_to_clause_item(
         process_group_id=r.get("process_group_id"),
         process_group_name=pg_name,
     )
+    # Prefer master keys; fall back to persisted master columns if present
+    std_code = r.get("standard_code") or (saved.get("standard_code") if saved else None)
+    pg_id = r.get("process_group_id") or (saved.get("process_group_id") if saved else None)
+    hls = r.get("hls_code") or (saved.get("hls_code") if saved else None)
     return AuditNoteClauseItem(
         id=r["id"],
         standard_key=r["standard_key"],
-        standard_code=r.get("standard_code"),
+        standard_code=std_code,
         family_code=r.get("family_code"),
         clause_no=r["clause_no"],
         clause_topic=topic,
@@ -815,10 +1079,13 @@ def _row_to_clause_item(
         ],
         process_group_name=pg_name,
         group_name=pg_name,
-        process_group_id=r.get("process_group_id"),
-        hls_code=r.get("hls_code"),
+        process_group_id=pg_id,
+        hls_code=hls,
         source=r.get("source"),
         sort_order=r.get("sort_order") or 0,
+        note_seq=1,
+        clause_row_id=clause_row_id,
+        is_extra=False,
         plan_dept=autofill.get("dept"),
         plan_process=autofill.get("process"),
         verdict=verdict,
@@ -852,18 +1119,25 @@ def _clauses_from_master(
     ncr_map: Optional[Dict[str, Any]] = None,
     plan_items: Optional[List[Dict[str, Any]]] = None,
 ) -> tuple:
-    """Process-group Excel masters only — never iso_clauses_master / 환경심층."""
+    """Official clause titles from standard_clause_masters; never iso_clauses_master."""
     saved_map = saved_map or {}
     ncr_map = ncr_map or {}
     pg_code = to_process_standard_code(sk)
     master: List[Dict[str, Any]] = []
-    source = "process_group"
-    if pg_code:
-        try:
-            master = list_clauses_for_standard_pg(db, pg_code, standard_key=sk)
-        except Exception:
-            logger.exception("process-group clause load failed for %s", sk)
-            master = []
+    source = "standard_clause_masters"
+    try:
+        from app.services.standard_clause_titles import ensure_standard_clause_titles
+
+        ensure_standard_clause_titles(db)
+    except Exception:
+        logger.exception("ensure standard_clause_titles failed for %s", sk)
+    try:
+        master = list_clauses_for_standard_pg(db, pg_code or sk, standard_key=sk)
+        if master and master[0].get("source"):
+            source = master[0]["source"]
+    except Exception:
+        logger.exception("clause master load failed for %s", sk)
+        master = []
     clauses_out = [
         _row_to_clause_item(
             r, saved_map=saved_map, ncr_map=ncr_map, plan_items=plan_items
@@ -944,13 +1218,17 @@ def _preview_session(
     iv_templates = _interview_templates_out([sk] if sk else keys[:1])
     # Preview: treat multi-select catalog as 통합 가능 (선택 표준 기준 표시)
     amode, amode_label = "single", "단일심사"
+    std_label = _standards_label(standards_out)
     return AuditNoteSessionOut(
         note_id=None,
         contract_id=None,
         company_id=None,
-        company_name="미리보기 (배정 없음)",
+        company_name=None,
+        cb_id=None,
+        cb_name=None,
         standard_key=sk,
         standards=standards_out,
+        standards_label=std_label,
         status="preview",
         clauses=clauses_out,
         preview=True,
@@ -965,6 +1243,10 @@ def _preview_session(
         audit_mode=amode,
         audit_mode_label=amode_label,
         audit_type=None,
+        audit_type_label=None,
+        audit_stage_label=None,
+        audit_date=None,
+        audit_period_end=None,
         auditor_name=None,
         is_lead=False,
         team_meeting=False,
@@ -1037,22 +1319,61 @@ def get_note_session(
         co = db.query(Companies).filter(Companies.id == company_id).first()
         if co:
             company_name = co.name
+    cb_id, cb_name = _cb_name_for_contract(db, contract)
 
     standards_out = _build_standards_out(db, keys if keys else ([sk] if sk else []))
     short = _short_standard(sk)
 
+    ensure_audit_note_longtext(db)
+    has_note_seq = _column_exists(db, "audit_note_clauses", "note_seq")
+    has_std_code = _column_exists(db, "audit_note_clauses", "standard_code")
+    has_pg = _column_exists(db, "audit_note_clauses", "process_group_id")
+    has_hls = _column_exists(db, "audit_note_clauses", "hls_code")
+    has_topic = _column_exists(db, "audit_note_clauses", "clause_topic")
+
     saved_map: Dict[str, Any] = {}
+    extras_by_clause: Dict[str, List[Any]] = {}
     if _table_exists(db, "audit_note_clauses"):
+        cols = [
+            "id",
+            "clause_id",
+            "clause_label",
+            "verdict",
+            "evidence",
+            "finding",
+            "kpi_json",
+            "updated_at",
+        ]
+        if has_note_seq:
+            cols.append("note_seq")
+        if has_std_code:
+            cols.append("standard_code")
+        if has_pg:
+            cols.append("process_group_id")
+        if has_hls:
+            cols.append("hls_code")
+        if has_topic:
+            cols.append("clause_topic")
         saved_rows = db.execute(
             text(
-                "SELECT id, clause_id, clause_label, verdict, evidence, finding, "
-                "kpi_json, updated_at FROM audit_note_clauses "
+                f"SELECT {', '.join(cols)} FROM audit_note_clauses "
                 "WHERE note_id = :nid AND (standard = :std OR standard = :sk)"
             ),
             {"nid": note_id, "std": short, "sk": sk[:20]},
         ).mappings().all()
         for sr in saved_rows:
-            saved_map[str(sr["clause_id"])] = sr
+            cno = str(sr["clause_id"] or "").strip()
+            if not cno:
+                continue
+            seq = int(sr["note_seq"]) if has_note_seq and sr.get("note_seq") is not None else 1
+            if seq <= 1:
+                # Keep latest primary row per clause_no
+                prev = saved_map.get(cno)
+                if not prev or (sr.get("id") or 0) >= (prev.get("id") or 0):
+                    saved_map[cno] = dict(sr)
+                    saved_map[cno]["note_seq"] = 1
+            else:
+                extras_by_clause.setdefault(cno, []).append(dict(sr))
 
     ncr_map: Dict[str, Any] = {}
     ensure_ncr_extra_columns(db)
@@ -1080,7 +1401,6 @@ def get_note_session(
     )
     plan_items = scope_info.get("items") or []
 
-    ensure_audit_note_longtext(db)
     clauses_out, clause_source, pg_code = _clauses_from_master(
         db, sk, saved_map=saved_map, ncr_map=ncr_map, plan_items=plan_items
     )
@@ -1095,6 +1415,8 @@ def get_note_session(
     else:
         method = _load_note_method(db, note_id)
     clauses_out = _apply_note_method_order(clauses_out, method)
+    # Extra notes only for plan-scoped parents (after order, keep next to parent)
+    clauses_out = _attach_extra_notes(clauses_out, extras_by_clause, ncr_map)
 
     status_row = db.execute(
         text("SELECT status FROM audit_notes WHERE id = :id"),
@@ -1111,14 +1433,20 @@ def get_note_session(
     package_keys = keys if keys else ([sk] if sk else [])
     amode, amode_label = _resolve_audit_mode(contract, package_keys)
     audit_type = getattr(contract, "audit_type", None)
+    audit_type_s = str(audit_type) if audit_type else None
+    audit_date = _ymd(getattr(contract, "audit_period_start", None))
+    audit_period_end = _ymd(getattr(contract, "audit_period_end", None))
 
     return AuditNoteSessionOut(
         note_id=note_id,
         contract_id=contract_id,
         company_id=company_id,
         company_name=company_name,
+        cb_id=cb_id,
+        cb_name=cb_name,
         standard_key=sk,
         standards=standards_out,
+        standards_label=_standards_label(standards_out),
         status=(status_row[0] if status_row else "draft") or "draft",
         clauses=clauses_out,
         preview=False,
@@ -1129,7 +1457,11 @@ def get_note_session(
         note_method=method,
         audit_mode=amode,
         audit_mode_label=amode_label,
-        audit_type=str(audit_type) if audit_type else None,
+        audit_type=audit_type_s,
+        audit_type_label=_audit_type_label(audit_type_s),
+        audit_stage_label=_audit_stage_label(audit_type_s),
+        audit_date=audit_date,
+        audit_period_end=audit_period_end,
         auditor_name=auditor_name,
         is_lead=bool(scope_info.get("is_lead")),
         team_meeting=bool(scope_info.get("team_meeting")),
@@ -1230,13 +1562,10 @@ def save_note_clause(
         if not note_text.strip():
             note_text = (payload.ncr_fact or "").strip()
 
-    existing = db.execute(
-        text(
-            "SELECT id FROM audit_note_clauses "
-            "WHERE note_id = :nid AND clause_id = :cno AND standard = :std LIMIT 1"
-        ),
-        {"nid": note_id, "cno": clause_no, "std": short},
-    ).first()
+    note_seq = int(payload.note_seq or 1)
+    if note_seq < 1:
+        note_seq = 1
+    payload_row_id = payload.clause_row_id
 
     kpi_json = json.dumps(kpi_map, ensure_ascii=False)
     label = clause_topic[:200]
@@ -1247,6 +1576,46 @@ def save_note_clause(
     has_pg = _column_exists(db, "audit_note_clauses", "process_group_id")
     has_hls = _column_exists(db, "audit_note_clauses", "hls_code")
     has_topic = _column_exists(db, "audit_note_clauses", "clause_topic")
+    has_note_seq = _column_exists(db, "audit_note_clauses", "note_seq")
+
+    existing = None
+    if payload_row_id:
+        existing = db.execute(
+            text(
+                "SELECT id FROM audit_note_clauses "
+                "WHERE id=:id AND note_id=:nid LIMIT 1"
+            ),
+            {"id": int(payload_row_id), "nid": note_id},
+        ).first()
+    if not existing:
+        if has_note_seq:
+            existing = db.execute(
+                text(
+                    "SELECT id FROM audit_note_clauses "
+                    "WHERE note_id = :nid AND clause_id = :cno AND standard = :std "
+                    "AND COALESCE(note_seq, 1) = :seq LIMIT 1"
+                ),
+                {
+                    "nid": note_id,
+                    "cno": clause_no,
+                    "std": short,
+                    "seq": note_seq,
+                },
+            ).first()
+        else:
+            # Legacy single-row-per-clause: extras collapse to primary
+            if note_seq > 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="추가 심사노트 저장을 위해 note_seq 컬럼이 필요합니다.",
+                )
+            existing = db.execute(
+                text(
+                    "SELECT id FROM audit_note_clauses "
+                    "WHERE note_id = :nid AND clause_id = :cno AND standard = :std LIMIT 1"
+                ),
+                {"nid": note_id, "cno": clause_no, "std": short},
+            ).first()
 
     master_set_parts: List[str] = []
     master_params: Dict[str, Any] = {}
@@ -1277,6 +1646,10 @@ def save_note_clause(
     if has_topic:
         master_ins_cols += ", clause_topic"
         master_ins_vals += ", :topic"
+    if has_note_seq:
+        master_ins_cols += ", note_seq"
+        master_ins_vals += ", :note_seq"
+        master_params["note_seq"] = note_seq
 
     if existing:
         clause_row_id = int(existing[0])
@@ -1288,7 +1661,7 @@ def save_note_clause(
             "evidence": (payload.ncr_fact or note_text or None),
             "kpi_json": kpi_json,
             "aid": auditor.id,
-            **master_params,
+            **{k: v for k, v in master_params.items() if k != "note_seq"},
         }
         if has_method_col and write_method:
             db.execute(
@@ -1353,14 +1726,30 @@ def save_note_clause(
             )
         if write_method:
             _save_note_method(db, note_id, write_method)
-        row = db.execute(
-            text(
-                "SELECT id FROM audit_note_clauses "
-                "WHERE note_id = :nid AND clause_id = :cno AND standard = :std "
-                "ORDER BY id DESC LIMIT 1"
-            ),
-            {"nid": note_id, "cno": clause_no, "std": short},
-        ).first()
+        if has_note_seq:
+            row = db.execute(
+                text(
+                    "SELECT id FROM audit_note_clauses "
+                    "WHERE note_id = :nid AND clause_id = :cno AND standard = :std "
+                    "AND COALESCE(note_seq, 1) = :seq "
+                    "ORDER BY id DESC LIMIT 1"
+                ),
+                {
+                    "nid": note_id,
+                    "cno": clause_no,
+                    "std": short,
+                    "seq": note_seq,
+                },
+            ).first()
+        else:
+            row = db.execute(
+                text(
+                    "SELECT id FROM audit_note_clauses "
+                    "WHERE note_id = :nid AND clause_id = :cno AND standard = :std "
+                    "ORDER BY id DESC LIMIT 1"
+                ),
+                {"nid": note_id, "cno": clause_no, "std": short},
+            ).first()
         clause_row_id = int(row[0]) if row else None
 
     ensure_ncr_extra_columns(db)

@@ -197,6 +197,146 @@ def auditor_portal_page():
     )
 
 
+# ── Audit document HTML (master-aligned demo) ───────────────────────
+_AUDIT_DOC_SLUGS = {
+    "recert": "recert.html",
+    "transfer": "transfer.html",
+    "special": "special.html",
+    "plan": "plan.html",
+    "personnel": "personnel.html",
+    "cert_decision": "cert_decision.html",
+    "application": "application.html",
+    "stage1_readiness": "stage1_readiness.html",
+    "stage1_report": "stage1_report.html",
+    "stage2_report": "stage2_report.html",
+}
+
+
+def _audit_doc_path(filename: str) -> str:
+    path = os.path.join(_STATIC_DIR, "audit_docs", filename)
+    if not os.path.exists(path):
+        raise FileNotFoundError(filename)
+    return path
+
+
+@app.get("/demo/audit-docs", include_in_schema=False)
+@app.get("/demo/audit-docs/", include_in_schema=False)
+def demo_audit_docs_hub():
+    """데모 허브 — 모든 인증심사 문서 페이지 링크."""
+    return FileResponse(
+        _audit_doc_path("hub.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/audit-docs/{slug}", include_in_schema=False)
+def audit_doc_page(slug: str):
+    """Serve document HTML under /audit-docs/{slug}?demo=1&contract_id=1."""
+    fname = _AUDIT_DOC_SLUGS.get(slug)
+    if not fname:
+        return JSONResponse(status_code=404, content={"detail": f"unknown doc slug: {slug}"})
+    return FileResponse(
+        _audit_doc_path(fname),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+# Legacy PHP aliases → FastAPI HTML (query string preserved by browser)
+@app.get("/audit_plan_doc.php", include_in_schema=False)
+@app.get("/심사계획서.php", include_in_schema=False)
+@app.get("/심사계획서.html", include_in_schema=False)
+def audit_plan_doc_alias():
+    return FileResponse(
+        _audit_doc_path("plan.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/special_audit_doc.php", include_in_schema=False)
+@app.get("/특별심사_문서세트.php", include_in_schema=False)
+@app.get("/특별심사_문서세트.html", include_in_schema=False)
+def special_audit_doc_alias():
+    return FileResponse(
+        _audit_doc_path("special.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/application_doc.php", include_in_schema=False)
+@app.get("/인증심사_신청계약인증서.php", include_in_schema=False)
+@app.get("/인증심사_신청계약인증서.html", include_in_schema=False)
+def application_doc_alias():
+    return FileResponse(
+        _audit_doc_path("application.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/cert_decision_doc.php", include_in_schema=False)
+@app.get("/인증검증_심의서.php", include_in_schema=False)
+@app.get("/인증검증_심의서.html", include_in_schema=False)
+def cert_decision_doc_alias():
+    return FileResponse(
+        _audit_doc_path("cert_decision.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/갱신심사_문서세트.php", include_in_schema=False)
+@app.get("/갱신심사_문서세트.html", include_in_schema=False)
+def recert_doc_alias():
+    return FileResponse(
+        _audit_doc_path("recert.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/전환심사_문서세트.php", include_in_schema=False)
+@app.get("/전환심사_문서세트.html", include_in_schema=False)
+def transfer_doc_alias():
+    return FileResponse(
+        _audit_doc_path("transfer.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/심사원역량_공정성_이의_불만.php", include_in_schema=False)
+@app.get("/심사원역량_공정성_이의_불만.html", include_in_schema=False)
+def personnel_doc_alias():
+    return FileResponse(
+        _audit_doc_path("personnel.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/stage1_readiness.php", include_in_schema=False)
+@app.get("/stage1_준비성검토.html", include_in_schema=False)
+@app.get("/stage1_준비성검토.php", include_in_schema=False)
+def stage1_readiness_alias():
+    return FileResponse(
+        _audit_doc_path("stage1_readiness.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/stage1_심사보고서_v2.html", include_in_schema=False)
+@app.get("/report_stage1.php", include_in_schema=False)
+def stage1_report_alias():
+    return FileResponse(
+        _audit_doc_path("stage1_report.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/stage2_심사보고서.html", include_in_schema=False)
+@app.get("/report_stage2.php", include_in_schema=False)
+def stage2_report_alias():
+    return FileResponse(
+        _audit_doc_path("stage2_report.html"),
+        media_type="text/html; charset=utf-8",
+    )
+
+
 @app.get("/login", include_in_schema=False)
 @app.get("/login.html", include_in_schema=False)
 def login_page():

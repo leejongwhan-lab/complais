@@ -1,0 +1,413 @@
+/* ComplAIs — Modern admin / document theme
+ * Served: /static/css/admin_doc_theme.css
+ * Standalone copy: 새 폴더/admin_doc_theme.css (relative link)
+ */
+
+:root {
+  /* 모던 어드민 테마 컬러 시스템 */
+  --admin-primary: #0F172A;
+  --admin-primary-light: #1E293B;
+  --admin-accent: #2563EB;
+  --admin-accent-bg: #EFF6FF;
+
+  --admin-bg: #F8FAFC;
+  --admin-card: #FFFFFF;
+  --admin-border: #E2E8F0;
+  --admin-text: #1E293B;
+  --admin-text-muted: #64748B;
+
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+
+  /* Legacy aliases used by document-set inline CSS */
+  --bg: var(--admin-card);
+  --bg2: var(--admin-bg);
+  --card: var(--admin-card);
+  --border: var(--admin-border);
+  --text1: var(--admin-text);
+  --text2: var(--admin-text-muted);
+  --text3: #94A3B8;
+  --blue: var(--admin-accent);
+  --blue2: var(--admin-accent-bg);
+  --blue3: #BFDBFE;
+  --indigo: var(--admin-primary);
+  --indigo2: #E2E8F0;
+  --indigo3: #CBD5E1;
+  --green: var(--success);
+  --green2: #ECFDF5;
+  --green3: #A7F3D0;
+  --amber: #B45309;
+  --amber2: #FFFBEB;
+  --amber3: #FDE68A;
+  --red: var(--danger);
+  --red2: #FEF2F2;
+  --red3: #FCA5A5;
+  --purple: #3730A3;
+  --purple2: #EEF2FF;
+  --teal: #0F766E;
+  --teal2: #F0FDFA;
+}
+
+/* ---- Standalone document pages (body.doc-admin-page) ---- */
+body.doc-admin-page {
+  font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  background-color: var(--admin-bg);
+  color: var(--admin-text);
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: keep-all;
+  -webkit-font-smoothing: antialiased;
+}
+
+body.doc-admin-page #hdr {
+  background-color: var(--admin-primary) !important;
+  color: #fff;
+  padding: 12px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+body.doc-admin-page #tab-bar {
+  background-color: var(--admin-card);
+  border-bottom: 1px solid var(--admin-border);
+  padding: 0 24px;
+}
+
+body.doc-admin-page .tab {
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--admin-text-muted);
+  border-bottom: 2px solid transparent;
+}
+
+body.doc-admin-page .tab:hover {
+  color: var(--admin-accent);
+  background-color: var(--admin-accent-bg);
+}
+
+body.doc-admin-page .tab.active {
+  color: var(--admin-accent);
+  border-bottom-color: var(--admin-accent-bg); /* as provided */
+  background-color: var(--admin-accent-bg);
+}
+
+body.doc-admin-page .doc-wrap {
+  background-color: var(--admin-card);
+  border-radius: 8px;
+  border: 1px solid var(--admin-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  padding: 32px;
+}
+
+body.doc-admin-page .doc-hd {
+  border-bottom: 2px solid var(--admin-primary);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+body.doc-admin-page .sec-h {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--admin-primary);
+  border-bottom: 1px solid var(--admin-border);
+  padding-bottom: 6px;
+  margin-bottom: 14px;
+}
+
+body.doc-admin-page .sec-no {
+  background-color: var(--admin-primary);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+body.doc-admin-page .form-tbl td {
+  border: 1px solid var(--admin-border);
+  padding: 8px 12px;
+}
+
+body.doc-admin-page .form-tbl td.lbl {
+  background-color: var(--admin-bg);
+  color: var(--admin-text-muted);
+  font-weight: 600;
+}
+
+body.doc-admin-page .inp,
+body.doc-admin-page .field-inp,
+body.doc-admin-page .ta,
+body.doc-admin-page .field-ta {
+  border: 1px solid var(--admin-border);
+  background-color: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--admin-text);
+  transition: all 0.15s ease;
+}
+
+body.doc-admin-page .inp:focus,
+body.doc-admin-page .field-inp:focus,
+body.doc-admin-page .ta:focus,
+body.doc-admin-page .field-ta:focus {
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  outline: none;
+}
+
+body.doc-admin-page .hbtn {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+
+body.doc-admin-page .hbtn.pri {
+  background-color: var(--admin-accent);
+  border-color: var(--admin-accent);
+  color: #fff;
+}
+
+body.doc-admin-page .hbtn.pri:hover {
+  background-color: #1D4ED8;
+}
+
+/* ---- Auditor 심사노트 shell (theme + sticky 3-pane polish) ---- */
+body.auditor-portal-page {
+  --admin-primary: #0F172A;
+  --admin-primary-light: #1E293B;
+  --admin-accent: #2563EB;
+  --admin-accent-bg: #EFF6FF;
+  --admin-bg: #F8FAFC;
+  --admin-card: #FFFFFF;
+  --admin-border: #E2E8F0;
+  --admin-text: #1E293B;
+  --admin-text-muted: #64748B;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --aud-note-header-offset: 112px;
+  --aud-note-toolbar-offset: 56px;
+  --aud-note-side-sticky-top: calc(
+    var(--aud-note-header-offset) + var(--aud-note-toolbar-offset)
+  );
+}
+
+body.auditor-portal-page.aud-note-open {
+  overflow: hidden;
+  height: 100vh;
+  background: var(--admin-bg);
+}
+
+body.auditor-portal-page.aud-note-open .admin-main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--admin-bg);
+}
+
+body.auditor-portal-page.aud-note-open .cb-page-header h1 {
+  color: var(--admin-primary);
+}
+
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+}
+
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-toolbar {
+  flex-shrink: 0;
+  z-index: 5;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: var(--admin-card);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) 250px;
+  gap: 0;
+  align-items: stretch;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--admin-card);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Sticky L/R; center .doc-wrap scrolls independently */
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-nav-pane,
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-ai {
+  position: sticky;
+  top: var(--aud-note-side-sticky-top);
+  height: calc(100vh - var(--aud-note-side-sticky-top));
+  max-height: 100%;
+  overflow-y: auto;
+  align-self: stretch;
+  box-sizing: border-box;
+  background: var(--admin-card);
+}
+
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-nav-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--admin-border);
+}
+
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-nav-pane .aud-note-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-ai {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--admin-border);
+}
+
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-ai .aud-note-ai-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-main.doc-wrap,
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .doc-wrap {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: var(--admin-card);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 16px 18px;
+}
+
+body.auditor-portal-page .aud-mode-tab {
+  border: 1px solid var(--admin-border);
+  background: var(--admin-card);
+  color: var(--admin-text-muted);
+}
+
+body.auditor-portal-page .aud-mode-tab.active {
+  background: var(--admin-accent);
+  color: #fff;
+  border-color: var(--admin-accent);
+}
+
+body.auditor-portal-page .aud-note-co-card {
+  background: var(--admin-accent-bg);
+  border: 1px solid var(--admin-border);
+}
+
+body.auditor-portal-page .aud-note-main textarea,
+body.auditor-portal-page .aud-note-ai textarea,
+body.auditor-portal-page .aud-note-main input,
+body.auditor-portal-page .aud-kpi-row input,
+body.auditor-portal-page .aud-note-std-select-area select,
+body.auditor-portal-page #aud-note-standard {
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+  color: var(--admin-text);
+  background: #fff;
+}
+
+body.auditor-portal-page .aud-note-main textarea:focus,
+body.auditor-portal-page .aud-note-ai textarea:focus,
+body.auditor-portal-page .aud-note-main input:focus,
+body.auditor-portal-page #aud-note-standard:focus {
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  outline: none;
+}
+
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .btn:not(.ghost) {
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+  color: #fff;
+}
+
+body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .btn.ghost {
+  border-color: var(--admin-border);
+  color: var(--admin-text);
+  background: var(--admin-card);
+}
+
+body.auditor-portal-page .aud-kpi-panel,
+body.auditor-portal-page .aud-guide-panel,
+body.auditor-portal-page .aud-cp {
+  border-color: var(--admin-border);
+  background: var(--admin-bg);
+}
+
+body.auditor-portal-page .aud-note-main h3 {
+  color: var(--admin-primary);
+}
+
+body.auditor-portal-page .aud-note-main .q {
+  background: var(--admin-bg);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text);
+}
+
+/* Keep saved-nav green affordance (success), not brand green clash */
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved {
+  background: var(--success);
+  color: #fff;
+}
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved:hover {
+  background: #059669;
+}
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.active:not(.is-saved) {
+  box-shadow: inset 2px 0 0 var(--admin-accent);
+}
+
+@media (max-width: 1100px) {
+  body.auditor-portal-page.aud-note-open,
+  body.auditor-portal-page.aud-note-open .admin-main {
+    height: auto;
+    max-height: none;
+    overflow: auto;
+  }
+  body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-grid {
+    grid-template-columns: 1fr;
+  }
+  body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-nav-pane,
+  body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-ai,
+  body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-main.doc-wrap {
+    position: relative;
+    top: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-main.doc-wrap {
+    max-height: min(70vh, 720px);
+    overflow-y: auto;
+  }
+}
