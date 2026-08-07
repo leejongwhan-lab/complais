@@ -1,12 +1,13 @@
 """ESG master KPI catalog API — enterprise + admin read endpoints."""
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime
 from typing import Dict, List, Optional, Set, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, inspect, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -20,6 +21,9 @@ from app.models.esg import (
     CompanyEsgKpiValue,
     EsgMasterKpi,
 )
+from app.models.kpi import KpiActuals, KpiMaster, KpiTargets
+
+logger = logging.getLogger(__name__)
 from app.schemas.esg_master_kpi import (
     CompanyEsgAuditNoteOut,
     CompanyEsgAuditNoteUpsert,
@@ -481,6 +485,296 @@ def _resolve_held(
     return held, cid
 
 
+def _table_exists(db: Session, name: str) -> bool:
+    try:
+        return inspect(db.get_bind()).has_table(name)
+    except Exception:
+        return False
+
+
+def _norm_esg_cat(raw: Optional[str]) -> str:
+    text = (raw or "").strip().upper()
+    if text in ("E", "S", "G"):
+        return text
+    if text.startswith("E") or "환경" in (raw or ""):
+        return "E"
+    if text.startswith("S") or "사회" in (raw or ""):
+        return "S"
+    if text.startswith("G") or "지배" in (raw or ""):
+        return "G"
+    return "E"
+
+
+def _legacy_source_mode(row: KpiMaster) -> str:
+    if getattr(row, "api_source", None) or getattr(row, "auto_collect", None):
+        return "public"
+    return "company"
+
+
+def _query_legacy_kpi_portal(
+    db: Session,
+    *,
+    company_id: Optional[int],
+    esg_category: Optional[str],
+    managed_standard_name: Optional[str],
+    q: Optional[str],
+    held_labels: Optional[List[str]],
+    held_only: bool,
+    source_mode: Optional[str],
+    skip: int,
+    limit: int,
+) -> EsgMasterKpiPortalListResponse:
+    """Fallback: kpi_master + kpi_actuals / kpi_targets when esg_master_kpis empty."""
+    years, current_year = _year_window()
+    empty = EsgMasterKpiPortalListResponse(
+        total=0,
+        skip=skip,
+        limit=limit,
+        data=[],
+        held_standards=held_labels or [],
+        available_standards=[],
+        matched_to_held=False,
+        years=years,
+        current_year=current_year,
+        notice="ESG KPI 데이터가 없습니다. kpi_master·실적 테이블을 확인하거나 카탈로그를 시드하세요.",
+        data_source="empty",
+    )
+    if not _table_exists(db, "kpi_master"):
+        return empty
+
+    try:
+        query = db.query(KpiMaster).filter(KpiMaster.is_active.is_(True))
+        if esg_category:
+            cat = esg_category.strip().upper()
+            if cat not in ("E", "S", "G"):
+                raise HTTPException(status_code=400, detail="esg_category는 E, S, G 중 하나여야 합니다.")
+            query = query.filter(
+                or_(
+                    KpiMaster.category_esg == cat,
+                    KpiMaster.category_esg.ilike(f"{cat}%"),
+                )
+            )
+        if managed_standard_name and managed_standard_name.strip():
+            token = managed_standard_name.strip()
+            query = query.filter(KpiMaster.applicable_stds.ilike(f"%{token}%"))
+        if q and q.strip():
+            like = f"%{q.strip()}%"
+            query = query.filter(
+                or_(
+                    KpiMaster.name_kr.ilike(like),
+                    KpiMaster.category_mid.ilike(like),
+                    KpiMaster.kpi_code.ilike(like),
+                    KpiMaster.iso_clause.ilike(like),
+                )
+            )
+        matched_to_held = False
+        if held_only:
+            if not held_labels:
+                return empty.model_copy(
+                    update={
+                        "notice": "보유 표준에 매칭되는 KPI가 없습니다. 필터를 해제해 보세요.",
+                        "data_source": "kpi_master",
+                    }
+                )
+            clauses = []
+            for label in held_labels:
+                nums = _iso_nums(label)
+                for num in nums:
+                    clauses.append(KpiMaster.applicable_stds.ilike(f"%{num}%"))
+                if not nums and len((label or "").strip()) >= 2:
+                    clauses.append(KpiMaster.applicable_stds.ilike(f"%{label.strip()}%"))
+            if clauses:
+                query = query.filter(or_(*clauses))
+                matched_to_held = True
+            else:
+                return empty.model_copy(
+                    update={
+                        "notice": "보유 표준에 매칭되는 KPI가 없습니다. 필터를 해제해 보세요.",
+                        "data_source": "kpi_master",
+                    }
+                )
+
+        rows = query.order_by(KpiMaster.sort_order.asc(), KpiMaster.id.asc()).all()
+        if source_mode:
+            mode_f = source_mode.strip().lower()
+            rows = [r for r in rows if _legacy_source_mode(r) == mode_f]
+
+        total = len(rows)
+        page = rows[skip : skip + limit]
+
+        values_by_kpi: Dict[int, Dict[int, str]] = {}
+        goals_by_kpi: Dict[int, str] = {}
+        if company_id and page and _table_exists(db, "kpi_actuals"):
+            kpi_ids = [r.id for r in page]
+            for v in (
+                db.query(KpiActuals)
+                .filter(
+                    KpiActuals.company_id == company_id,
+                    KpiActuals.kpi_id.in_(kpi_ids),
+                    KpiActuals.measured_year.in_(years),
+                )
+                .all()
+            ):
+                if v.measured_value is None:
+                    continue
+                values_by_kpi.setdefault(int(v.kpi_id), {})[int(v.measured_year)] = str(
+                    v.measured_value
+                )
+        if company_id and page and _table_exists(db, "kpi_targets"):
+            kpi_ids = [r.id for r in page]
+            for g in (
+                db.query(KpiTargets)
+                .filter(
+                    KpiTargets.company_id == company_id,
+                    KpiTargets.kpi_id.in_(kpi_ids),
+                )
+                .order_by(KpiTargets.target_year.desc())
+                .all()
+            ):
+                if g.kpi_id not in goals_by_kpi and g.target_value is not None:
+                    goals_by_kpi[int(g.kpi_id)] = str(g.target_value)
+
+        stds = sorted(
+            {
+                (r.applicable_stds or "").strip()
+                for r in rows
+                if (r.applicable_stds or "").strip()
+            }
+        )
+        data: List[EsgMasterKpiPortalOut] = []
+        for r in page:
+            mode = _legacy_source_mode(r)
+            ymap = values_by_kpi.get(int(r.id), {})
+            year_values = {str(y): ymap.get(y) for y in years}
+            cat = _norm_esg_cat(r.category_esg)
+            data.append(
+                EsgMasterKpiPortalOut(
+                    kpi_id=int(r.id),
+                    esg_category=cat,
+                    sub_category=r.category_mid or "미분류",
+                    kpi_name=r.name_kr,
+                    is_quantitative=True,
+                    unit_format=r.unit or "-",
+                    managed_standard_name=(r.applicable_stds or "공통").strip() or "공통",
+                    iso_clause_detail=r.iso_clause or "-",
+                    is_iso_auditable=True,
+                    source_type_code="A" if mode == "public" else "D",
+                    extraction_detail_method=r.api_source or ("공공연동" if mode == "public" else "기업 직접입력"),
+                    is_public_api_available=bool(r.api_source or r.auto_collect),
+                    criteria_mapping=r.frameworks,
+                    description=r.name_en,
+                    kpi_code=r.kpi_code or f"KPI-{cat}-{int(r.id):03d}",
+                    input_mode=mode,
+                    data_path_label=(r.api_source or "공공API") if mode == "public" else None,
+                    is_required=bool(r.is_mandatory),
+                    years=years,
+                    year_values=year_values,
+                    trend=compute_trend(year_values, years),
+                    goal_value=goals_by_kpi.get(int(r.id)),
+                    goal_year=None,
+                    has_audit_note=False,
+                    audit_note_preview=None,
+                    can_company_input=(mode == "company"),
+                    can_set_goal=True,
+                    current_year=current_year,
+                )
+            )
+
+        notice = None
+        if total == 0:
+            notice = "조회된 ESG KPI가 없습니다. 필터를 조정하거나 데이터 입력을 확인하세요."
+        return EsgMasterKpiPortalListResponse(
+            total=total,
+            skip=skip,
+            limit=limit,
+            data=data,
+            held_standards=held_labels or [],
+            available_standards=stds[:80],
+            matched_to_held=matched_to_held,
+            years=years,
+            current_year=current_year,
+            notice=notice,
+            data_source="kpi_master",
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("legacy kpi_master ESG soft-fail")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return empty
+
+
+def fetch_company_esg_portal(
+    db: Session,
+    company_id: Optional[int],
+    *,
+    held_labels: Optional[List[str]] = None,
+    esg_category: Optional[str] = None,
+    managed_standard_name: Optional[str] = None,
+    q: Optional[str] = None,
+    held_only: bool = False,
+    source_mode: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+) -> EsgMasterKpiPortalListResponse:
+    """Shared ESG portal payload for Enterprise + Admin (same schema).
+
+    Prefer ``esg_master_kpis``; soft-fall back to ``kpi_master`` + ``kpi_actuals``.
+    """
+    held = held_labels or []
+    use_master = _table_exists(db, "esg_master_kpis")
+    master_count = 0
+    if use_master:
+        try:
+            master_count = int(db.query(func.count(EsgMasterKpi.kpi_id)).scalar() or 0)
+        except Exception:
+            logger.exception("esg_master_kpis count soft-fail")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            use_master = False
+            master_count = 0
+
+    if use_master and master_count > 0:
+        try:
+            resp = _query_portal_kpis(
+                db,
+                company_id=company_id,
+                esg_category=esg_category,
+                managed_standard_name=managed_standard_name,
+                q=q,
+                held_labels=held,
+                held_only=held_only,
+                source_mode=source_mode,
+                skip=skip,
+                limit=limit,
+            )
+            return resp.model_copy(update={"data_source": "esg_master_kpis"})
+        except Exception:
+            logger.exception("esg_master_kpis portal query soft-fail → kpi_master")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+    return _query_legacy_kpi_portal(
+        db,
+        company_id=company_id,
+        esg_category=esg_category,
+        managed_standard_name=managed_standard_name,
+        q=q,
+        held_labels=held,
+        held_only=held_only,
+        source_mode=source_mode,
+        skip=skip,
+        limit=limit,
+    )
+
+
 @user_router.get("/esg-master-kpis", response_model=EsgMasterKpiPortalListResponse)
 def list_user_esg_master_kpis(
     esg_category: Optional[str] = Query(None, description="E | S | G"),
@@ -499,16 +793,16 @@ def list_user_esg_master_kpis(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """기업 포털 — ESG 마스터 KPI + 연도값/목표/심사노트."""
+    """기업 포털 — ESG 마스터 KPI + 연도값/목표/심사노트 (own company only)."""
     require_enterprise_user(current_user)
     held, cid = _resolve_held(db, current_user, company_id, held_only)
-    return _query_portal_kpis(
+    return fetch_company_esg_portal(
         db,
-        company_id=cid,
+        cid,
+        held_labels=held,
         esg_category=esg_category,
         managed_standard_name=managed_standard_name,
         q=q,
-        held_labels=held,
         held_only=held_only,
         source_mode=source_mode,
         skip=skip,

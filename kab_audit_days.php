@@ -49,7 +49,7 @@ if ($app_id > 0) {
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>KAB 심사일수 산정 v8</title>
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="assets/css/kab_audit_days.css">
+<link rel="stylesheet" href="/assets/css/kab_audit_days.css">
 <style>
 /* 이 페이지가 company_main.php와 같은 대시보드 셸(assets/css/dashboard.css) 안에서 열릴 때는
    거기서 정의한 --text/--surface/--blue 등 값이 우선 적용되고, 이 블록은 기본값(fallback)이다. */
@@ -421,7 +421,7 @@ body{font-family:'Pretendard',var(--font-sans,'Apple SD Gothic Neo',sans-serif)}
 </style>
 
 <script>const KAB_CONFIG = <?php echo md_calc_config_json(); ?>;</script>
-<script src="assets/js/kab_audit_days.js"></script>
+<script src="/kab_audit_days.js"></script>
 <script>initKabCalcEngine();</script>
 
 

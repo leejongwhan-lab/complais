@@ -70,6 +70,14 @@ class EsgMasterKpiListResponse(BaseModel):
     )
     years: List[int] = Field(default_factory=list)
     current_year: Optional[int] = None
+    notice: Optional[str] = Field(
+        default=None,
+        description="빈 카탈로그·폴백 안내 등 soft-fail 메시지",
+    )
+    data_source: Optional[str] = Field(
+        default=None,
+        description="esg_master_kpis | kpi_master | empty",
+    )
 
 
 class EsgMasterKpiPortalListResponse(EsgMasterKpiListResponse):

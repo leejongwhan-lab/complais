@@ -66,6 +66,9 @@ class EmissionFactorMasterBase(BaseModel):
     factor_co2: Optional[Decimal] = None
     factor_ch4: Optional[Decimal] = None
     factor_n2o: Optional[Decimal] = None
+    total_ghg_factor: Optional[Decimal] = Field(
+        default=None, description="tCO2eq합계 = CO2 + CH4×GWP_CH4 + N2O×GWP_N2O"
+    )
     unit_input: Optional[str] = None
     scope_type: Optional[int] = None
     fuel_category: Optional[str] = Field(default=None, description="대분류")
@@ -87,6 +90,7 @@ class EmissionFactorMasterUpdate(BaseModel):
     factor_co2: Optional[Decimal] = None
     factor_ch4: Optional[Decimal] = None
     factor_n2o: Optional[Decimal] = None
+    total_ghg_factor: Optional[Decimal] = None
     unit_input: Optional[str] = None
     scope_type: Optional[int] = None
     fuel_category: Optional[str] = None
@@ -99,6 +103,7 @@ class EmissionFactorMasterUpdate(BaseModel):
 class EmissionFactorMasterResponse(EmissionFactorMasterBase):
     id: int
     created_at: Optional[datetime] = None
+    source: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 

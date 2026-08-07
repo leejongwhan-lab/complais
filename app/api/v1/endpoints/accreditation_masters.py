@@ -9,16 +9,26 @@ from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_db
 from app.core.security import CurrentUser, require_cb_scope, require_platform_admin
+from app.models.auditor import AuditorEducation
 from app.models.cb import CertificationBodies
 from app.models.enums import UsersRole
-from app.models.master_data import CbAccreditedScope, IafCode, IsoStandard
+from app.models.master import MasterIafCodes, MasterMajors
+from app.models.master_data import CbAccreditedScope, IafCode, IsoStandard, Major
 from app.services.iaf_recommendation import recommend_iaf
 
 router = APIRouter(tags=["Accreditation Masters"])
+
+
+def _db_has_table(db: Session, table: str) -> bool:
+    try:
+        return inspect(db.get_bind()).has_table(table)
+    except Exception:
+        return False
 
 
 # ---------- Schemas ----------
@@ -193,33 +203,38 @@ def _resolve_cb_id(current_user: CurrentUser, cb_id: Optional[int]) -> int:
 
 
 def _ensure_seed_masters(db: Session) -> None:
-    """UI 드롭다운용 최소 시드 (비어 있을 때만)."""
+    """UI 드롭다운용 최소 시드 (비어 있을 때만). 테이블 없으면 스킵."""
     now = datetime.utcnow()
-    if db.query(IsoStandard.id).first() is None:
-        for code, name in _DEFAULT_ISO:
-            db.add(
-                IsoStandard(
-                    standard_code=code,
-                    standard_name_ko=name,
-                    is_active=True,
-                    created_at=now,
-                    updated_at=now,
+    if _db_has_table(db, "iso_standards"):
+        if db.query(IsoStandard.id).first() is None:
+            for code, name in _DEFAULT_ISO:
+                db.add(
+                    IsoStandard(
+                        standard_code=code,
+                        standard_name_ko=name,
+                        is_active=True,
+                        created_at=now,
+                        updated_at=now,
+                    )
                 )
-            )
-        db.flush()
-    if db.query(IafCode.id).first() is None:
-        for code, name in _DEFAULT_IAF:
-            db.add(
-                IafCode(
-                    code=code,
-                    name_ko=name,
-                    name_en=name,
-                    is_active=True,
-                    updated_at=now,
+            db.flush()
+    if _db_has_table(db, "iaf_codes"):
+        if db.query(IafCode.id).first() is None:
+            for code, name in _DEFAULT_IAF:
+                db.add(
+                    IafCode(
+                        code=code,
+                        name_ko=name,
+                        name_en=name,
+                        is_active=True,
+                        updated_at=now,
+                    )
                 )
-            )
-        db.flush()
-    db.commit()
+            db.flush()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
 
 
 def _iaf_out(r: IafCode) -> IafCodeOut:
@@ -362,13 +377,98 @@ def meta_list_iaf_codes(
     q: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """등록된 활성 IAF 코드 목록."""
+    """등록된 활성 IAF 코드 목록 (iaf_codes 우선, 없으면 master_iaf_codes)."""
     _ensure_seed_masters(db)
-    query = db.query(IafCode).filter(IafCode.is_active.is_(True))
+    if _db_has_table(db, "iaf_codes"):
+        query = db.query(IafCode).filter(IafCode.is_active.is_(True))
+        if q:
+            like = f"%{q.strip()}%"
+            query = query.filter((IafCode.code.ilike(like)) | (IafCode.name_ko.ilike(like)))
+        return [_iaf_out(r) for r in query.order_by(IafCode.code.asc()).limit(500).all()]
+
+    # Live DB: master_iaf_codes
+    query = db.query(MasterIafCodes).filter(MasterIafCodes.is_active.is_(True))
     if q:
         like = f"%{q.strip()}%"
-        query = query.filter((IafCode.code.ilike(like)) | (IafCode.name_ko.ilike(like)))
-    return [_iaf_out(r) for r in query.order_by(IafCode.code.asc()).limit(500).all()]
+        query = query.filter(
+            (MasterIafCodes.iaf_code.ilike(like))
+            | (MasterIafCodes.name_kr.ilike(like))
+            | (MasterIafCodes.name_en.ilike(like))
+        )
+    rows = query.order_by(MasterIafCodes.iaf_code.asc()).limit(500).all()
+    return [
+        IafCodeOut(
+            iaf_code_id=r.id,
+            iaf_code=r.iaf_code,
+            industry_name_ko=r.name_kr or r.scope_name_ko or r.iaf_code,
+            name_en=r.name_en,
+            description=None,
+            is_active=bool(r.is_active),
+            updated_at=None,
+        )
+        for r in rows
+    ]
+
+
+class MajorOut(BaseModel):
+    id: Optional[int] = None
+    name: str
+    category: Optional[str] = None
+    source: str = "master"  # master | education | suggestion
+
+
+@router.get("/meta/majors", response_model=List[MajorOut])
+def meta_list_majors(
+    q: Optional[str] = Query(None, description="전공학과명 검색어"),
+    limit: int = Query(30, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """전공 자동완성 — master_majors / majors / 학력 distinct 제안."""
+    term = (q or "").strip()
+    like = f"%{term}%" if term else None
+    out: List[MajorOut] = []
+    seen = set()
+
+    def _add(name: str, *, mid: Optional[int], category: Optional[str], source: str):
+        key = name.strip().lower()
+        if not key or key in seen:
+            return
+        seen.add(key)
+        out.append(MajorOut(id=mid, name=name.strip(), category=category, source=source))
+
+    if _db_has_table(db, "master_majors"):
+        query = db.query(MasterMajors).filter(MasterMajors.is_active.is_(True))
+        if like:
+            query = query.filter(MasterMajors.name.ilike(like))
+        for r in query.order_by(MasterMajors.name.asc()).limit(limit).all():
+            _add(r.name, mid=r.id, category=r.category, source="master")
+
+    if len(out) < limit and _db_has_table(db, "majors"):
+        query = db.query(Major)
+        if like:
+            query = query.filter(Major.name.ilike(like))
+        for r in query.order_by(Major.name.asc()).limit(limit).all():
+            _add(r.name, mid=r.id, category=getattr(r, "category", None), source="master")
+
+    if len(out) < limit and _db_has_table(db, "auditor_educations"):
+        query = db.query(AuditorEducation.major).distinct()
+        if like:
+            query = query.filter(AuditorEducation.major.ilike(like))
+        for (name,) in query.limit(limit).all():
+            if name and name != "-":
+                _add(str(name), mid=None, category=None, source="education")
+
+    # 마스터가 비어 있을 때 최소 제안
+    if not out:
+        fallback = [
+            "화학공학", "기계공학", "전기전자공학", "컴퓨터공학", "환경공학",
+            "산업공학", "토목공학", "식품공학", "경영학", "안전공학",
+        ]
+        for name in fallback:
+            if not term or term.lower() in name.lower():
+                _add(name, mid=None, category=None, source="suggestion")
+
+    return out[:limit]
 
 
 @router.get("/meta/iso-standards", response_model=List[IsoStandardOut])

@@ -14,15 +14,17 @@
   function yn(name, val) {
     const v = String(val || "");
     return (
+      `<div class="radios radio-group">` +
       `<label><input type="radio" name="${esc(name)}" value="yes"${v === "yes" ? " checked" : ""}> 예</label>` +
-      `<label><input type="radio" name="${esc(name)}" value="no"${v === "no" ? " checked" : ""}> 아니오</label>`
+      `<label><input type="radio" name="${esc(name)}" value="no"${v === "no" ? " checked" : ""}> 아니오</label>` +
+      `</div>`
     );
   }
 
   function chips(name, options, selected) {
     const ck = checkedSet(selected);
     return (
-      `<div class="aspect-chips">` +
+      `<div class="aspect-chips checkbox-group">` +
       (options || [])
         .map(
           (o) =>
@@ -58,10 +60,10 @@
       </div>
       <h4 class="aspect-sub">환경영향평가 / 사고</h4>
       <div class="aspect-grid">
-        <div class="ff"><label>환경영향평가 실시</label><div class="radios">${yn("ems_eia_done", eia.done)}</div></div>
-        <div class="ff"><label>실시일</label><input class="form-input" type="date" id="ems_eia_date" value="${esc(eia.date || "")}"></div>
-        <div class="ff"><label>절차명/번호</label><input class="form-input" id="ems_eia_proc" value="${esc(eia.procedure || "")}"></div>
-        <div class="ff"><label>최근 3년 환경사고</label><div class="radios">${yn("ems_acc", eia.accident_3y)}</div></div>
+        <div class="ff form-group"><label>환경영향평가 실시</label>${yn("ems_eia_done", eia.done)}</div>
+        <div class="ff form-group"><label>실시일</label><input class="form-input" type="date" id="ems_eia_date" value="${esc(eia.date || "")}"></div>
+        <div class="ff form-group"><label>절차명/번호</label><input class="form-input" id="ems_eia_proc" value="${esc(eia.procedure || "")}"></div>
+        <div class="ff form-group"><label>최근 3년 환경사고</label>${yn("ems_acc", eia.accident_3y)}</div>
         <div class="ff" style="grid-column:1/-1"><label>사고 내용</label><input class="form-input" id="ems_acc_detail" value="${esc(eia.accident_detail || "")}"></div>
       </div>
       <h4 class="aspect-sub">환경 세부측면</h4>
@@ -83,12 +85,12 @@
     box.innerHTML = `
       <h4 class="aspect-sub">위험성평가 / 사고</h4>
       <div class="aspect-grid">
-        <div class="ff"><label>클라이언트 프로파일 작성</label><div class="radios">${yn("ohs_profile", risk.client_profile)}</div></div>
-        <div class="ff"><label>위험성평가 실시</label><div class="radios">${yn("ohs_assess", risk.assessment_done)}</div></div>
-        <div class="ff"><label>실시일</label><input class="form-input" type="date" id="ohs_assess_date" value="${esc(risk.assessment_date || "")}"></div>
-        <div class="ff"><label>절차명/번호</label><input class="form-input" id="ohs_assess_proc" value="${esc(risk.assessment_procedure || "")}"></div>
-        <div class="ff" style="grid-column:1/-1"><label>주요 시설명</label><input class="form-input" id="ohs_facilities" value="${esc(risk.facilities || "")}" placeholder="CNC, MCT, 콤프레샤 등"></div>
-        <div class="ff"><label>최근 안전사고</label><div class="radios">${yn("ohs_acc", risk.accident_recent)}</div></div>
+        <div class="ff form-group"><label>클라이언트 프로파일 작성</label>${yn("ohs_profile", risk.client_profile)}</div>
+        <div class="ff form-group"><label>위험성평가 실시</label>${yn("ohs_assess", risk.assessment_done)}</div>
+        <div class="ff form-group"><label>실시일</label><input class="form-input" type="date" id="ohs_assess_date" value="${esc(risk.assessment_date || "")}"></div>
+        <div class="ff form-group"><label>절차명/번호</label><input class="form-input" id="ohs_assess_proc" value="${esc(risk.assessment_procedure || "")}"></div>
+        <div class="ff form-group" style="grid-column:1/-1"><label>주요 시설명</label><input class="form-input" id="ohs_facilities" value="${esc(risk.facilities || "")}" placeholder="CNC, MCT, 콤프레샤 등"></div>
+        <div class="ff form-group"><label>최근 안전사고</label>${yn("ohs_acc", risk.accident_recent)}</div>
         <div class="ff"><label>사고 내용</label><input class="form-input" id="ohs_acc_detail" value="${esc(risk.accident_detail || "")}"></div>
       </div>
       <h4 class="aspect-sub">위험요인 세부</h4>
@@ -110,8 +112,8 @@
     box.innerHTML = `
       <h4 class="aspect-sub">에너지검토 / 시설</h4>
       <div class="aspect-grid">
-        <div class="ff"><label>에너지경영질문서 작성</label><div class="radios">${yn("enms_q", en.questionnaire_done)}</div></div>
-        <div class="ff"><label>에너지검토 실시</label><div class="radios">${yn("enms_review", en.review_done)}</div></div>
+        <div class="ff form-group"><label>에너지경영질문서 작성</label>${yn("enms_q", en.questionnaire_done)}</div>
+        <div class="ff form-group"><label>에너지검토 실시</label>${yn("enms_review", en.review_done)}</div>
         <div class="ff"><label>실시일</label><input class="form-input" type="date" id="enms_review_date" value="${esc(en.review_date || "")}"></div>
         <div class="ff"><label>절차명/번호</label><input class="form-input" id="enms_review_proc" value="${esc(en.review_procedure || "")}"></div>
         <div class="ff" style="grid-column:1/-1"><label>주요 시설명</label><input class="form-input" id="enms_facilities" value="${esc(en.facilities || "")}"></div>

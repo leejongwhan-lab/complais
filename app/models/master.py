@@ -53,6 +53,11 @@ class EmissionFactorMaster(Base):
     factor_co2: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True)
     factor_ch4: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True)
     factor_n2o: Mapped[Optional[Decimal]] = mapped_column(Numeric, nullable=True)
+    total_ghg_factor: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(18, 8),
+        nullable=True,
+        comment="tCO2eq합계 = CO2 + CH4×GWP_CH4 + N2O×GWP_N2O",
+    )
     unit_input: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     scope_type: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
     fuel_category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="대분류")
@@ -111,6 +116,15 @@ class KsicNaceMapping(Base):
     nace_code: Mapped[str] = mapped_column(String(10), nullable=False, comment="FK → nace_codes")
     iaf_code: Mapped[str] = mapped_column(String(5), nullable=False, comment="중복 저장 (조회 최적화)")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class MasterMajors(Base):
+    """전공학과 마스터 (자동완성 제안용)."""
+    __tablename__ = "master_majors"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, comment="전공학과명")
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="계열/분류")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
 class MasterIafCodes(Base):

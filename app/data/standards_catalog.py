@@ -247,17 +247,36 @@ def _prefer_edition(defs: List[StandardDefinition]) -> Optional[StandardDefiniti
     return pool[0]
 
 
+def _parts_from_def(s: StandardDefinition) -> Dict[str, str]:
+    return {
+        "initial": s.family_code,
+        "iso_code": s.display_code,
+        "name_kr": s.name_ko.replace(" ", ""),
+    }
+
+
 def standard_display_parts(raw: Optional[str]) -> Dict[str, str]:
     """UI 표기 부품 — {initial, iso_code, name_kr}.
 
     역할별 조합은 ``format_standard_label(..., mode=)`` 를 사용한다.
     DB/API 내부 코드(9001 등)는 그대로 두고 화면에서만 변환한다.
+    ``standard_key`` / ``display_code`` 가 주어지면 해당 판본을 그대로 쓴다.
     """
     import re
 
     text = str(raw or "").strip()
     if not text:
         return {"initial": "", "iso_code": "", "name_kr": ""}
+
+    # exact standard_key (QMS_2015 / QMS_2026 …)
+    by_key = STANDARD_BY_KEY.get(text) or STANDARD_BY_KEY.get(text.upper())
+    if by_key and by_key.role == "CERTIFIABLE":
+        return _parts_from_def(by_key)
+
+    # exact display_code (ISO 9001:2026)
+    by_display = next((s for s in OPERATING_STANDARDS if s.display_code == text), None)
+    if by_display:
+        return _parts_from_def(by_display)
 
     # bare numeric code
     digits = re.sub(r"[^0-9]", "", text)
@@ -272,11 +291,7 @@ def standard_display_parts(raw: Optional[str]) -> Dict[str, str]:
         defs = [s for s in OPERATING_STANDARDS if s.family_code == fam]
         chosen = _prefer_edition(defs)
         if chosen:
-            return {
-                "initial": chosen.family_code,
-                "iso_code": chosen.display_code,
-                "name_kr": chosen.name_ko.replace(" ", ""),
-            }
+            return _parts_from_def(chosen)
         fb = next((v for v in _CODE_FALLBACKS.values() if v["initial"] == fam), None)
         if fb:
             return dict(fb)
@@ -330,21 +345,49 @@ def standard_display_payload(
     code: Optional[str] = None,
     mode: StandardDisplayMode = "enterprise",
 ) -> Dict[str, str]:
-    """API/UI payload: internal code + part fields + role-specific label."""
-    internal = (code if code is not None else raw) or ""
-    # normalize bare codes like 9001
+    """API/UI payload: internal code + part fields + role-specific label.
+
+    Prefer ``standard_key`` (QMS_2015) as ``code`` when the input is a catalog key
+    or when ``code=`` is explicitly passed. Bare numeric codes (9001) remain for
+    legacy storage.
+    """
     import re
 
-    m = re.search(
-        r"(9001|14001|45001|27001|37001|37301|50001|22000|13485|19443|27701|42001|22301)",
-        str(internal),
-        re.I,
-    )
-    code_out = m.group(1) if m else str(internal).strip()
-    parts = standard_display_parts(internal or raw)
-    label = format_standard_label(internal or raw, mode=mode)
+    text = str(raw or "").strip()
+    explicit = str(code).strip() if code is not None else ""
+    resolve_from = explicit or text
+
+    by_key = STANDARD_BY_KEY.get(resolve_from) or STANDARD_BY_KEY.get(resolve_from.upper())
+    if by_key and by_key.role == "CERTIFIABLE":
+        code_out = by_key.standard_key
+        parts = _parts_from_def(by_key)
+        label = format_standard_label(by_key.standard_key, mode=mode)
+        return {
+            "code": code_out,
+            "standard_key": by_key.standard_key,
+            "initial": parts["initial"],
+            "iso_code": parts["iso_code"],
+            "name_kr": parts["name_kr"],
+            "label": label,
+            "name": label,
+            "mode": mode,
+        }
+
+    if explicit:
+        code_out = explicit
+    else:
+        m = re.search(
+            r"(9001|14001|45001|27001|37001|37301|50001|22000|13485|19443|27701|42001|22301)",
+            resolve_from,
+            re.I,
+        )
+        code_out = m.group(1) if m else resolve_from
+
+    parts = standard_display_parts(resolve_from or text)
+    label = format_standard_label(resolve_from or text, mode=mode)
     return {
         "code": code_out,
+        "standard_key": "",
         "initial": parts["initial"],
         "iso_code": parts["iso_code"],
         "name_kr": parts["name_kr"],

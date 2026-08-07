@@ -20,6 +20,7 @@ from app.api.v1.endpoints.admin_cb import (
 )
 from app.core.security import CurrentUser, require_cb_scope
 from app.models.cb import CertificationBodies
+from app.models.certification_body import cb_to_spec_dict
 from app.models.enums import UsersRole
 from app.models.master_data import CbAccreditedScope
 
@@ -48,12 +49,19 @@ class CbProfileScopeItem(BaseModel):
 
 
 class CbProfileOut(BaseModel):
+    """CB 프로필 — Admin ``cb_to_spec_dict`` 와 동일 마스터 별칭 포함."""
+
     cb_id: int
     code: Optional[str] = None
+    cb_code: Optional[str] = None
     name: Optional[str] = None
+    cb_name: Optional[str] = None
     name_en: Optional[str] = None
+    cb_name_en: Optional[str] = None
+    cb_initial: Optional[str] = None
     ceo_name: Optional[str] = None
     biz_no: Optional[str] = None
+    biz_reg_no: Optional[str] = None
     address: Optional[str] = None
     tel: Optional[str] = None
     phone: Optional[str] = None
@@ -63,11 +71,13 @@ class CbProfileOut(BaseModel):
     intro: Optional[str] = None
     accreditation_body: Optional[str] = None
     accreditation_no: Optional[str] = None
+    reg_no: Optional[str] = None
     accreditation_region: Optional[str] = None
     accreditation_country: Optional[str] = None
     expire_date: Optional[str] = None
     status: Optional[str] = None
     tax_email: Optional[str] = None
+    logo_path: Optional[str] = None
     is_active: bool = True
     scopes: List[CbProfileScopeItem] = Field(default_factory=list)
     scope_count: int = 0
@@ -177,29 +187,43 @@ def _load_scopes(db: Session, cb_id: int) -> List[CbProfileScopeItem]:
 
 
 def _to_profile_out(cb: CertificationBodies, scopes: List[CbProfileScopeItem]) -> CbProfileOut:
-    has_basic = bool((cb.name or "").strip() or (cb.ceo_name or "").strip() or (cb.address or "").strip())
+    """Admin CB detail 과 동일 ``cb_to_spec_dict`` 베이스 + 포털 Scope."""
+    spec = cb_to_spec_dict(cb)
+    has_basic = bool(
+        (spec.get("cb_name") or spec.get("name") or "").strip()
+        or (spec.get("ceo_name") or "").strip()
+        or (spec.get("address") or "").strip()
+    )
+    expire = getattr(cb, "expire_date", None)
     return CbProfileOut(
-        cb_id=cb.id,
-        code=cb.code,
-        name=cb.name,
-        name_en=cb.name_en,
-        ceo_name=cb.ceo_name,
-        biz_no=cb.biz_no,
-        address=cb.address,
-        tel=cb.tel,
-        phone=cb.phone or cb.tel,
-        fax=cb.fax,
-        email=cb.email,
-        website=cb.website,
-        intro=cb.intro,
-        accreditation_body=cb.accreditation_body,
-        accreditation_no=cb.accreditation_no,
-        accreditation_region=cb.accreditation_region,
-        accreditation_country=cb.accreditation_country,
-        expire_date=cb.expire_date,
-        status=cb.status,
-        tax_email=cb.tax_email,
-        is_active=bool(cb.is_active),
+        cb_id=int(spec["id"]),
+        code=spec.get("cb_code") or spec.get("code"),
+        cb_code=spec.get("cb_code") or spec.get("code"),
+        name=spec.get("cb_name") or spec.get("name"),
+        cb_name=spec.get("cb_name") or spec.get("name"),
+        name_en=spec.get("cb_name_en") or spec.get("name_en"),
+        cb_name_en=spec.get("cb_name_en") or spec.get("name_en"),
+        cb_initial=spec.get("cb_initial"),
+        ceo_name=spec.get("ceo_name"),
+        biz_no=spec.get("biz_reg_no") or spec.get("biz_no"),
+        biz_reg_no=spec.get("biz_reg_no") or spec.get("biz_no"),
+        address=spec.get("address"),
+        tel=spec.get("tel"),
+        phone=getattr(cb, "phone", None) or spec.get("tel"),
+        fax=getattr(cb, "fax", None),
+        email=spec.get("email"),
+        website=spec.get("website"),
+        intro=getattr(cb, "intro", None),
+        accreditation_body=spec.get("accreditation_body"),
+        accreditation_no=spec.get("reg_no") or getattr(cb, "accreditation_no", None),
+        reg_no=spec.get("reg_no"),
+        accreditation_region=getattr(cb, "accreditation_region", None),
+        accreditation_country=getattr(cb, "accreditation_country", None),
+        expire_date=expire.isoformat() if hasattr(expire, "isoformat") and expire else expire,
+        status=spec.get("status") or getattr(cb, "status", None),
+        tax_email=getattr(cb, "tax_email", None),
+        logo_path=spec.get("logo_path"),
+        is_active=bool(getattr(cb, "is_active", True)),
         scopes=scopes,
         scope_count=len(scopes),
         has_profile=has_basic,

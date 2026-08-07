@@ -827,7 +827,7 @@ body.admin-page .data-table.admin-data-table th {
 
 .modal-dialog.lg,
 .modal-dialog.company-org-modal {
-  width: min(1040px, 100%);
+  width: min(1180px, 100%);
 }
 
 .modal-header,
@@ -1043,6 +1043,114 @@ body.admin-page .data-table.admin-data-table th {
   color: var(--admin-muted);
   border-top: 1px solid var(--admin-border);
   border-bottom: 1px solid var(--admin-border);
+}
+
+/* Admin company detail — ESG KPI (read-only, soft-green) */
+.ac-esg-filters {
+  margin-bottom: 10px;
+}
+
+.ac-esg-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  font: var(--font-body-small);
+  color: var(--admin-ink);
+  font-weight: var(--font-weight-regular, 400);
+}
+
+.ac-esg-meta {
+  margin: 0 0 10px;
+  color: var(--admin-muted);
+  font: var(--font-body-small);
+}
+
+.ac-esg-table-wrap {
+  overflow-x: auto;
+  max-height: min(52vh, 520px);
+  border-top: 1px solid var(--admin-border);
+  border-bottom: 1px solid var(--admin-border);
+}
+
+table.ac-esg-table {
+  min-width: 980px;
+  width: 100%;
+}
+
+table.ac-esg-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--admin-surface, #f4f7f5);
+  white-space: nowrap;
+}
+
+table.ac-esg-table .ac-esg-col-year,
+table.ac-esg-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+table.ac-esg-table .ac-esg-col-trend,
+table.ac-esg-table .ac-esg-col-goal {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ac-esg-group-row td {
+  background: #eef6ef;
+  color: var(--admin-ink, #1e2a24);
+  font: var(--font-body-small);
+  border-bottom: 1px solid #d9e8db;
+  padding: 9px 10px;
+}
+
+.ac-esg-group-count {
+  color: var(--admin-muted);
+  font-weight: 500;
+}
+
+.ac-esg-kpi-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.ac-esg-kpi-code {
+  color: #2f7a4f;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.ac-esg-kpi-name {
+  color: var(--admin-ink, #1e2a24);
+  font: var(--font-body-small);
+}
+
+.ac-esg-req {
+  color: var(--admin-muted);
+  font: var(--font-caption);
+}
+
+.ac-esg-empty {
+  color: var(--admin-faint, #9aa59e);
+}
+
+.ac-esg-trend {
+  font: var(--font-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ac-esg-trend.down { color: #2f7a4f; }
+.ac-esg-trend.up { color: #b42318; }
+.ac-esg-trend.flat { color: var(--admin-muted); }
+
+#ac-esg-pagination {
+  margin-top: 10px;
 }
 
 .membership-card,
@@ -1631,31 +1739,50 @@ body.cb-portal-page .muted {
 }
 
 /* --------------------------------------------------------------------------
-   Enterprise cert application — standards one-line + aspects
+   Enterprise cert application — standards 3-per-row grid + aspects
    -------------------------------------------------------------------------- */
 .std-row {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 10px 14px;
-  align-items: center;
-  overflow-x: auto;
-  padding: 8px 4px 10px;
-  -webkit-overflow-scrolling: touch;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 12px;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+  padding: 8px 0 10px;
 }
 
 .std-row .std-item {
-  display: inline-flex;
-  flex: 0 0 auto;
+  display: flex;
   gap: 6px;
-  align-items: center;
-  white-space: nowrap;
+  align-items: flex-start;
+  min-width: 0;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
   font-size: 12px;
   font-weight: 600;
+  font-family: Pretendard, "Noto Sans KR", sans-serif;
   color: var(--admin-ink);
-  padding: 6px 10px;
+  padding: 8px 10px;
   border: 1px solid var(--admin-border);
   border-radius: var(--admin-radius);
   background: var(--admin-surface);
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .std-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .std-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .std-row .std-item:has(input:checked) {
@@ -1749,6 +1876,40 @@ body.register-page .ff > label {
   font-weight: 700;
   color: var(--admin-muted, #5A675F);
   line-height: 1.35;
+}
+
+/* Enterprise portal form type scale (overrides shared portal-form labels) */
+body.enterprise-page .portal-form .form-row > label,
+body.enterprise-page .portal-form .ff > label,
+body.enterprise-page .portal-form .org-field > label,
+body.enterprise-page .portal-form .ep-field > label,
+body.enterprise-portal-page .portal-form .form-row > label,
+body.enterprise-portal-page .portal-form .ff > label,
+body.enterprise-portal-page .portal-form .org-field > label,
+body.enterprise-portal-page .portal-form .ep-field > label,
+body.ent-cert-page .form-row > label,
+body.ent-cert-page .ff > label,
+body.ent-cert-page .org-field > label,
+body.enterprise-page.ent-cert-page .ff > label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+body.enterprise-page .portal-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body.enterprise-page .portal-form select,
+body.enterprise-page .portal-form textarea,
+body.enterprise-page .portal-form .form-input,
+body.enterprise-portal-page .portal-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body.enterprise-portal-page .portal-form select,
+body.enterprise-portal-page .portal-form textarea,
+body.enterprise-portal-page .portal-form .form-input,
+body.ent-cert-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body.ent-cert-page select,
+body.ent-cert-page textarea,
+body.ent-cert-page .form-input {
+  font-size: 13px;
+  color: #1E293B;
 }
 
 .portal-form .form-row > :not(label),
@@ -1853,24 +2014,69 @@ body.review-page textarea.form-input {
   resize: vertical;
 }
 
+/* Dynamic ISO questionnaire / aspects: checkbox & radio wrap alignment */
 .portal-form .radios,
 .portal-form .choice-group,
 .portal-form .check-group,
+.portal-form .checkbox-group,
+.portal-form .radio-group,
 .cert-app-page .radios,
+.cert-app-page .checkbox-group,
+.cert-app-page .radio-group,
 body.ent-cert-page .radios,
+body.ent-cert-page .checkbox-group,
+body.ent-cert-page .radio-group,
 body.review-page .radios,
+body.review-page .checkbox-group,
+body.review-page .radio-group,
 body.ent-cert-page .q-row .q-ctrl.radios,
-body.ent-cert-page .std-row {
+body.ent-cert-page .q-row .q-ctrl.radio-group,
+body.ent-cert-page .aspect-chips.checkbox-group {
   display: flex;
-  align-items: center;
-  gap: 16px;
   flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+}
+
+.portal-form .radios label,
+.portal-form .checkbox-group label,
+.portal-form .radio-group label,
+.cert-app-page .radios label,
+.cert-app-page .checkbox-group label,
+.cert-app-page .radio-group label,
+body.ent-cert-page .radios label,
+body.ent-cert-page .checkbox-group label,
+body.ent-cert-page .radio-group label,
+body.ent-cert-page .q-row .q-ctrl.radios label,
+body.ent-cert-page .q-row .q-ctrl.radio-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  white-space: nowrap;
 }
 
 body.ent-cert-page .std-row {
-  overflow-x: auto;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 12px;
+  overflow: visible;
+  flex-wrap: unset;
   padding: 4px 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 900px) {
+  body.ent-cert-page .std-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  body.ent-cert-page .std-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Daum/Kakao postcode address group */

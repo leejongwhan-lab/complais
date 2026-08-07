@@ -1,9 +1,10 @@
-"""기업 포털 — 기업정보 CRUD, 추가사업장/부서/담당자, 인증현황."""
+"""기업 포털 — 기업정보 CRUD, 추가사업장/부서/담당자, 인증현황 · 대시보드."""
 from __future__ import annotations
 
 import json
+import logging
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -13,14 +14,20 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.api.v1.endpoints.user_common import require_enterprise_user, resolve_company_id
 from app.core.security import CurrentUser, get_current_user
-from app.models.auth import Users
+from app.data.standards_catalog import format_standard_label
+from app.models.audit import AuditNcrs
+from app.models.auth import Notifications, Users
 from app.models.backoffice import CompanyStaff
 from app.models.cb import CertificationBodies
-from app.models.certification import Certificates, CertificationApplications
+from app.models.certification import CertificationApplications
 from app.models.client import AuditRequest
+from app.models.contract import Contracts
 from app.models.enterprise_audit_application import EnterpriseAuditApplication
 from app.models.company import Companies, CompanyDepartments, CompanyHeadcountYearly, CompanySites
 from app.services import company_org as org
+from app.services.company_held_certs import list_company_held_cert_status
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/user", tags=["User Enterprise Portal"])
 
@@ -595,11 +602,24 @@ class HeldCertOut(BaseModel):
     id: int
     cert_no: Optional[str] = None
     standards: str
+    standard_label: Optional[str] = None
     scope_kr: Optional[str] = None
+    cb_id: Optional[int] = None
+    cb_name: Optional[str] = None
+    ab_code: Optional[str] = None
     valid_from: Optional[str] = None
     valid_until: Optional[str] = None
-    status: str
+    status: Optional[str] = None
     issued_at: Optional[str] = None
+    last_audit_date: Optional[str] = None
+    last_audit_type: Optional[str] = None
+    last_audit_type_label: Optional[str] = None
+    current_audit_type: Optional[str] = None
+    current_audit_type_label: Optional[str] = None
+    certificate_file_url: Optional[str] = None
+    expiry_within_3_months: bool = False
+    days_to_expiry: Optional[int] = None
+    expiry_notice: Optional[str] = None
 
 
 class CertAppOut(BaseModel):
@@ -661,54 +681,157 @@ def _status_label(status_val: Optional[str], step: int) -> str:
     return status_val or "-"
 
 
-def _audit_type_label(raw: Optional[str]) -> str:
+def _audit_type_label(raw: Optional[str]) -> Optional[str]:
+    if not raw:
+        return None
+    key = str(raw).strip().lower().replace(" ", "").replace("_", "")
     mapping = {
         "initial": "최초심사",
+        "최초": "최초심사",
+        "최초심사": "최초심사",
         "surveillance": "사후심사",
+        "surveillance1": "사후1차",
+        "surveillance2": "사후2차",
+        "sa1": "사후1차",
+        "sa2": "사후2차",
+        "사후": "사후심사",
+        "사후1": "사후1차",
+        "사후1차": "사후1차",
+        "사후2": "사후2차",
+        "사후2차": "사후2차",
         "recertification": "갱신심사",
+        "renewal": "갱신심사",
+        "갱신": "갱신심사",
+        "갱신심사": "갱신심사",
         "special": "특별심사",
         "transfer": "전환심사",
         "전환": "전환심사",
     }
-    if not raw:
-        return "심사"
-    return mapping.get(str(raw).strip().lower(), str(raw))
+    return mapping.get(key, str(raw))
 
 
-@router.get("/cert-status", response_model=CertStatusResponse)
-def get_cert_status(
-    company_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
-):
-    """보유 인증 + 인증 신청 관리(7단계 스테퍼)."""
-    require_enterprise_user(current_user)
-    cid = resolve_company_id(current_user, company_id)
-    company = db.get(Companies, cid)
-    if not company:
-        raise HTTPException(status_code=404, detail="기업 정보를 찾을 수 없습니다.")
+DASHBOARD_STAGES = [
+    {"step": 1, "key": "apply", "label": "신청"},
+    {"step": 2, "key": "doc_review", "label": "서류검토"},
+    {"step": 3, "key": "onsite", "label": "현장심사"},
+    {"step": 4, "key": "ncr", "label": "시정조치"},
+    {"step": 5, "key": "done", "label": "완료"},
+]
 
-    held_rows = (
-        db.query(Certificates)
-        .filter(Certificates.company_id == cid)
-        .order_by(Certificates.id.desc())
-        .limit(50)
-        .all()
+
+def _dashboard_stage_from_process(process_step: int) -> int:
+    """Map 7-step cert process → 5-step dashboard timeline."""
+    if process_step <= 1:
+        return 1
+    if process_step <= 4:
+        return 2
+    if process_step == 5:
+        return 3
+    if process_step == 6:
+        return 4
+    return 5
+
+
+_OPEN_NCR = {
+    "PENDING", "pending", "OPEN", "open", "ISSUED", "issued",
+    "REJECTED", "rejected", "ACTION_SUBMITTED", "action_submitted",
+    "ca_submitted", "CA_SUBMITTED",
+}
+_PENDING_APP = {
+    "submitted", "proposal", "proposal_sent", "under_review", "reviewing",
+    "reviewed", "coordinating", "negotiating", "contract", "contracted",
+    "signed", "auditing", "in_audit", "audit", "corrective", "ncr",
+    "corrective_action", "need_fix", "SUBMITTED", "REVIEWING", "PROPOSED",
+}
+
+
+def _build_held_certificates(db: Session, company_id: int) -> List[HeldCertOut]:
+    """보유 인증 — shared master helper (full, all CBs)."""
+    rows = list_company_held_cert_status(
+        db, company_id, cb_id=None, display_mode="enterprise"
     )
-    held = [
-        HeldCertOut(
-            id=r.id,
-            cert_no=r.cert_no,
-            standards=r.standards,
-            scope_kr=r.scope_kr,
-            valid_from=r.valid_from.isoformat() if r.valid_from else None,
-            valid_until=r.valid_until.isoformat() if r.valid_until else None,
-            status=r.status,
-            issued_at=r.issued_at.isoformat() if r.issued_at else None,
-        )
-        for r in held_rows
-    ]
+    out: List[HeldCertOut] = []
+    for r in rows:
+        last_t = r.get("last_audit_type")
+        cur_t = r.get("current_audit_type")
+        payload = dict(r)
+        payload["last_audit_type_label"] = _audit_type_label(last_t)
+        payload["current_audit_type_label"] = _audit_type_label(cur_t)
+        out.append(HeldCertOut.model_validate(payload))
+    return out
 
+
+class DashboardKpiOut(BaseModel):
+    active_certifications: int = 0
+    next_audit_date: Optional[str] = None
+    next_audit_dday: Optional[int] = None
+    pending_applications: int = 0
+    open_ncrs: int = 0
+
+
+class DashboardTimelineOut(BaseModel):
+    title: Optional[str] = None
+    application_no: Optional[str] = None
+    audit_type: Optional[str] = None
+    standards: List[str] = Field(default_factory=list)
+    cb_name: Optional[str] = None
+    process_step: int = 1
+    stage_step: int = 1
+    status_label: Optional[str] = None
+    stages: List[dict] = Field(default_factory=lambda: DASHBOARD_STAGES)
+
+
+class DashboardTodoOut(BaseModel):
+    id: str
+    title: str
+    due_date: Optional[str] = None
+    dday: Optional[int] = None
+    kind: str = "general"
+    link: Optional[str] = None
+
+
+class DashboardNotifOut(BaseModel):
+    id: int
+    title: str
+    body: Optional[str] = None
+    link: Optional[str] = None
+    sent_at: Optional[str] = None
+    is_read: bool = False
+
+
+class DashboardCertRowOut(BaseModel):
+    id: int
+    standards: str
+    standard_label: Optional[str] = None
+    cb_name: Optional[str] = None
+    valid_until: Optional[str] = None
+    certificate_file_url: Optional[str] = None
+    status: Optional[str] = None
+
+
+class DashboardSummaryResponse(BaseModel):
+    company_id: int
+    company_name: str
+    kpis: DashboardKpiOut
+    timeline: Optional[DashboardTimelineOut] = None
+    held_certificates: List[DashboardCertRowOut] = Field(default_factory=list)
+    todos: List[DashboardTodoOut] = Field(default_factory=list)
+    notifications: List[DashboardNotifOut] = Field(default_factory=list)
+    stages: List[dict] = Field(default_factory=lambda: DASHBOARD_STAGES)
+
+
+def _active_held_count(held: List[HeldCertOut]) -> int:
+    n = 0
+    for c in held:
+        st = (c.status or "").lower()
+        if st in {"withdrawn", "expired", "cancelled", "suspended"}:
+            continue
+        n += 1
+    return n
+
+
+def _collect_applications(db: Session, company_id: int, company_name: str) -> List[CertAppOut]:
+    """Shared application list for cert-status + dashboard (real DB only)."""
     apps: List[CertAppOut] = []
     cb_cache: Dict[int, str] = {}
 
@@ -724,14 +847,17 @@ def get_cert_status(
 
     cert_apps = (
         db.query(CertificationApplications)
-        .filter(CertificationApplications.company_id == cid)
+        .filter(CertificationApplications.company_id == company_id)
         .order_by(CertificationApplications.id.desc())
         .limit(50)
         .all()
     )
     for row in cert_apps:
         step = _step_from_status(row.status)
-        standards = _parse_json_list(row.standards_json)
+        standards = [
+            format_standard_label(s, mode="enterprise") or s
+            for s in _parse_json_list(row.standards_json)
+        ]
         apps.append(
             CertAppOut(
                 id=row.id,
@@ -739,8 +865,8 @@ def get_cert_status(
                 application_no=row.application_no,
                 cb_id=row.cb_id,
                 cb_name=cb_name(row.cb_id),
-                company_name=company.name,
-                audit_type=_audit_type_label(row.application_type),
+                company_name=company_name,
+                audit_type=_audit_type_label(row.application_type) or "심사",
                 standards=standards,
                 status=row.status,
                 status_label=_status_label(row.status, step),
@@ -753,17 +879,18 @@ def get_cert_status(
             )
         )
 
-    # audit_requests fallback / supplement
     seen_nos = {a.application_no for a in apps if a.application_no}
     reqs = (
         db.query(AuditRequest)
-        .filter(AuditRequest.company_id == cid)
+        .filter(AuditRequest.company_id == company_id)
         .order_by(AuditRequest.id.desc())
         .limit(50)
         .all()
     )
     for row in reqs:
-        app_no = getattr(row, "application_no", None) or f"APP-{row.created_at.strftime('%Y%m%d') if row.created_at else '----'}-{row.id:04d}"
+        app_no = getattr(row, "application_no", None) or (
+            f"APP-{row.created_at.strftime('%Y%m%d') if row.created_at else '----'}-{row.id:04d}"
+        )
         if app_no in seen_nos:
             continue
         step = _step_from_status(row.status, getattr(row, "process_step", None))
@@ -774,8 +901,8 @@ def get_cert_status(
                 application_no=app_no,
                 cb_id=row.cb_id,
                 cb_name=cb_name(row.cb_id),
-                company_name=company.name,
-                audit_type=_audit_type_label(row.audit_type),
+                company_name=company_name,
+                audit_type=_audit_type_label(row.audit_type) or "심사",
                 standards=_parse_json_list(row.iso_standards),
                 status=row.status,
                 status_label=_status_label(row.status, step),
@@ -792,12 +919,10 @@ def get_cert_status(
             )
         )
 
-
-    # enterprise_audit_applications (MD snapshot history)
     _STATUS_STEP = {"SUBMITTED": 1, "REVIEWING": 2, "PROPOSED": 3, "CONTRACTED": 4}
     eaa_rows = (
         db.query(EnterpriseAuditApplication)
-        .filter(EnterpriseAuditApplication.enterprise_id == cid)
+        .filter(EnterpriseAuditApplication.enterprise_id == company_id)
         .order_by(EnterpriseAuditApplication.application_id.desc())
         .limit(50)
         .all()
@@ -812,17 +937,40 @@ def get_cert_status(
                 application_no=f"MD-{row.application_id:05d}",
                 cb_id=row.cb_id,
                 cb_name=cb_name(row.cb_id),
-                company_name=company.name,
-                audit_type=_audit_type_label(row.audit_type),
+                company_name=company_name,
+                audit_type=_audit_type_label(row.audit_type) or "심사",
                 standards=[str(s) for s in stds],
                 status=row.status,
-                status_label={"SUBMITTED": "제출", "REVIEWING": "검토중", "PROPOSED": "제안", "CONTRACTED": "계약"}.get(row.status, row.status),
+                status_label={
+                    "SUBMITTED": "제출",
+                    "REVIEWING": "검토중",
+                    "PROPOSED": "제안",
+                    "CONTRACTED": "계약",
+                }.get(row.status, row.status),
                 process_step=step,
                 preferred_start_date=None,
                 submitted_at=row.created_at.isoformat() if row.created_at else None,
                 steps=PROCESS_STEPS,
             )
         )
+    return apps
+
+
+@router.get("/cert-status", response_model=CertStatusResponse)
+def get_cert_status(
+    company_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """보유 인증 + 인증 신청 관리(7단계 스테퍼)."""
+    require_enterprise_user(current_user)
+    cid = resolve_company_id(current_user, company_id)
+    company = db.get(Companies, cid)
+    if not company:
+        raise HTTPException(status_code=404, detail="기업 정보를 찾을 수 없습니다.")
+
+    held = _build_held_certificates(db, cid)
+    apps = _collect_applications(db, cid, company.name)
 
     return CertStatusResponse(
         company_id=cid,
@@ -830,4 +978,190 @@ def get_cert_status(
         held_certificates=held,
         applications=apps,
         process_steps=PROCESS_STEPS,
+    )
+
+
+@router.get("/dashboard-summary", response_model=DashboardSummaryResponse)
+def get_dashboard_summary(
+    company_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """기업 포털 대시보드 집계 — KPI · 타임라인 · 할 일 · 알림."""
+    require_enterprise_user(current_user)
+    cid = resolve_company_id(current_user, company_id)
+    company = db.get(Companies, cid)
+    if not company:
+        raise HTTPException(status_code=404, detail="기업 정보를 찾을 수 없습니다.")
+
+    held = _build_held_certificates(db, cid)
+    apps = _collect_applications(db, cid, company.name)
+    today = date.today()
+
+    # Next audit date: earliest preferred_start / contract period / cert-driven current
+    next_date: Optional[date] = None
+    for a in apps:
+        if a.process_step >= 7:
+            continue
+        if a.preferred_start_date:
+            try:
+                d = date.fromisoformat(a.preferred_start_date[:10])
+                if d >= today and (next_date is None or d < next_date):
+                    next_date = d
+            except ValueError:
+                pass
+    try:
+        contracts = (
+            db.query(Contracts)
+            .filter(Contracts.company_id == cid)
+            .filter(Contracts.status.notin_(["closed", "cancelled", "completed", "expired"]))
+            .all()
+        )
+        for c in contracts:
+            d = c.audit_period_start
+            if d and d >= today and (next_date is None or d < next_date):
+                next_date = d
+    except Exception:  # noqa: BLE001
+        logger.exception("dashboard contracts soft-fail company_id=%s", cid)
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
+    pending = sum(1 for a in apps if (a.status or "") in _PENDING_APP and a.process_step < 7)
+
+    open_ncrs = 0
+    ncr_rows: List[AuditNcrs] = []
+    try:
+        ncr_rows = (
+            db.query(AuditNcrs)
+            .join(Contracts, Contracts.id == AuditNcrs.contract_id)
+            .filter(Contracts.company_id == cid)
+            .order_by(AuditNcrs.id.desc())
+            .limit(100)
+            .all()
+        )
+        open_ncrs = sum(1 for r in ncr_rows if (r.status or "") in _OPEN_NCR)
+    except Exception:  # noqa: BLE001
+        logger.exception("dashboard ncr soft-fail company_id=%s", cid)
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
+    dday = (next_date - today).days if next_date else None
+    kpis = DashboardKpiOut(
+        active_certifications=_active_held_count(held),
+        next_audit_date=next_date.isoformat() if next_date else None,
+        next_audit_dday=dday,
+        pending_applications=pending,
+        open_ncrs=open_ncrs,
+    )
+
+    # In-progress timeline — first non-closed application
+    timeline: Optional[DashboardTimelineOut] = None
+    for a in apps:
+        if a.process_step >= 7:
+            continue
+        stage = _dashboard_stage_from_process(a.process_step)
+        timeline = DashboardTimelineOut(
+            title=a.cb_name or a.company_name or "진행 중인 심사",
+            application_no=a.application_no,
+            audit_type=a.audit_type,
+            standards=a.standards or [],
+            cb_name=a.cb_name,
+            process_step=a.process_step,
+            stage_step=stage,
+            status_label=a.status_label,
+            stages=DASHBOARD_STAGES,
+        )
+        break
+
+    cert_rows = [
+        DashboardCertRowOut(
+            id=c.id,
+            standards=c.standards,
+            standard_label=c.standard_label,
+            cb_name=c.cb_name,
+            valid_until=c.valid_until,
+            certificate_file_url=c.certificate_file_url,
+            status=c.status,
+        )
+        for c in held
+    ]
+
+    todos: List[DashboardTodoOut] = []
+    for a in apps:
+        if (a.status or "").lower() in {"need_fix", "보완"}:
+            due = a.preferred_start_date
+            td: Optional[int] = None
+            if due:
+                try:
+                    td = (date.fromisoformat(due[:10]) - today).days
+                except ValueError:
+                    td = None
+            todos.append(
+                DashboardTodoOut(
+                    id=f"app-{a.source}-{a.id}",
+                    title=f"서류 보완 — {a.application_no or a.id}",
+                    due_date=due,
+                    dday=td,
+                    kind="doc_revision",
+                    link="#cert-apply",
+                )
+            )
+    for r in ncr_rows:
+        if (r.status or "") not in _OPEN_NCR:
+            continue
+        due = r.due_date.isoformat() if r.due_date else None
+        td = (r.due_date - today).days if r.due_date else None
+        todos.append(
+            DashboardTodoOut(
+                id=f"ncr-{r.id}",
+                title=f"시정조치 제출 — NCR #{r.id}",
+                due_date=due,
+                dday=td,
+                kind="ncr",
+                link="#ncr",
+            )
+        )
+    todos = todos[:8]
+
+    notifs: List[DashboardNotifOut] = []
+    try:
+        uid = int(current_user.id)
+        rows = (
+            db.query(Notifications)
+            .filter(Notifications.user_id == uid)
+            .order_by(Notifications.sent_at.desc())
+            .limit(10)
+            .all()
+        )
+        for n in rows:
+            notifs.append(
+                DashboardNotifOut(
+                    id=n.id,
+                    title=n.title,
+                    body=n.body,
+                    link=n.link,
+                    sent_at=n.sent_at.isoformat() if n.sent_at else None,
+                    is_read=bool(n.is_read),
+                )
+            )
+    except Exception:  # noqa: BLE001
+        logger.exception("dashboard notifications soft-fail")
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
+    return DashboardSummaryResponse(
+        company_id=cid,
+        company_name=company.name,
+        kpis=kpis,
+        timeline=timeline,
+        held_certificates=cert_rows,
+        todos=todos,
+        notifications=notifs,
+        stages=DASHBOARD_STAGES,
     )

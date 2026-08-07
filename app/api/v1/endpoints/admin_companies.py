@@ -21,16 +21,21 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import CurrentUser, get_current_admin_user
 from app.models.company import Companies
+from app.api.v1.endpoints.esg_master_kpis import fetch_company_esg_portal
+from app.schemas.esg_master_kpi import EsgMasterKpiPortalListResponse
 from app.services import company_org as org
-from app.services.company_held_certs import list_company_held_standards
+from app.services.company_held_certs import (
+    company_held_standard_labels,
+    list_company_held_cert_status,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def _held_standards_safe(db: Session, company_id: int) -> List[Dict[str, Any]]:
-    """Platform admin: full held standards (all CBs). Soft-fail → []."""
+    """Platform admin: full held standards + expiry fields (all CBs). Soft-fail → []."""
     try:
-        return list_company_held_standards(
+        return list_company_held_cert_status(
             db, int(company_id), cb_id=None, display_mode="admin_company"
         )
     except Exception:
@@ -315,6 +320,42 @@ def get_company_detail(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"기업 상세 조회에 실패했습니다: {exc.__class__.__name__}",
         ) from exc
+
+
+@router.get(
+    "/{company_id}/esg-kpis",
+    response_model=EsgMasterKpiPortalListResponse,
+)
+def get_company_esg_kpis(
+    company_id: int,
+    esg_category: Optional[str] = Query(None, description="E | S | G"),
+    managed_standard_name: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    held_only: bool = Query(False),
+    source_mode: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_admin_user),
+) -> EsgMasterKpiPortalListResponse:
+    """Admin RO — Enterprise와 동일 ESG KPI 스키마 (쓰기 없음)."""
+    _ = current_user
+    org.get_company_or_404(db, company_id)
+    held = company_held_standard_labels(
+        db, company_id, cb_id=None, display_mode="admin_company"
+    )
+    return fetch_company_esg_portal(
+        db,
+        company_id,
+        held_labels=held,
+        esg_category=esg_category,
+        managed_standard_name=managed_standard_name,
+        q=q,
+        held_only=held_only,
+        source_mode=source_mode,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.put("/{company_id}")

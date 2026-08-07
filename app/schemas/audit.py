@@ -556,6 +556,12 @@ class AuditPlanItemsBase(BaseModel):
     auditor_name: Optional[str] = None
     note: Optional[str] = None
     sort_order: Optional[int] = None
+    auditor_id: Optional[int] = None
+    process_group_id: Optional[str] = None
+    clause_no: Optional[str] = None
+    dept: Optional[str] = None
+    standard_code: Optional[str] = None
+    standard_key: Optional[str] = None
 
 
 class AuditPlanItemsCreate(AuditPlanItemsBase):
@@ -572,6 +578,12 @@ class AuditPlanItemsUpdate(BaseModel):
     auditor_name: Optional[str] = None
     note: Optional[str] = None
     sort_order: Optional[int] = None
+    auditor_id: Optional[int] = None
+    process_group_id: Optional[str] = None
+    clause_no: Optional[str] = None
+    dept: Optional[str] = None
+    standard_code: Optional[str] = None
+    standard_key: Optional[str] = None
 
 
 class AuditPlanItemsResponse(AuditPlanItemsBase):

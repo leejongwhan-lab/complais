@@ -554,7 +554,7 @@ body.embed .wrap{max-width:none;padding:16px}
 @media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}.wrap{padding:16px}}
 @media(max-width:900px){.doc-shell{padding:22px 16px}.doc-grid-2,.md-adjust-grid,.md-summary-list,.md-factor-wrap{grid-template-columns:1fr}.doc-kv{grid-template-columns:1fr}.doc-table th{width:120px}.doc-title{font-size:24px;letter-spacing:.08em}.doc-table-wide,.doc-table-sites{table-layout:auto}}
 </style>
-<link rel="stylesheet" href="complais_readability.css">
+<link rel="stylesheet" href="/complais_readability.css">
 </head>
 <body class="<?= $embed ? 'embed' : '' ?>">
 <div class="wrap">

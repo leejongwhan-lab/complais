@@ -72,6 +72,9 @@ class Users(Base):
     cb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     company_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    ci_key: Mapped[Optional[str]] = mapped_column(
+        String(128), nullable=True, comment="본인인증 CI (PortOne/Kakao/Naver)"
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

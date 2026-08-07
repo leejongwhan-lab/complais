@@ -26,7 +26,7 @@ from app.models.company import Companies
 from app.models.contract import Contracts
 from app.models.enterprise_audit_application import Application
 from app.models.enums import AuditorSettlementsStatus
-from app.services.company_held_certs import list_company_held_standards
+from app.services.company_held_certs import list_company_held_cert_status
 from app.schemas.cb_portal import (
     AuditTypeBreakdown,
     AuditorQueueSummary,
@@ -777,7 +777,7 @@ def list_cb_companies(
             item = CompanySummaryResponse.model_validate(c)
             try:
                 # CB portal: only standards this CB audits/certifies for the company
-                item.held_standards = list_company_held_standards(
+                item.held_standards = list_company_held_cert_status(
                     db, int(c.id), cb_id=cb_id, display_mode="cb"
                 )
             except Exception:
@@ -814,7 +814,7 @@ def get_cb_company_detail(
     try:
         detail = org.build_company_org_detail(db, company_id, headcount_year)
         try:
-            detail["held_standards"] = list_company_held_standards(
+            detail["held_standards"] = list_company_held_cert_status(
                 db, company_id, cb_id=cb_id, display_mode="cb"
             )
         except Exception:

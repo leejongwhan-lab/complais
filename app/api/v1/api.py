@@ -12,6 +12,8 @@ from app.api.v1.endpoints import (
     assignments,
     auditor_masters,
     auditor_memberships,
+    auditor_portal,
+    auditor_audit_notes,
     auditors,
     auth,
     audit_request,
@@ -30,6 +32,7 @@ from app.api.v1.endpoints import (
     contracts,
     enterprise_audit_applications,
     enterprise_cert_applications,
+    emission_factors,
     enterprise_portal,
     esg_master_kpis,
     mappings,
@@ -55,6 +58,8 @@ api_router.include_router(enterprise_portal.router)
 api_router.include_router(enterprise_audit_applications.router)
 api_router.include_router(esg_master_kpis.user_router)
 api_router.include_router(esg_master_kpis.admin_router)
+api_router.include_router(emission_factors.user_router)
+api_router.include_router(emission_factors.admin_router)
 api_router.include_router(archive.router)
 api_router.include_router(ncr.router)
 api_router.include_router(approval.router)
@@ -71,6 +76,8 @@ api_router.include_router(assignments.router)
 api_router.include_router(auditors.router)
 api_router.include_router(auditor_masters.router)
 api_router.include_router(auditor_memberships.router)
+api_router.include_router(auditor_portal.router)
+api_router.include_router(auditor_audit_notes.router)
 api_router.include_router(cb_auditors.router)
 api_router.include_router(accreditation_masters.router)
 api_router.include_router(cb_profile.router)

@@ -9,3 +9,6 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 app/main-JW*.py
+
+# Reference seed spreadsheets (local only, do not commit)
+data/*.xlsx

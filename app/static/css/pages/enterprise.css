@@ -529,17 +529,18 @@ table.esg-kpi-table td.num {
 .ep-section-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin: 0;
-  font: var(--font-h3, 1.05rem/1.35 inherit);
-  font-weight: 700;
-  color: var(--font-primary, #222);
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: #1E293B;
 }
 .ep-section-title .ep-mark {
-  width: 10px;
-  height: 10px;
+  width: 3px;
+  height: 14px;
   border-radius: 2px;
-  background: #f59e0b;
+  background: var(--admin-primary, #2F6B4F);
   flex: 0 0 auto;
 }
 .ep-section-note {
@@ -559,9 +560,9 @@ table.esg-kpi-table td.num {
 .ep-full { grid-column: 1 / -1; }
 .ep-field label {
   display: block;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--font-primary, #222);
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
   margin-bottom: 6px;
 }
 .ep-field label .req { color: #dc2626; margin-left: 2px; }
@@ -573,9 +574,10 @@ table.esg-kpi-table td.num {
   border: 1px solid #d8d8d4;
   border-radius: 8px;
   box-sizing: border-box;
-  font: var(--font-body-small, 14px/1.45 inherit);
+  font-size: 13px;
+  line-height: 1.45;
   background: #fff;
-  color: var(--font-primary, #222);
+  color: #1E293B;
 }
 .ep-field input.api-filled,
 .ep-field select.api-filled,
@@ -790,6 +792,157 @@ button.btn-navy:hover { background: #16304f; }
   background: #fff;
 }
 .held-cert-card h4 { margin: 0 0 6px; font-size: 0.92rem; }
+.held-cert-card.is-expiring {
+  border-color: #e2c48a;
+  background: #fffaf2;
+}
+.held-cert-meta {
+  margin: 0;
+  display: grid;
+  gap: 4px 10px;
+  font-size: 0.82rem;
+}
+.held-cert-meta > div {
+  display: grid;
+  grid-template-columns: 7.5em 1fr;
+  gap: 6px;
+}
+.held-cert-meta dt {
+  margin: 0;
+  color: #6b7280;
+  font-weight: 500;
+}
+.held-cert-meta dd {
+  margin: 0;
+  color: #1f2937;
+}
+.held-cert-expiry-notice {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid #c9a227;
+  background: rgba(201, 162, 39, 0.08);
+  color: #5c4a12;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+/* —— Enterprise dashboard composition —— */
+.ent-dash { padding: 22px 22px 28px; }
+.ent-dash-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.ent-kpi-grid { margin-bottom: 20px; }
+body.enterprise-page .ent-kpi {
+  background: linear-gradient(180deg, #ffffff 0%, #f7f8f6 100%);
+  border: 1px solid var(--gray-line-2, #eee);
+  box-shadow: none;
+}
+body.enterprise-page .ent-kpi .value {
+  font-family: "Pretendard", "Apple SD Gothic Neo", sans-serif;
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--font-primary, #222);
+}
+body.enterprise-page .ent-kpi .label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8rem;
+  color: var(--font-secondary, #666);
+}
+.ent-kpi-sub { margin: 4px 0 0; font-size: 0.75rem; }
+
+.ent-dash-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(240px, 0.9fr);
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .ent-dash-layout { grid-template-columns: 1fr; }
+}
+.ent-dash-main,
+.ent-dash-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.ent-dash-block {
+  border: 1px solid var(--gray-line-2, #eee);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: #fff;
+}
+.ent-dash-block-title {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--font-primary, #222);
+}
+.ent-tl-meta { margin-bottom: 12px; }
+.ent-tl-stepper {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+@media (max-width: 640px) {
+  .ent-tl-stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.ent-cert-table th,
+.ent-cert-table td { font-size: 0.86rem; }
+.ent-pdf-btn {
+  padding: 6px 10px !important;
+  font-size: 0.78rem !important;
+}
+.ent-todo-list,
+.ent-notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ent-todo-list li a {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  text-decoration: none;
+  color: inherit;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0ec;
+}
+.ent-todo-list li:last-child a,
+.ent-notif-list li:last-child { border-bottom: 0; }
+.ent-todo-title { font-size: 0.88rem; font-weight: 600; }
+.ent-todo-dday {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #b45309;
+  white-space: nowrap;
+}
+.ent-notif-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0ec;
+  font-size: 0.86rem;
+}
+.ent-quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ent-quick-actions .btn,
+.ent-quick-actions a.ghost,
+.ent-quick-actions button {
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
 
 /* Archive years */
 .archive-year {
@@ -837,7 +990,8 @@ button.btn-navy:hover { background: #16304f; }
 }
 
 /* Admin shell alignment (enterprise uses admin-sidebar + admin-main) */
-body.enterprise-portal-page .admin-main {
+body.enterprise-portal-page .admin-main,
+body.enterprise-page .admin-main {
   min-width: 0;
 }
 body.enterprise-portal-page .ep-field input,
@@ -845,30 +999,293 @@ body.enterprise-portal-page .ep-field select,
 body.enterprise-portal-page .ep-field textarea,
 body.enterprise-portal-page .field input,
 body.enterprise-portal-page .field select,
-body.enterprise-portal-page .field textarea {
+body.enterprise-portal-page .field textarea,
+body.enterprise-page .ep-field input,
+body.enterprise-page .ep-field select,
+body.enterprise-page .ep-field textarea,
+body.enterprise-page .field input,
+body.enterprise-page .field select,
+body.enterprise-page .field textarea {
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--admin-border, #E8ECE9);
   border-radius: var(--admin-radius, 8px);
   padding: 8px 10px;
-  font: inherit;
+  font-size: 13px;
   background: var(--admin-surface, #fff);
-  color: var(--admin-ink, #1E2A24);
+  color: #1E293B;
 }
 body.enterprise-portal-page .ep-field input:focus,
 body.enterprise-portal-page .ep-field select:focus,
 body.enterprise-portal-page .ep-field textarea:focus,
 body.enterprise-portal-page .field input:focus,
 body.enterprise-portal-page .field select:focus,
-body.enterprise-portal-page .field textarea:focus {
+body.enterprise-portal-page .field textarea:focus,
+body.enterprise-page .ep-field input:focus,
+body.enterprise-page .ep-field select:focus,
+body.enterprise-page .ep-field textarea:focus,
+body.enterprise-page .field input:focus,
+body.enterprise-page .field select:focus,
+body.enterprise-page .field textarea:focus {
   outline: none;
   border-color: var(--admin-primary, #2F6B4F);
   box-shadow: 0 0 0 3px var(--admin-primary-soft, rgba(47, 107, 79, 0.15));
 }
-body.enterprise-portal-page .card {
+body.enterprise-portal-page .card,
+body.enterprise-page .card {
   background: var(--admin-surface, #fff);
   border: 1px solid var(--admin-border, #E8ECE9);
   border-radius: var(--admin-radius-lg, 12px);
   padding: 16px 18px;
   margin-bottom: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Enterprise portal typography (Pretendard B2B SaaS)
+   Scope: body.enterprise-page / .enterprise-portal-page / .ent-cert-page
+   -------------------------------------------------------------------------- */
+body.enterprise-page,
+body.enterprise-portal-page,
+body.ent-cert-page {
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo",
+    "Noto Sans KR", "Malgun Gothic", sans-serif;
+  word-break: keep-all;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.enterprise-page .admin-sidebar,
+body.enterprise-portal-page .admin-sidebar,
+body.enterprise-page .ent-shell,
+body.enterprise-portal-page .ent-shell {
+  font-family: inherit;
+}
+
+/* Sidebar — company name */
+body.enterprise-page .sidebar-profile-name,
+body.enterprise-portal-page .sidebar-profile-name,
+body.enterprise-page #sidebar-company-name,
+body.enterprise-portal-page #sidebar-company-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #0F172A;
+  word-break: keep-all;
+}
+
+body.enterprise-page .sidebar-profile-code,
+body.enterprise-portal-page .sidebar-profile-code {
+  margin: 2px 0 8px;
+  font-size: 12px;
+  color: #64748B;
+}
+
+/* Sidebar — held standards / other cert lines */
+body.enterprise-page .sidebar-std-label,
+body.enterprise-portal-page .sidebar-std-label {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94A3B8;
+  letter-spacing: 0.02em;
+}
+
+body.enterprise-page .sidebar-held-list,
+body.enterprise-portal-page .sidebar-held-list,
+body.enterprise-page .sidebar-badges,
+body.enterprise-portal-page .sidebar-badges {
+  display: block;
+  margin: 0 0 12px;
+  min-height: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748B;
+  word-break: keep-all;
+}
+
+body.enterprise-page .sidebar-held-line,
+body.enterprise-portal-page .sidebar-held-line {
+  display: block;
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748B;
+  word-break: keep-all;
+}
+
+body.enterprise-page .sidebar-held-line:last-child,
+body.enterprise-portal-page .sidebar-held-line:last-child {
+  margin-bottom: 0;
+}
+
+body.enterprise-page .sidebar-held-line.empty,
+body.enterprise-portal-page .sidebar-held-line.empty,
+body.enterprise-page .sidebar-badge.empty,
+body.enterprise-portal-page .sidebar-badge.empty {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #94A3B8;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+/* Keep legacy badge chips readable if still rendered */
+body.enterprise-page .sidebar-badge:not(.empty),
+body.enterprise-portal-page .sidebar-badge:not(.empty) {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #64748B;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: normal;
+  word-break: keep-all;
+}
+
+/* Sidebar — menu group titles */
+body.enterprise-page .sidebar-group-label,
+body.enterprise-portal-page .sidebar-group-label,
+body.enterprise-page .side-group-label,
+body.enterprise-portal-page .side-group-label {
+  margin: 16px 0 6px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #94A3B8;
+}
+
+body.enterprise-page .sidebar-group-label:first-of-type,
+body.enterprise-portal-page .sidebar-group-label:first-of-type {
+  margin-top: 8px;
+}
+
+/* Sidebar — menu links */
+body.enterprise-page .sidebar-menu-item,
+body.enterprise-portal-page .sidebar-menu-item,
+body.enterprise-page .side-link,
+body.enterprise-portal-page .side-link {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #334155;
+  padding: 8px 12px;
+}
+
+body.enterprise-page .sidebar-menu-item.active,
+body.enterprise-portal-page .sidebar-menu-item.active,
+body.enterprise-page .side-link.active,
+body.enterprise-portal-page .side-link.active {
+  font-weight: 600;
+  color: var(--admin-primary, #2F6B4F);
+}
+
+/* Main title / subtitle */
+body.enterprise-page .cb-page-header h1,
+body.enterprise-portal-page .cb-page-header h1,
+body.enterprise-page #page-title,
+body.enterprise-portal-page #page-title,
+body.enterprise-page .topbar h1,
+body.enterprise-portal-page .topbar h1,
+body.ent-cert-page .hdr h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #0F172A;
+  letter-spacing: -0.02em;
+}
+
+body.enterprise-page .cb-page-header #page-sub,
+body.enterprise-portal-page .cb-page-header #page-sub,
+body.enterprise-page .cb-page-header .muted,
+body.enterprise-portal-page .cb-page-header .muted,
+body.enterprise-page #page-sub,
+body.enterprise-portal-page #page-sub,
+body.enterprise-page .topbar .muted,
+body.enterprise-portal-page .topbar .muted,
+body.ent-cert-page .hdr .sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: #64748B;
+}
+
+/* Section headers (card-level h2 without ep-mark) */
+body.enterprise-page .card > h2,
+body.enterprise-portal-page .card > h2,
+body.ent-cert-page .chd {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+body.ent-cert-page .chd {
+  border-left: 3px solid var(--admin-primary, #2F6B4F);
+  padding-left: 14px;
+}
+
+/* Form labels / controls (keep 160px / 38px grid from style.css) */
+body.enterprise-page .portal-form .ep-field > label,
+body.enterprise-portal-page .portal-form .ep-field > label,
+body.enterprise-page .portal-form .ff > label,
+body.enterprise-portal-page .portal-form .ff > label,
+body.enterprise-page .portal-form .form-row > label,
+body.enterprise-portal-page .portal-form .form-row > label,
+body.enterprise-page .field label,
+body.enterprise-portal-page .field label,
+body.ent-cert-page .ff > label,
+body.ent-cert-page .form-row > label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+body.enterprise-page .portal-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body.enterprise-page .portal-form select,
+body.enterprise-page .portal-form textarea,
+body.enterprise-portal-page .portal-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body.enterprise-portal-page .portal-form select,
+body.enterprise-portal-page .portal-form textarea,
+body.ent-cert-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+body.ent-cert-page select,
+body.ent-cert-page textarea,
+body.ent-cert-page .form-input {
+  font-size: 13px;
+  color: #1E293B;
+}
+
+/* Dynamic ISO questionnaire / aspects (all standards inherit) */
+body.ent-cert-page .form-group.q-row {
+  margin-bottom: 0;
+}
+body.ent-cert-page .checkbox-group,
+body.ent-cert-page .radio-group,
+body.ent-cert-page .radios,
+body.ent-cert-page .aspect-chips.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+}
+body.ent-cert-page .checkbox-group label,
+body.ent-cert-page .radio-group label,
+body.ent-cert-page .radios label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  white-space: nowrap;
 }

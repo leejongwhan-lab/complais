@@ -197,6 +197,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (tabName === "dashboard") {
       await loadDashboardStats();
+      return;
+    }
+    if (tabName === "calc-rules") {
+      await loadEmissionFactors();
     }
   }
 
@@ -369,6 +373,12 @@ document.addEventListener("DOMContentLoaded", () => {
   let draftDepartments = [];
   let draftSites = [];
   let draftStaff = [];
+  let adminEsgPage = 0;
+  let adminEsgLimit = 50;
+  let adminEsgTotal = 0;
+  let adminEsgYears = [];
+  let adminEsgStdLoaded = false;
+  let adminEsgLoadedFor = null;
 
   function openCompanyDetailModal() {
     const modal = document.getElementById("companyDetailModal");
@@ -465,13 +475,232 @@ document.addEventListener("DOMContentLoaded", () => {
     return res.json();
   }
 
+  function resetAdminEsgPanel() {
+    adminEsgPage = 0;
+    adminEsgTotal = 0;
+    adminEsgYears = [];
+    adminEsgStdLoaded = false;
+    adminEsgLoadedFor = null;
+    const tabCount = document.getElementById("ac-esg-tab-count");
+    if (tabCount) tabCount.textContent = "";
+    const meta = document.getElementById("ac-esg-meta");
+    if (meta) meta.textContent = "";
+    const tbody = document.getElementById("ac-esg-tbody");
+    if (tbody) {
+      tbody.innerHTML =
+        '<tr><td colspan="10" class="muted">불러오는 중…</td></tr>';
+    }
+    const pag = document.getElementById("ac-esg-pagination");
+    if (pag) pag.innerHTML = "";
+    setOrgMsg("ac-esg-msg", "");
+  }
+
+  function adminEsgPathLabel(row) {
+    if (row?.data_path_label) return row.data_path_label;
+    if (row?.input_mode === "public") return "공공연동";
+    if (row?.input_mode === "auditor") return "심사노트";
+    if (row?.input_mode === "company") return "직접입력";
+    return "—";
+  }
+
+  function adminEsgFmtVal(v) {
+    if (v == null || v === "") return '<span class="ac-esg-empty">-</span>';
+    return escapeHtml(String(v));
+  }
+
+  function adminEsgTrendHtml(trend) {
+    if (!trend || trend.pct == null) return '<span class="ac-esg-empty">-</span>';
+    const dir = trend.direction || "flat";
+    const arrow = dir === "up" ? "↑" : dir === "down" ? "↓" : "→";
+    return `<span class="ac-esg-trend ${escapeHtml(dir)}">${arrow} ${escapeHtml(trend.pct)}%</span>`;
+  }
+
+  function fillAdminEsgStdOptions(standards) {
+    const sel = document.getElementById("ac-esg-std");
+    if (!sel || !Array.isArray(standards)) return;
+    const current = sel.value;
+    sel.innerHTML =
+      '<option value="">전체</option>' +
+      standards.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+    if (current && standards.includes(current)) sel.value = current;
+    adminEsgStdLoaded = true;
+  }
+
+  function updateAdminEsgThead(years) {
+    const thead = document.getElementById("ac-esg-thead");
+    if (!thead) return;
+    const y = years?.length ? years : adminEsgYears;
+    if (!y?.length) return;
+    adminEsgYears = y;
+    thead.innerHTML = `<tr>
+      <th class="ac-esg-col-kpi">KPI 지표</th>
+      <th class="ac-esg-col-path">경로</th>
+      <th class="ac-esg-col-unit">단위</th>
+      ${y.map((yr) => `<th class="ac-esg-col-year">${yr}년</th>`).join("")}
+      <th class="ac-esg-col-trend">추세</th>
+      <th class="ac-esg-col-goal">목표</th>
+    </tr>`;
+  }
+
+  function renderAdminEsgRows(rows, years) {
+    const groups = new Map();
+    rows.forEach((row) => {
+      const key = row.sub_category || "미분류";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    });
+    let html = "";
+    const colSpan = 3 + years.length + 2;
+    for (const [sub, items] of groups) {
+      html += `<tr class="ac-esg-group-row"><td colspan="${colSpan}"><strong>${escapeHtml(sub)}</strong> <span class="ac-esg-group-count">(${items.length})</span></td></tr>`;
+      items.forEach((row) => {
+        const yearCells = years
+          .map((yr) => {
+            const v = row.year_values ? row.year_values[String(yr)] : null;
+            return `<td class="ac-esg-col-year num">${adminEsgFmtVal(v)}</td>`;
+          })
+          .join("");
+        const goal =
+          row.goal_value != null && row.goal_value !== ""
+            ? escapeHtml(row.goal_value)
+            : '<span class="ac-esg-empty">-</span>';
+        html += `<tr class="ac-esg-data-row">
+          <td class="ac-esg-col-kpi">
+            <div class="ac-esg-kpi-cell">
+              <span class="ac-esg-kpi-code">${escapeHtml(row.kpi_code || row.esg_category || "")}</span>
+              <span class="ac-esg-kpi-name">${escapeHtml(row.kpi_name || "—")}</span>
+              ${row.is_required ? '<span class="ac-esg-req">필수</span>' : ""}
+            </div>
+          </td>
+          <td class="ac-esg-col-path">${escapeHtml(adminEsgPathLabel(row))}</td>
+          <td class="ac-esg-col-unit">${escapeHtml(row.unit_format || "-")}</td>
+          ${yearCells}
+          <td class="ac-esg-col-trend">${adminEsgTrendHtml(row.trend)}</td>
+          <td class="ac-esg-col-goal">${goal}</td>
+        </tr>`;
+      });
+    }
+    return html;
+  }
+
+  function renderAdminEsgPagination() {
+    const box = document.getElementById("ac-esg-pagination");
+    if (!box) return;
+    const pages = Math.max(1, Math.ceil(adminEsgTotal / adminEsgLimit));
+    const cur = adminEsgPage;
+    if (adminEsgTotal <= adminEsgLimit) {
+      box.innerHTML = "";
+      return;
+    }
+    let html = `<button type="button" data-ac-esg-page="${cur - 1}" ${cur <= 0 ? "disabled" : ""}>이전</button>`;
+    const start = Math.max(0, cur - 2);
+    const end = Math.min(pages - 1, start + 4);
+    for (let i = start; i <= end; i++) {
+      html += `<button type="button" class="${i === cur ? "active" : ""}" data-ac-esg-page="${i}">${i + 1}</button>`;
+    }
+    html += `<button type="button" data-ac-esg-page="${cur + 1}" ${cur >= pages - 1 ? "disabled" : ""}>다음</button>`;
+    box.innerHTML = html;
+    box.querySelectorAll("button[data-ac-esg-page]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const p = Number(btn.dataset.acEsgPage);
+        if (Number.isNaN(p) || p < 0 || p >= pages) return;
+        adminEsgPage = p;
+        loadAdminCompanyEsg(false);
+      });
+    });
+  }
+
+  async function loadAdminCompanyEsg(resetPage) {
+    if (!currentCompanyId) return;
+    if (resetPage) adminEsgPage = 0;
+    const tbody = document.getElementById("ac-esg-tbody");
+    const cat = document.getElementById("ac-esg-cat")?.value || "";
+    const std = document.getElementById("ac-esg-std")?.value || "";
+    const mode = document.getElementById("ac-esg-mode")?.value || "";
+    const q = document.getElementById("ac-esg-q")?.value.trim() || "";
+    const heldOnly = !!document.getElementById("ac-esg-held-only")?.checked;
+    const params = new URLSearchParams({
+      skip: String(adminEsgPage * adminEsgLimit),
+      limit: String(adminEsgLimit),
+    });
+    if (cat) params.set("esg_category", cat);
+    if (std) params.set("managed_standard_name", std);
+    if (mode) params.set("source_mode", mode);
+    if (q) params.set("q", q);
+    if (heldOnly) params.set("held_only", "true");
+
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="10" class="muted">불러오는 중…</td></tr>';
+    }
+    setOrgMsg("ac-esg-msg", "");
+
+    try {
+      const res = await authFetch(
+        `${API_BASE}/admin/companies/${currentCompanyId}/esg-kpis?${params}`,
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data.detail === "string" ? data.detail : `ESG 조회 실패 (HTTP ${res.status})`,
+        );
+      }
+
+      adminEsgTotal = data.total || 0;
+      adminEsgLoadedFor = currentCompanyId;
+      const tabCount = document.getElementById("ac-esg-tab-count");
+      if (tabCount) tabCount.textContent = adminEsgTotal ? `(${adminEsgTotal})` : "(0)";
+
+      if (!adminEsgStdLoaded && data.available_standards?.length) {
+        fillAdminEsgStdOptions(data.available_standards);
+      }
+
+      const years = data.years?.length
+        ? data.years
+        : Array.from({ length: 5 }, (_, i) => (data.current_year || new Date().getFullYear()) - 4 + i);
+      updateAdminEsgThead(years);
+
+      const held = (data.held_standards || []).join(", ") || "없음";
+      const srcHint = data.data_source === "kpi_master" ? " · 출처 kpi_master" : "";
+      const from = adminEsgTotal ? adminEsgPage * adminEsgLimit + 1 : 0;
+      const to = Math.min((adminEsgPage + 1) * adminEsgLimit, adminEsgTotal);
+      let metaText = data.matched_to_held
+        ? `보유 표준(${held}) 매칭 · ${from}–${to} / ${adminEsgTotal}`
+        : `전체 카탈로그 · ${from}–${to} / ${adminEsgTotal}`;
+      if (data.notice) metaText = data.notice;
+      const meta = document.getElementById("ac-esg-meta");
+      if (meta) meta.textContent = metaText + (data.notice ? "" : srcHint);
+
+      if (!tbody) return;
+      if (!data.data?.length) {
+        const emptyMsg =
+          data.notice ||
+          (heldOnly
+            ? "보유 표준에 매칭되는 KPI가 없습니다. 필터를 해제해 보세요."
+            : "조회된 ESG KPI가 없습니다.");
+        tbody.innerHTML = `<tr><td colspan="${3 + years.length + 2}" class="muted">${escapeHtml(emptyMsg)}</td></tr>`;
+        renderAdminEsgPagination();
+        return;
+      }
+      tbody.innerHTML = renderAdminEsgRows(data.data, years);
+      renderAdminEsgPagination();
+    } catch (error) {
+      console.error("Admin ESG load failed:", error);
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="10" class="muted">${escapeHtml(error.message || "ESG 조회 실패")}</td></tr>`;
+      }
+      setOrgMsg("ac-esg-msg", error.message || "ESG 조회 실패", "err");
+    }
+  }
+
   async function openDetailModal(id) {
     const cached = currentCompaniesData.find((item) => item.id === id);
     if (cached) setText("modal-company-title", `${cached.company_name || cached.name} 상세 정보`);
+    resetAdminEsgPanel();
     openCompanyDetailModal();
     try {
       const detail = await fetchCompanyDetail(id);
       bindCompanyDetail(detail);
+      loadAdminCompanyEsg(true);
     } catch (error) {
       console.error("Company detail failed:", error);
       setOrgMsg("ac-basic-msg", error.message || "상세를 불러오지 못했습니다.", "err");
@@ -581,7 +810,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   document.querySelectorAll("#companyDetailTab [data-detail-tab]").forEach((btn) => {
-    btn.addEventListener("click", () => switchCompanyDetailTab(btn.getAttribute("data-detail-tab")));
+    btn.addEventListener("click", () => {
+      const tabId = btn.getAttribute("data-detail-tab");
+      switchCompanyDetailTab(tabId);
+      if (tabId === "esg-info" && currentCompanyId && adminEsgLoadedFor !== currentCompanyId) {
+        loadAdminCompanyEsg(true);
+      }
+    });
+  });
+
+  document.getElementById("ac-esg-search-btn")?.addEventListener("click", () => loadAdminCompanyEsg(true));
+  document.getElementById("ac-esg-q")?.addEventListener("keyup", (e) => {
+    if (e.key === "Enter") loadAdminCompanyEsg(true);
+  });
+  ["ac-esg-cat", "ac-esg-std", "ac-esg-mode", "ac-esg-held-only"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", () => loadAdminCompanyEsg(true));
   });
 
   document.getElementById("admin-company-basic-form")?.addEventListener("submit", async (e) => {
@@ -786,37 +1029,34 @@ document.addEventListener("DOMContentLoaded", () => {
     return map[status] || status || "—";
   }
 
-  function renderMembershipPlain(memberships) {
+  function renderAffiliationsPlain(affiliations, membershipsFallback) {
     const el = document.getElementById("aud-membership-list");
     if (!el) return;
-    if (!memberships.length) {
-      el.textContent = "—";
+    const rows =
+      Array.isArray(affiliations) && affiliations.length
+        ? affiliations
+        : (membershipsFallback || []).map((m) => ({
+            cb_id: m.cb_id,
+            cb_name: m.cb_name,
+            cb_code: m.cb_code,
+            status: m.status,
+            is_primary: m.is_primary,
+          }));
+    if (!rows.length) {
+      el.textContent = "소속 인증기관 없음";
       return;
     }
-    el.innerHTML = memberships
+    // 소속만 표시 — 계약형태·수수료·근무조건 등 계약관계 필드 제외
+    el.innerHTML = rows
       .map((m) => {
         const cbLabel = m.cb_name
           ? `${m.cb_name}${m.cb_code ? ` (${m.cb_code})` : ""}`
           : `CB #${m.cb_id}`;
-        const grade = gradeLabel(m.approved_grade || m.grade_at_cb || m.apply_grade);
-        const standards = m.cert_standards || "—";
-        const iaf = m.approved_iaf_codes || "—";
-        const period =
-          m.qualification_granted_at || m.qualification_expires_at
-            ? `${m.qualification_granted_at || "—"} ~ ${m.qualification_expires_at || "—"}`
-            : "—";
+        const status = membershipStatusLabel(m.status);
+        const primary = m.is_primary ? " · 주소속" : "";
         return `<div class="history-item" style="margin-bottom:8px;">
           <strong>${escapeHtml(cbLabel)}</strong>
-          <small>
-            ${escapeHtml(membershipStatusLabel(m.status))}
-            · 등급 ${escapeHtml(grade)}
-            · 표준 ${escapeHtml(standards)}
-            · IAF ${escapeHtml(iaf)}
-            · 자격기간 ${escapeHtml(period)}
-            ${m.is_primary ? " · 주소속" : ""}
-            · ${escapeHtml(employmentLabel(m.employment_type))}
-            · 프리랜서 ${m.is_freelance ? "예" : "아니오"}
-          </small>
+          <small>${escapeHtml(status)}${primary}</small>
         </div>`;
       })
       .join("");
@@ -930,20 +1170,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "aud-f-freelance",
       profile.is_freelance == null ? "" : profile.is_freelance ? "true" : "false",
     );
-    set("aud-f-contract-type", profile.contract_type);
-    set("aud-f-cb-affiliation", profile.cb_affiliation);
-    const primaryCb =
-      profile.primary_cb_name || profile.primary_cb_code
-        ? `${profile.primary_cb_name || "—"}${profile.primary_cb_code ? ` (${profile.primary_cb_code})` : ""}${profile.primary_cb_id ? ` · #${profile.primary_cb_id}` : ""}`
-        : profile.primary_cb_id
-          ? `#${profile.primary_cb_id}`
-          : "—";
-    setText("aud-f-primary-cb", primaryCb);
-    set("aud-f-income-type", profile.income_type);
-    set("aud-f-commission-type", profile.commission_type);
-    set("aud-f-daily-rate", profile.daily_rate != null ? profile.daily_rate : "");
-    set("aud-f-fee-ratio", profile.fee_ratio != null ? profile.fee_ratio : "");
-    set("aud-f-monthly-fee", profile.monthly_fee != null ? profile.monthly_fee : "");
+    // 계약관계(계약형태·수수료·주소속 단일표기)는 상세 UI에서 숨김 — 소속은 affiliations 목록 사용
 
     set("aud-f-bank", profile.bank_name);
     set("aud-f-account", profile.account_no);
@@ -970,7 +1197,7 @@ document.addEventListener("DOMContentLoaded", () => {
         subEl.textContent = `${profile.name || "—"} · ${gradeLabel(profile.grade)}`;
       }
       fillAuditorDetailForm(profile);
-      renderMembershipPlain(data.memberships || []);
+      renderAffiliationsPlain(data.affiliations || [], data.memberships || []);
       renderExternalCertsPlain(data.external_certs || []);
       renderEduList(data.educations || []);
       renderCareerList(data.careers || []);
@@ -1012,7 +1239,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const profile = data.profile || {};
     fillAuditorDetailForm(profile);
-    renderMembershipPlain(data.memberships || []);
+    renderAffiliationsPlain(data.affiliations || [], data.memberships || []);
     renderExternalCertsPlain(data.external_certs || []);
     renderEduList(data.educations || []);
     renderCareerList(data.careers || []);
@@ -1186,8 +1413,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function fillCbDetailForm(d = {}) {
     cbDetailState.accreditationBody = d.accreditation_body || "KAB";
     cbDetailState.cbInitial = d.cb_initial || null;
-    cbDetailState.cbCode = d.cb_code || "";
-    cbDetailState.cbName = d.cb_name || "";
+    cbDetailState.cbCode = d.cb_code || d.code || "";
+    cbDetailState.cbName = d.cb_name || d.name || "";
     cbDetailState.status = d.status || "active";
     const contract = d.contract || {};
     cbDetailState.contractYear = contract.contract_year || new Date().getFullYear();
@@ -1204,9 +1431,9 @@ document.addEventListener("DOMContentLoaded", () => {
     cbDetailState.legacyRegNo = d.reg_no || null;
     cbDetailState.legacyExpireDate = d.expire_date || null;
 
-    set("cb-f-name-en", d.cb_name_en);
+    set("cb-f-name-en", d.cb_name_en || d.name_en);
     set("cb-f-initial", d.cb_initial);
-    set("cb-f-biz", d.biz_reg_no);
+    set("cb-f-biz", d.biz_reg_no || d.biz_no);
     set("cb-f-corp", d.corp_no);
     set("cb-f-personal", d.personal_no);
     set("cb-f-ceo", d.ceo_name);
@@ -1857,6 +2084,324 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Dashboard stats failed:", err);
     }
   }
+
+  // ── 배출계수 마스터 ──────────────────────────────────────────
+  const efState = {
+    year: new Date().getFullYear(),
+    gwp_ch4: 27.9,
+    gwp_n2o: 273,
+    items: [],
+    yearsFilled: false,
+  };
+
+  function fillEfYearSelects() {
+    if (efState.yearsFilled) return;
+    const cur = new Date().getFullYear();
+    const years = [];
+    for (let y = cur + 1; y >= 2020; y--) years.push(y);
+    const sel = document.getElementById("ef-year-sel");
+    const from = document.getElementById("copy-from");
+    const to = document.getElementById("copy-to");
+    [sel, from, to].forEach((el) => {
+      if (!el) return;
+      el.innerHTML = years
+        .map((y) => `<option value="${y}">${y}년</option>`)
+        .join("");
+    });
+    if (sel) sel.value = String(efState.year);
+    if (from) from.value = String(efState.year);
+    if (to) to.value = String(efState.year + 1);
+    efState.yearsFilled = true;
+  }
+
+  function fmtFactor(n, digits = 8) {
+    const v = Number(n || 0);
+    if (!Number.isFinite(v)) return "—";
+    return String(Number(v.toFixed(digits)));
+  }
+
+  function computeLocalTotal(co2, ch4, n2o) {
+    return (
+      Number(co2 || 0) +
+      Number(ch4 || 0) * Number(efState.gwp_ch4) +
+      Number(n2o || 0) * Number(efState.gwp_n2o)
+    );
+  }
+
+  function refreshEfmTotal() {
+    const total = computeLocalTotal(
+      document.getElementById("efm-co2")?.value,
+      document.getElementById("efm-ch4")?.value,
+      document.getElementById("efm-n2o")?.value,
+    );
+    const el = document.getElementById("efm-total");
+    if (el) el.value = total.toFixed(8);
+    const f = document.getElementById("efm-formula");
+    if (f) {
+      f.textContent = `tCO₂eq = CO₂ + CH₄×${efState.gwp_ch4} + N₂O×${efState.gwp_n2o}`;
+    }
+  }
+
+  function openModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add("show");
+    el.setAttribute("aria-hidden", "false");
+  }
+  function closeModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove("show");
+    el.setAttribute("aria-hidden", "true");
+  }
+
+  async function loadEmissionFactors() {
+    fillEfYearSelects();
+    const year =
+      parseInt(document.getElementById("ef-year-sel")?.value, 10) ||
+      efState.year;
+    efState.year = year;
+    const tbody = document.getElementById("ef-tbody");
+    if (tbody) {
+      tbody.innerHTML =
+        '<tr><td colspan="12" style="text-align:center;color:var(--font-tertiary);">불러오는 중…</td></tr>';
+    }
+    try {
+      const res = await authFetch(
+        `${API_BASE}/admin/emission-factors?year=${year}`,
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      efState.gwp_ch4 = data.gwp_ch4;
+      efState.gwp_n2o = data.gwp_n2o;
+      efState.items = data.items || [];
+      const gwpLabel = document.getElementById("ef-gwp-label");
+      if (gwpLabel) {
+        gwpLabel.textContent = `GWP — CH₄ ${data.gwp_ch4} · N₂O ${data.gwp_n2o}`;
+      }
+      const meta = document.getElementById("ef-meta");
+      if (meta) {
+        meta.textContent = `${year}년 · ${data.total || 0}개 · 수정 즉시 기업 탄소계산에 반영`;
+      }
+      renderEfTable();
+    } catch (err) {
+      console.error("emission factors load failed", err);
+      if (tbody) {
+        tbody.innerHTML =
+          '<tr><td colspan="12" style="text-align:center;color:var(--sec-red);">불러오기 실패</td></tr>';
+      }
+    }
+  }
+
+  function renderEfTable() {
+    const tbody = document.getElementById("ef-tbody");
+    if (!tbody) return;
+    const rows = efState.items;
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--font-tertiary);padding:28px;">
+        ${efState.year}년 배출계수가 없습니다. 전년도에서 복사하거나 신규 추가하세요.
+      </td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows
+      .map((r) => {
+        const total =
+          r.total_ghg_factor != null
+            ? Number(r.total_ghg_factor)
+            : computeLocalTotal(r.factor_co2, r.factor_ch4, r.factor_n2o);
+        const scope =
+          r.scope_type == 1
+            ? "S1"
+            : r.scope_type == 2
+              ? "S2"
+              : r.scope_type == 3
+                ? "S3"
+                : "—";
+        const active = r.is_active
+          ? '<span class="badge" style="background:#ecfdf5;color:#047857;">활성</span>'
+          : '<span class="badge" style="background:#fef2f2;color:#b91c1c;">비활성</span>';
+        return `<tr data-ef-id="${r.id}">
+          <td>${escapeHtml(r.fuel_category || "—")}</td>
+          <td>${escapeHtml(r.fuel_subcategory || "—")}</td>
+          <td><strong>${escapeHtml(r.fuel_name)}</strong><div class="muted" style="font-size:11px;">${escapeHtml(r.fuel_code)}</div></td>
+          <td>${escapeHtml(r.unit_input || "—")}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums;">${fmtFactor(r.factor_co2)}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--font-secondary);">${fmtFactor(r.factor_ch4)}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--font-secondary);">${fmtFactor(r.factor_n2o)}</td>
+          <td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${total.toFixed(6)}</td>
+          <td style="font-size:12px;">${escapeHtml(r.source_name || r.source || "—")}</td>
+          <td style="text-align:center;">${scope}</td>
+          <td style="text-align:center;" id="efst-${r.id}">${active}</td>
+          <td style="white-space:nowrap;">
+            <button type="button" class="btn-secondary btn-sm" data-ef-edit="${r.id}">편집</button>
+            <button type="button" class="btn-secondary btn-sm" data-ef-toggle="${r.id}">${r.is_active ? "비활성" : "활성화"}</button>
+          </td>
+        </tr>`;
+      })
+      .join("");
+  }
+
+  function openEfModal(row) {
+    document.getElementById("efm-error").textContent = "";
+    document.getElementById("ef-edit-title").textContent = row
+      ? "배출계수 편집"
+      : "신규 배출계수 추가";
+    document.getElementById("efm-id").value = row ? row.id : 0;
+    const codeEl = document.getElementById("efm-code");
+    codeEl.value = row?.fuel_code || "";
+    codeEl.disabled = !!row;
+    document.getElementById("efm-name").value = row?.fuel_name || "";
+    document.getElementById("efm-cat").value = row?.fuel_category || "";
+    document.getElementById("efm-sub").value = row?.fuel_subcategory || "";
+    document.getElementById("efm-ftype").value = row?.fuel_type || "fossil_fuel";
+    document.getElementById("efm-scope").value = String(row?.scope_type || 1);
+    document.getElementById("efm-unit").value = row?.unit_input || "";
+    document.getElementById("efm-year").value = row?.factor_year || efState.year;
+    document.getElementById("efm-co2").value =
+      row?.factor_co2 != null ? row.factor_co2 : "";
+    document.getElementById("efm-ch4").value = row?.factor_ch4 ?? 0;
+    document.getElementById("efm-n2o").value = row?.factor_n2o ?? 0;
+    document.getElementById("efm-src").value = row?.source_name || "";
+    document.getElementById("efm-active").checked =
+      row ? !!row.is_active : true;
+    refreshEfmTotal();
+    openModal("efEditModal");
+  }
+
+  async function saveEfModal() {
+    const id = parseInt(document.getElementById("efm-id").value, 10) || 0;
+    const payload = {
+      fuel_code: document.getElementById("efm-code").value.trim(),
+      fuel_name: document.getElementById("efm-name").value.trim(),
+      fuel_category: document.getElementById("efm-cat").value.trim(),
+      fuel_subcategory: document.getElementById("efm-sub").value.trim(),
+      fuel_type: document.getElementById("efm-ftype").value,
+      scope_type: parseInt(document.getElementById("efm-scope").value, 10) || 1,
+      unit_input: document.getElementById("efm-unit").value.trim(),
+      factor_year: parseInt(document.getElementById("efm-year").value, 10),
+      factor_co2: document.getElementById("efm-co2").value,
+      factor_ch4: document.getElementById("efm-ch4").value || "0",
+      factor_n2o: document.getElementById("efm-n2o").value || "0",
+      source_name: document.getElementById("efm-src").value.trim(),
+      is_active: document.getElementById("efm-active").checked,
+    };
+    const errEl = document.getElementById("efm-error");
+    if (!payload.fuel_name || payload.factor_co2 === "" || !payload.factor_year) {
+      errEl.textContent = "연료명, 적용연도, CO₂ 계수는 필수입니다.";
+      return;
+    }
+    if (!id && !payload.fuel_code) {
+      errEl.textContent = "연료코드는 필수입니다.";
+      return;
+    }
+    try {
+      const url = id
+        ? `${API_BASE}/admin/emission-factors/${id}`
+        : `${API_BASE}/admin/emission-factors`;
+      const res = await authFetch(url, {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        errEl.textContent = data.detail || "저장 실패";
+        return;
+      }
+      closeModal("efEditModal");
+      if (payload.factor_year) {
+        document.getElementById("ef-year-sel").value = String(
+          payload.factor_year,
+        );
+      }
+      await loadEmissionFactors();
+    } catch (e) {
+      errEl.textContent = "저장 중 오류";
+    }
+  }
+
+  document.getElementById("ef-year-sel")?.addEventListener("change", () => {
+    loadEmissionFactors();
+  });
+  document.getElementById("ef-add-btn")?.addEventListener("click", () => {
+    openEfModal(null);
+  });
+  document.getElementById("efm-save")?.addEventListener("click", saveEfModal);
+  ["efm-co2", "efm-ch4", "efm-n2o"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("input", refreshEfmTotal);
+  });
+  document.querySelectorAll("[data-ef-modal-close]").forEach((btn) => {
+    btn.addEventListener("click", () => closeModal("efEditModal"));
+  });
+  document.getElementById("ef-gwp-btn")?.addEventListener("click", () => {
+    document.getElementById("gwp-ch4-inp").value = efState.gwp_ch4;
+    document.getElementById("gwp-n2o-inp").value = efState.gwp_n2o;
+    openModal("efGwpModal");
+  });
+  document.querySelectorAll("[data-ef-gwp-close]").forEach((btn) => {
+    btn.addEventListener("click", () => closeModal("efGwpModal"));
+  });
+  document.getElementById("gwp-save-btn")?.addEventListener("click", async () => {
+    const ch4 = parseFloat(document.getElementById("gwp-ch4-inp").value);
+    const n2o = parseFloat(document.getElementById("gwp-n2o-inp").value);
+    if (!(ch4 > 0) || !(n2o > 0)) {
+      alert("유효한 GWP 값을 입력하세요.");
+      return;
+    }
+    const res = await authFetch(`${API_BASE}/admin/gwp-settings`, {
+      method: "PUT",
+      body: JSON.stringify({ gwp_ch4: ch4, gwp_n2o: n2o }),
+    });
+    if (!res.ok) {
+      alert("GWP 저장 실패");
+      return;
+    }
+    closeModal("efGwpModal");
+    await loadEmissionFactors();
+  });
+  document.getElementById("ef-copy-btn")?.addEventListener("click", () => {
+    fillEfYearSelects();
+    document.getElementById("copy-from").value = String(efState.year);
+    document.getElementById("copy-to").value = String(efState.year + 1);
+    openModal("efCopyModal");
+  });
+  document.querySelectorAll("[data-ef-copy-close]").forEach((btn) => {
+    btn.addEventListener("click", () => closeModal("efCopyModal"));
+  });
+  document.getElementById("ef-copy-run")?.addEventListener("click", async () => {
+    const from_year = parseInt(document.getElementById("copy-from").value, 10);
+    const to_year = parseInt(document.getElementById("copy-to").value, 10);
+    const res = await authFetch(`${API_BASE}/admin/emission-factors/copy`, {
+      method: "POST",
+      body: JSON.stringify({ from_year, to_year }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(data.detail || "복사 실패");
+      return;
+    }
+    closeModal("efCopyModal");
+    document.getElementById("ef-year-sel").value = String(to_year);
+    await loadEmissionFactors();
+    alert(`${from_year}년 → ${to_year}년 복사 완료 (${data.copied || 0}개)`);
+  });
+  document.getElementById("ef-tbody")?.addEventListener("click", async (e) => {
+    const editId = e.target.closest("[data-ef-edit]")?.getAttribute("data-ef-edit");
+    const toggleId = e.target
+      .closest("[data-ef-toggle]")
+      ?.getAttribute("data-ef-toggle");
+    if (editId) {
+      const row = efState.items.find((r) => String(r.id) === String(editId));
+      if (row) openEfModal(row);
+      return;
+    }
+    if (toggleId) {
+      const res = await authFetch(
+        `${API_BASE}/admin/emission-factors/${toggleId}/toggle`,
+        { method: "PATCH" },
+      );
+      if (res.ok) await loadEmissionFactors();
+    }
+  });
 
   // 초기 탭 (해시 deep-link 지원: #cb-contracts)
   const initialTab = window.__initialAdminTab || "dashboard";

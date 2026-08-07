@@ -25,6 +25,30 @@ from app.core.database import Base
 
 
 
+class PreRegisteredAuditor(Base):
+    """사전 등록 심사원 — 본인인증 CI/성명/연락처로 가입 시 이력 자동 매칭."""
+    __tablename__ = "pre_registered_auditors"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+    phone = Column(String(50), nullable=True)
+    ci_key = Column(String(128), nullable=True)
+    email = Column(String(200), nullable=True)
+    cb_id = Column(Integer, nullable=True)
+    apply_grade = Column(String(50), nullable=True)
+    education_json = Column(JSON, nullable=True)
+    career_json = Column(JSON, nullable=True)
+    qualification_json = Column(JSON, nullable=True)
+    iaf_codes_json = Column(JSON, nullable=True)
+    major_name = Column(String(200), nullable=True)
+    memo = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    matched_user_id = Column(Integer, nullable=True)
+    uploaded_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
+
+
 class AuditorAnnualEvaluations(Base):
     __tablename__ = "auditor_annual_evaluations"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -314,18 +338,31 @@ class AuditorGradeRequirements(Base):
 
 
 class AuditorQualification(Base):
-    """심사원 보유 표준 및 IAF 코드 자격 (승인 워크플로우).
-    Note: table may not exist on legacy DB yet — used by approval APIs.
+    """심사원 표준별 자격 — live `auditor_qualifications` 스키마.
+
+    Identity 가입 시 cb_id=NULL / is_active=0 로 저장하고,
+    CB 소속 신청·승인 시 cb_id·membership_id·is_active 를 갱신한다.
     """
     __tablename__ = "auditor_qualifications"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     auditor_id = Column(Integer, ForeignKey("auditors.id", ondelete="CASCADE"), nullable=False)
-    standard = Column(String(20), nullable=False)
-    # master_data.IafCode 정규화 이후 sub_code(구 iaf_ksic.IafCode PK) 대신 code를 참조
-    sub_code = Column(String(10), ForeignKey("iaf_codes.code"), nullable=False)
-    approval_status = Column(String(20), default="PENDING")
-    approved_by = Column(String(50), nullable=True)
+    cb_id = Column(Integer, nullable=True, comment="자격 관리 CB (가입 직후 NULL 가능)")
+    standard_code = Column(String(20), nullable=False, comment="QMS/EMS/OHSMS/ISMS …")
+    grade = Column(String(50), nullable=False, default="trainee")
+    pcaa_seq = Column(Integer, nullable=True)
+    pcaa_no = Column(String(30), nullable=True)
+    granted_at = Column(Date, nullable=True)
+    expires_at = Column(Date, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
+    # Additive signup/affiliation columns
+    cert_body_name = Column(String(100), nullable=True, comment="KAR/IRCA/Exemplar Global 등")
+    cert_no = Column(String(100), nullable=True)
+    iaf_codes = Column(JSON, nullable=True)
+    major_name = Column(String(200), nullable=True)
+    membership_id = Column(Integer, nullable=True)
 
     auditor = relationship("Auditor", back_populates="qualification_records")
 
@@ -421,27 +458,29 @@ class AuditorWitnessRecords(Base):
 
 
 class AuditorWorkExperience(Base):
-    """Maps to live auditor_work_experiences table (API 'careers' collection).
-
-    주의: 과거 __tablename__이 실제와 다른 `auditor_careers`로 잘못 지정되어 있었고
-    (`alembic revision --autogenerate` 검토 중 발견: 실제 테이블은 6건의 실데이터를 가진
-    `auditor_work_experiences`이며 `auditor_careers`는 아예 존재하지 않음), 컬럼 별칭 또한
-    실제 컬럼명(company_name/position/ksic_code/iaf_code/note)과 다른 레거시 별칭
-    (company/role/industry_code/iaf_codes/description)을 가리키고 있어 함께 수정함.
-    """
+    """Maps to live auditor_work_experiences table (API 'careers' collection)."""
     __tablename__ = "auditor_work_experiences"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     auditor_id = Column(Integer, ForeignKey("auditors.id"), nullable=False)
     company_name = Column(String(200), nullable=False)
+    company_id = Column(Integer, nullable=True)
+    biz_no = Column(String(20), nullable=True)
     position = Column(String(100), nullable=True)
+    department = Column(String(100), nullable=True)
     ksic_code = Column(String(10), nullable=True)
     iaf_code = Column(String(10), nullable=True)
+    nace_code = Column(String(10), nullable=True)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)
     is_current = Column(Boolean, nullable=False, default=False)
+    work_years = Column(Numeric, nullable=True)
+    is_verified = Column(Boolean, nullable=False, default=False)
     note = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=True)
+    # Additive: 미등록 기업 직접입력
+    is_temporary = Column(Boolean, nullable=False, default=False)
+    duties = Column(Text, nullable=True)
 
     auditor = relationship("Auditor", back_populates="careers")
 
@@ -571,6 +610,7 @@ class Auditor(Base):
     name_en = Column(String(100), nullable=True)
     email = Column(String(100), nullable=True, index=True)
     phone = Column(String(20), nullable=True)
+    ci_key = Column(String(128), nullable=True, comment="본인인증 CI (PortOne)")
     grade = Column(String(30), nullable=True)
     employment_type = Column(String(50), nullable=True)
     is_freelance = Column(Boolean, nullable=True)

@@ -179,7 +179,11 @@
             <div class="field"><label>이니셜</label><input id="f-initial" /></div>
             <div class="field"><label>기본 인정기관(레거시)</label><input id="f-acc-body" placeholder="KAB" /></div>
             <div class="field"><label>사업자번호</label><input id="f-biz" placeholder="000-00-00000" data-validate="biz" inputmode="numeric" maxlength="12" autocomplete="off" /></div>
+            <div class="field"><label>법인번호</label><input id="f-corp" /></div>
+            <div class="field"><label>개인사업자번호</label><input id="f-personal" /></div>
             <div class="field"><label>대표자</label><input id="f-ceo" /></div>
+            <div class="field"><label>인정 지역</label><input id="f-acc-region" /></div>
+            <div class="field"><label>인정 국가</label><input id="f-acc-country" /></div>
             <div class="field" style="grid-column:1/-1;">
               <label>주소</label>
               <div class="addr-row">
@@ -193,7 +197,9 @@
               <input id="f-address-detail" placeholder="상세주소" style="margin-top:8px;width:100%;" />
             </div>
             <div class="field"><label>전화번호</label><input id="f-tel" placeholder="02-1234-5678" data-validate="phone" inputmode="tel" maxlength="13" /></div>
+            <div class="field"><label>팩스</label><input id="f-fax" /></div>
             <div class="field"><label>이메일</label><input id="f-email" data-validate="email" autocomplete="email" /></div>
+            <div class="field"><label>세금계산서 메일</label><input id="f-tax-email" data-validate="email" autocomplete="email" /></div>
             <div class="field"><label>웹사이트</label><input id="f-web" /></div>
             <div class="field"><label>상태</label>
               <select id="f-status">
@@ -202,6 +208,9 @@
                 <option value="inactive">inactive</option>
               </select>
             </div>
+            <div class="field"><label>은행</label><input id="f-bank" /></div>
+            <div class="field"><label>계좌번호</label><input id="f-account" /></div>
+            <div class="field"><label>예금주</label><input id="f-holder" /></div>
             <div class="field"><label>티어</label>
               <select id="f-tier">
                 <option value="SMALL">SMALL</option>
@@ -211,6 +220,10 @@
             </div>
             <div class="field"><label>기본료</label><input id="f-base-fee" type="number" /></div>
             <div class="field"><label>계약연도</label><input id="f-year" type="number" /></div>
+            <div class="field" style="grid-column:1/-1;">
+              <label>기관 소개</label>
+              <textarea id="f-intro" rows="3"></textarea>
+            </div>
           </div>
         </div>
 
@@ -260,6 +273,7 @@
       page: 1, limit: 100, total: 0,
       editingId: null,
       legacyRegNo: null,
+      legacyExpireDate: null,
       pendingFile: null,
       uploadMode: "upload-excel", // or reset-and-upload
       standards: [],
@@ -489,25 +503,40 @@
     }
 
     function fillForm(d = {}) {
-      document.getElementById("f-code").value = d.cb_code || "";
-      document.getElementById("f-name").value = d.cb_name || "";
-      document.getElementById("f-name-en").value = d.cb_name_en || "";
-      document.getElementById("f-initial").value = d.cb_initial || "";
-      document.getElementById("f-acc-body").value = d.accreditation_body || "KAB";
+      const set = (id, v) => {
+        const el = document.getElementById(id);
+        if (el) el.value = v == null || v === "" ? "" : String(v);
+      };
+      set("f-code", d.cb_code || d.code || "");
+      set("f-name", d.cb_name || d.name || "");
+      set("f-name-en", d.cb_name_en || d.name_en || "");
+      set("f-initial", d.cb_initial || "");
+      set("f-acc-body", d.accreditation_body || "KAB");
       state.legacyRegNo = d.reg_no || null;
-      document.getElementById("f-biz").value = d.biz_reg_no || "";
-      document.getElementById("f-ceo").value = d.ceo_name || "";
-      document.getElementById("f-zip").value = "";
-      document.getElementById("f-address").value = d.address || "";
-      document.getElementById("f-address-detail").value = "";
-      document.getElementById("f-tel").value = d.tel || "";
-      document.getElementById("f-email").value = d.email || "";
-      document.getElementById("f-web").value = d.website || "";
-      document.getElementById("f-status").value = d.status || "active";
+      state.legacyExpireDate = d.expire_date || null;
+      set("f-biz", d.biz_reg_no || d.biz_no || "");
+      set("f-corp", d.corp_no || "");
+      set("f-personal", d.personal_no || "");
+      set("f-ceo", d.ceo_name || "");
+      set("f-acc-region", d.accreditation_region || "");
+      set("f-acc-country", d.accreditation_country || "");
+      set("f-zip", "");
+      set("f-address", d.address || "");
+      set("f-address-detail", "");
+      set("f-tel", d.tel || "");
+      set("f-fax", d.fax || "");
+      set("f-email", d.email || "");
+      set("f-tax-email", d.tax_email || "");
+      set("f-web", d.website || "");
+      set("f-status", d.status || "active");
+      set("f-bank", d.bank_name || "");
+      set("f-account", d.account_no || "");
+      set("f-holder", d.account_holder || "");
+      set("f-intro", d.intro || "");
       const contract = d.contract || {};
-      document.getElementById("f-year").value = contract.contract_year || new Date().getFullYear();
-      document.getElementById("f-tier").value = contract.tier || d.billing_tier || "MEDIUM";
-      document.getElementById("f-base-fee").value = contract.annual_base_fee ?? "";
+      set("f-year", contract.contract_year || new Date().getFullYear());
+      set("f-tier", contract.tier || d.billing_tier || "MEDIUM");
+      set("f-base-fee", contract.annual_base_fee ?? "");
       state.activeScopes = new Set(
         (d.scopes || []).filter((s) => s.is_active !== false).map((s) => {
           let code = String(s.scope_code || s.iaf_code || "").trim();
@@ -588,24 +617,36 @@
           return;
         }
       }
+      const val = (id) => (document.getElementById(id)?.value || "").trim();
       const payload = {
-        cb_code: document.getElementById("f-code").value.trim(),
-        cb_name: document.getElementById("f-name").value.trim(),
-        cb_name_en: document.getElementById("f-name-en").value.trim() || null,
-        cb_initial: document.getElementById("f-initial").value.trim() || null,
-        accreditation_body: document.getElementById("f-acc-body").value.trim() || "KAB",
+        cb_code: val("f-code"),
+        cb_name: val("f-name"),
+        cb_name_en: val("f-name-en") || null,
+        cb_initial: val("f-initial") || null,
+        accreditation_body: val("f-acc-body") || "KAB",
         reg_no: state.legacyRegNo,
-        biz_reg_no: document.getElementById("f-biz").value.trim() || null,
-        ceo_name: document.getElementById("f-ceo").value.trim() || null,
+        expire_date: state.legacyExpireDate || null,
+        biz_reg_no: val("f-biz") || null,
+        corp_no: val("f-corp") || null,
+        personal_no: val("f-personal") || null,
+        ceo_name: val("f-ceo") || null,
+        accreditation_region: val("f-acc-region") || null,
+        accreditation_country: val("f-acc-country") || null,
         address: (() => {
-          const base = document.getElementById("f-address").value.trim();
-          const detail = (document.getElementById("f-address-detail")?.value || "").trim();
+          const base = val("f-address");
+          const detail = val("f-address-detail");
           if (!base && !detail) return null;
           return detail ? `${base} ${detail}`.trim() : base;
         })(),
-        tel: document.getElementById("f-tel").value.trim() || null,
-        email: document.getElementById("f-email").value.trim() || null,
-        website: document.getElementById("f-web").value.trim() || null,
+        tel: val("f-tel") || null,
+        fax: val("f-fax") || null,
+        email: val("f-email") || null,
+        tax_email: val("f-tax-email") || null,
+        website: val("f-web") || null,
+        bank_name: val("f-bank") || null,
+        account_no: val("f-account") || null,
+        account_holder: val("f-holder") || null,
+        intro: val("f-intro") || null,
         status: document.getElementById("f-status").value,
         scopes: collectScopes(),
         standard_accreditations: collectStdAcc(),

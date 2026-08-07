@@ -246,6 +246,11 @@ class CbDetailResponse(BaseModel):
     scope_count: int = 0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    # DB 컬럼명 별칭 (frontend/PHP 호환 — 동일 값)
+    code: Optional[str] = None
+    name: Optional[str] = None
+    name_en: Optional[str] = None
+    biz_no: Optional[str] = None
 
 
 class ContractInfo(BaseModel):

@@ -21,7 +21,7 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <link rel="stylesheet" href="/static/css/main.css?v=20260807rd">
     <link rel="stylesheet" href="/static/css/portal.css?v=20260807rd">
-    <link rel="stylesheet" href="/static/css/style.css?v=20260807rd">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260807esg">
     <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
     <script src="/static/js/daum_postcode.js?v=20260807rd"></script>
 </head>
@@ -40,7 +40,7 @@
                 <li><a href="#" class="sidebar-menu-item" data-tab="companies">기업</a></li>
                 <li><a href="#" class="sidebar-menu-item" data-tab="auditors">인증심사원</a></li>
                 <li><a href="#" class="sidebar-menu-item" data-tab="accreditations">인정범위 승인</a></li>
-                <li><a href="#" class="sidebar-menu-item" data-tab="calc-rules">산출 지침</a></li>
+                <li><a href="#" class="sidebar-menu-item" data-tab="calc-rules">배출계수</a></li>
             </ul>
         </nav>
     </aside>
@@ -271,8 +271,135 @@
         </section>
 
         <section id="tab-calc-rules" class="tab-panel">
-            <p style="color: var(--font-secondary); margin: 0;">산출 지침 관리 탭 (연결 예정)</p>
+            <div class="panel-header" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
+                <div>
+                    <h3 style="font: var(--font-h3); margin: 0;">배출계수 관리</h3>
+                    <p class="muted" style="margin:6px 0 0;font:var(--font-body-small);">
+                        온실가스 배출계수 — 수정 즉시 기업 탄소계산에 반영됩니다.
+                        tCO₂eq = CO₂ + CH₄×GWP + N₂O×GWP
+                    </p>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <label style="font:var(--font-caption);color:var(--font-secondary);">적용연도</label>
+                    <select id="ef-year-sel" style="min-width:100px;"></select>
+                    <span class="panel-count" id="ef-gwp-label">GWP —</span>
+                    <button type="button" class="btn-secondary" id="ef-gwp-btn">GWP 변경</button>
+                    <button type="button" class="btn-secondary" id="ef-copy-btn">연도 복사</button>
+                    <button type="button" class="btn-primary" id="ef-add-btn">+ 신규</button>
+                </div>
+            </div>
+            <p class="muted" id="ef-meta" style="margin:0 0 10px;"></p>
+            <div class="table-responsive">
+                <table class="data-table admin-data-table" id="ef-table">
+                    <thead>
+                        <tr>
+                            <th>대분류</th>
+                            <th>중분류</th>
+                            <th>연료명</th>
+                            <th>단위</th>
+                            <th style="text-align:right;">CO₂</th>
+                            <th style="text-align:right;">CH₄</th>
+                            <th style="text-align:right;">N₂O</th>
+                            <th style="text-align:right;">tCO₂eq합계</th>
+                            <th>출처</th>
+                            <th>Scope</th>
+                            <th>상태</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="ef-tbody">
+                        <tr><td colspan="12" style="text-align:center;color:var(--font-tertiary);">불러오는 중…</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
+
+        <div class="modal-backdrop" id="efEditModal" aria-hidden="true">
+          <div class="modal-dialog" role="dialog" aria-modal="true" style="max-width:640px;">
+            <div class="modal-header">
+              <h5 class="modal-title fw-bold" id="ef-edit-title">배출계수</h5>
+              <button type="button" class="btn-close" data-ef-modal-close aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" id="efm-id" value="0" />
+              <div class="cb-field-grid">
+                <div class="cb-field"><label>연료코드 *</label><input id="efm-code" maxlength="20" /></div>
+                <div class="cb-field"><label>연료명 *</label><input id="efm-name" maxlength="100" /></div>
+                <div class="cb-field"><label>대분류</label><input id="efm-cat" maxlength="50" /></div>
+                <div class="cb-field"><label>중분류</label><input id="efm-sub" maxlength="50" /></div>
+                <div class="cb-field"><label>연료 유형</label>
+                  <select id="efm-ftype">
+                    <option value="fossil_fuel">화석연료</option>
+                    <option value="electricity">전력</option>
+                    <option value="steam">스팀</option>
+                    <option value="renewable">재생에너지</option>
+                    <option value="other">기타</option>
+                  </select>
+                </div>
+                <div class="cb-field"><label>Scope</label>
+                  <select id="efm-scope">
+                    <option value="1">Scope 1</option>
+                    <option value="2">Scope 2</option>
+                    <option value="3">Scope 3</option>
+                  </select>
+                </div>
+                <div class="cb-field"><label>단위</label><input id="efm-unit" maxlength="20" placeholder="MWh / Nm³ / L" /></div>
+                <div class="cb-field"><label>적용연도 *</label><input id="efm-year" type="number" min="2015" max="2035" /></div>
+                <div class="cb-field"><label>CO₂계수 *</label><input id="efm-co2" type="number" step="any" min="0" /></div>
+                <div class="cb-field"><label>CH₄계수</label><input id="efm-ch4" type="number" step="any" min="0" /></div>
+                <div class="cb-field"><label>N₂O계수</label><input id="efm-n2o" type="number" step="any" min="0" /></div>
+                <div class="cb-field"><label>tCO₂eq합계 (자동)</label><input id="efm-total" readonly /></div>
+                <div class="cb-field" style="grid-column:1/-1;"><label>출처</label><input id="efm-src" maxlength="100" /></div>
+                <div class="cb-field" style="grid-column:1/-1;">
+                  <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="efm-active" checked /> 활성 (탄소계산에 적용)
+                  </label>
+                </div>
+              </div>
+              <p class="muted" id="efm-formula" style="margin:10px 0 0;font:var(--font-caption);"></p>
+              <div class="error" id="efm-error" style="margin-top:8px;"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn-secondary" data-ef-modal-close>취소</button>
+              <button type="button" class="btn-primary" id="efm-save">저장</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-backdrop" id="efGwpModal" aria-hidden="true">
+          <div class="modal-dialog" role="dialog" aria-modal="true" style="max-width:360px;">
+            <div class="modal-header">
+              <h5 class="modal-title fw-bold">GWP 값 변경</h5>
+              <button type="button" class="btn-close" data-ef-gwp-close aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+              <p class="muted" style="margin:0 0 12px;font:var(--font-caption);">IPCC AR6 기준. 변경 시 전체 tCO₂eq 합계가 재계산됩니다.</p>
+              <div class="cb-field"><label>CH₄ GWP</label><input id="gwp-ch4-inp" type="number" step="0.1" min="1" /></div>
+              <div class="cb-field" style="margin-top:8px;"><label>N₂O GWP</label><input id="gwp-n2o-inp" type="number" step="1" min="1" /></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn-secondary" data-ef-gwp-close>취소</button>
+              <button type="button" class="btn-primary" id="gwp-save-btn">저장</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-backdrop" id="efCopyModal" aria-hidden="true">
+          <div class="modal-dialog" role="dialog" aria-modal="true" style="max-width:380px;">
+            <div class="modal-header">
+              <h5 class="modal-title fw-bold">연도 전체 복사</h5>
+              <button type="button" class="btn-close" data-ef-copy-close aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="cb-field"><label>복사 원본 연도</label><select id="copy-from"></select></div>
+              <div class="cb-field" style="margin-top:8px;"><label>복사 대상 연도</label><select id="copy-to"></select></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn-secondary" data-ef-copy-close>취소</button>
+              <button type="button" class="btn-primary" id="ef-copy-run">복사 실행</button>
+            </div>
+          </div>
+        </div>
     </main>
 
     <div class="modal-backdrop" id="monitoringDetailModal" aria-hidden="true">
@@ -512,10 +639,14 @@
               <div style="font:var(--font-body-small);color:var(--font-secondary);margin-bottom:6px;">외부 자격</div>
               <div id="aud-external-certs" class="muted">—</div>
             </div>
-            <div style="margin-top:12px;">
-              <div style="font:var(--font-body-small);color:var(--font-secondary);margin-bottom:6px;">소속 CB 자격</div>
-              <div id="aud-membership-list" class="muted">—</div>
-            </div>
+          </div>
+
+          <div class="org-section cb-detail-box">
+            <h3 class="org-section-title">소속 인증기관</h3>
+            <p style="margin:0 0 8px;color:var(--font-secondary);font:var(--font-body-small);">
+              다수 소속이 가능합니다. 계약관계(근무·수수료·계약조건)는 표시하지 않습니다.
+            </p>
+            <div id="aud-membership-list" class="muted">—</div>
           </div>
 
           <div class="org-section cb-detail-box">
@@ -535,14 +666,6 @@
                   <option value="false">아니오</option>
                 </select>
               </div>
-              <div class="cb-field"><label for="aud-f-contract-type">계약형태</label><input id="aud-f-contract-type" placeholder="—" readonly /></div>
-              <div class="cb-field"><label for="aud-f-cb-affiliation">소속 표기</label><input id="aud-f-cb-affiliation" placeholder="—" readonly /></div>
-              <div class="cb-field"><label>주 소속 CB</label><div class="cb-readonly" id="aud-f-primary-cb">—</div></div>
-              <div class="cb-field"><label for="aud-f-income-type">소득유형</label><input id="aud-f-income-type" placeholder="—" readonly /></div>
-              <div class="cb-field"><label for="aud-f-commission-type">수수료 유형</label><input id="aud-f-commission-type" placeholder="—" readonly /></div>
-              <div class="cb-field"><label for="aud-f-daily-rate">일당</label><input id="aud-f-daily-rate" type="number" min="0" step="1" placeholder="—" readonly /></div>
-              <div class="cb-field"><label for="aud-f-fee-ratio">수수료 비율</label><input id="aud-f-fee-ratio" type="number" min="0" step="0.01" placeholder="—" readonly /></div>
-              <div class="cb-field"><label for="aud-f-monthly-fee">월 보수</label><input id="aud-f-monthly-fee" type="number" min="0" step="1" placeholder="—" readonly /></div>
             </div>
           </div>
 
@@ -606,7 +729,7 @@
             </li>
             <li role="presentation">
               <button class="nav-link" type="button" data-detail-tab="esg-info">
-                ESG 정보 <span class="panel-count">(연동 예정)</span>
+                ESG 정보 <span class="panel-count" id="ac-esg-tab-count"></span>
               </button>
             </li>
           </ul>
@@ -749,8 +872,69 @@
             </div>
 
             <div class="detail-tab-pane" id="esg-info" role="tabpanel">
-              <div class="placeholder-box">
-                <p style="margin: 0;">ESG 진단 지표 및 심사 리포트 데이터 연동 예정 영역입니다.</p>
+              <div class="org-section ac-esg-section">
+                <h3 class="org-section-title">ESG KPI</h3>
+                <p style="margin:0 0 10px;color:var(--font-secondary);font:var(--font-body-small);">
+                  Enterprise ESG와 동일 마스터 조회입니다. 플랫폼 관리자는 읽기 전용입니다.
+                </p>
+                <div class="org-grid-3 ac-esg-filters">
+                  <div class="org-field">
+                    <label for="ac-esg-cat">ESG 영역</label>
+                    <select id="ac-esg-cat">
+                      <option value="">전체</option>
+                      <option value="E">E (환경)</option>
+                      <option value="S">S (사회)</option>
+                      <option value="G">G (지배구조)</option>
+                    </select>
+                  </div>
+                  <div class="org-field">
+                    <label for="ac-esg-mode">입력 경로</label>
+                    <select id="ac-esg-mode">
+                      <option value="">전체</option>
+                      <option value="public">공공연동</option>
+                      <option value="auditor">심사노트</option>
+                      <option value="company">직접입력</option>
+                    </select>
+                  </div>
+                  <div class="org-field">
+                    <label for="ac-esg-std">관리 표준</label>
+                    <select id="ac-esg-std"><option value="">전체</option></select>
+                  </div>
+                  <div class="org-field">
+                    <label for="ac-esg-q">검색</label>
+                    <input id="ac-esg-q" type="text" placeholder="KPI명 · 세부카테고리 · 조항" />
+                  </div>
+                  <div class="org-field">
+                    <label for="ac-esg-held-only">&nbsp;</label>
+                    <label class="ac-esg-check">
+                      <input type="checkbox" id="ac-esg-held-only" />
+                      보유 표준만
+                    </label>
+                  </div>
+                  <div class="org-field">
+                    <label>&nbsp;</label>
+                    <button type="button" class="btn-secondary" id="ac-esg-search-btn">조회</button>
+                  </div>
+                </div>
+                <p class="ac-esg-meta" id="ac-esg-meta"></p>
+                <div class="table-responsive ac-esg-table-wrap">
+                  <table class="org-table ac-esg-table" id="ac-esg-table">
+                    <thead id="ac-esg-thead">
+                      <tr>
+                        <th>KPI 지표</th>
+                        <th>경로</th>
+                        <th>단위</th>
+                        <th>추세</th>
+                        <th>목표</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ac-esg-tbody">
+                      <tr><td colspan="5" class="muted">기업을 선택하면 ESG KPI가 표시됩니다.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="pagination" id="ac-esg-pagination"></div>
+                <div class="org-msg" id="ac-esg-msg"></div>
               </div>
             </div>
           </div>
@@ -761,7 +945,7 @@
       </div>
     </div>
 
-    <script src="/static/js/validation.js?v=20260807rd"></script>
-    <script src="/static/admin.js?v=20260807rd"></script>
+    <script src="/static/js/validation.js?v=20260807esg"></script>
+    <script src="/static/admin.js?v=20260807ef"></script>
 </body>
 </html>

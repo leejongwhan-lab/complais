@@ -5,30 +5,31 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>기업 포털 - complAIs</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=20260807rd">
-  <link rel="stylesheet" href="/static/css/portal.css?v=20260807rd">
-  <link rel="stylesheet" href="/static/css/pages/enterprise.css?v=20260807rd">
-  <link rel="stylesheet" href="/static/css/style.css?v=20260807rd">
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+  <link rel="stylesheet" href="/static/css/main.css?v=20260807u2">
+  <link rel="stylesheet" href="/static/css/portal.css?v=20260807u2">
+  <link rel="stylesheet" href="/static/css/pages/enterprise.css?v=20260807u2">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260807u2">
   <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-  <script src="/static/js/daum_postcode.js?v=20260807rd"></script>
+  <script src="/static/js/daum_postcode.js?v=20260807u2"></script>
 </head>
-<body class="portal-page admin-page enterprise-portal-page">
-  <aside class="admin-sidebar">
+<body class="portal-page admin-page enterprise-portal-page enterprise-page">
+  <aside class="admin-sidebar ent-shell">
     <div class="brand-lockup" style="margin-bottom:14px;padding:6px 4px;">
       <a href="/enterprise">
         <img src="/static/brand/complais-logo.png" alt="complAIs" class="brand-logo brand-logo-md" />
       </a>
     </div>
     <div class="sidebar-profile" id="sidebar-profile" aria-live="polite" style="padding:0 4px 12px;">
-      <p class="sidebar-profile-name" id="sidebar-company-name" style="margin:0;font-weight:700;">기업 정보 로딩…</p>
-      <p class="sidebar-profile-code muted" id="sidebar-company-code" style="margin:2px 0 8px;font-size:12px;"></p>
-      <p class="muted" style="margin:0 0 4px;font-size:11px;">보유 표준</p>
-      <div class="sidebar-badges" id="sidebar-held-badges">
-        <span class="sidebar-badge empty">조회 중</span>
+      <p class="sidebar-profile-name" id="sidebar-company-name">기업 정보 로딩…</p>
+      <p class="sidebar-profile-code muted" id="sidebar-company-code"></p>
+      <p class="sidebar-std-label">보유 표준</p>
+      <div class="sidebar-held-list" id="sidebar-held-badges">
+        <span class="sidebar-held-line empty">조회 중</span>
       </div>
-      <p class="muted" style="margin:8px 0 4px;font-size:11px;">기타 인증</p>
-      <div class="sidebar-badges" id="sidebar-other-badges">
-        <span class="sidebar-badge empty">조회 중</span>
+      <p class="sidebar-std-label">기타 인증</p>
+      <div class="sidebar-held-list" id="sidebar-other-badges">
+        <span class="sidebar-held-line empty">조회 중</span>
       </div>
     </div>
     <nav>
@@ -40,7 +41,7 @@
       <div class="sidebar-group-label">인증 관리</div>
       <ul class="sidebar-menu">
         <li><a href="#" class="sidebar-menu-item side-link" data-panel="cert">인증현황</a></li>
-        <li><a href="/enterprise/cert-application" class="sidebar-menu-item">인증신청</a></li>
+        <li><a href="#" class="sidebar-menu-item side-link" data-panel="cert-apply">인증신청관리</a></li>
         <li><a href="#" class="sidebar-menu-item side-link" data-panel="archive">결과보관함</a></li>
         <li><a href="#" class="sidebar-menu-item side-link" data-panel="ncr">시정조치 (NCR)</a></li>
       </ul>
@@ -58,8 +59,8 @@
   <main class="admin-main">
       <header class="cb-page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
         <div>
-          <h1 id="page-title" style="font: var(--font-h1); margin: 0;">기업정보</h1>
-          <p class="muted" id="page-sub" style="margin: 6px 0 0;">기업 마스터 · 사업장 · 담당자</p>
+          <h1 id="page-title">기업정보</h1>
+          <p class="muted" id="page-sub">기업 마스터 · 사업장 · 담당자</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <a class="btn-secondary" id="admin-switch" href="/admin/dashboard">플랫폼 어드민 전환</a>
@@ -70,10 +71,79 @@
         <div class="success" id="global-success"></div>
 
         
-        <section class="card" id="panel-dashboard" style="display:none;">
-          <h2 style="margin:0 0 8px;font:var(--font-h3);">대시보드</h2>
-          <p class="muted" style="margin:0 0 14px;">기업 마스터와 인증·ESG 현황을 한눈에 확인합니다.</p>
-          <dl class="kv" id="dashboard-kv"><dt>불러오는 중…</dt><dd></dd></dl>
+        <section class="card ent-dash" id="panel-dashboard" style="display:none;">
+          <div class="ent-dash-head">
+            <div>
+              <h2 class="ep-section-title" style="margin:0;"><span class="ep-mark" aria-hidden="true"></span>대시보드</h2>
+              <p class="muted" style="margin:6px 0 0;">인증·심사·시정조치 현황을 한눈에 확인합니다.</p>
+            </div>
+            <button type="button" class="ghost" id="dash-reload-btn">새로고침</button>
+          </div>
+
+          <div class="portal-kpi-grid ent-kpi-grid" id="dash-kpi-grid" aria-live="polite">
+            <div class="portal-kpi ent-kpi">
+              <p class="label">보유 인증 수</p>
+              <p class="value" id="kpi-active-certs">—</p>
+            </div>
+            <div class="portal-kpi ent-kpi">
+              <p class="label">다음 심사 D-Day</p>
+              <p class="value" id="kpi-next-dday">—</p>
+              <p class="ent-kpi-sub muted" id="kpi-next-date"></p>
+            </div>
+            <div class="portal-kpi ent-kpi">
+              <p class="label">진행 중인 신청/심사</p>
+              <p class="value" id="kpi-pending-apps">—</p>
+            </div>
+            <div class="portal-kpi ent-kpi">
+              <p class="label">미결 시정조치</p>
+              <p class="value" id="kpi-open-ncrs">—</p>
+            </div>
+          </div>
+
+          <div class="ent-dash-layout">
+            <div class="ent-dash-main">
+              <div class="ent-dash-block">
+                <h3 class="ent-dash-block-title">현재 진행 중인 심사</h3>
+                <div id="dash-timeline"><div class="muted">불러오는 중…</div></div>
+              </div>
+              <div class="ent-dash-block">
+                <h3 class="ent-dash-block-title">보유 인증서 현황</h3>
+                <div class="table-responsive">
+                  <table class="data-table ent-cert-table">
+                    <thead>
+                      <tr>
+                        <th>표준명</th>
+                        <th>인증기관</th>
+                        <th>만료일</th>
+                        <th>인증서</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dash-cert-tbody">
+                      <tr><td colspan="4" class="muted">불러오는 중…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <aside class="ent-dash-side">
+              <div class="ent-dash-block">
+                <h3 class="ent-dash-block-title">주요 할 일</h3>
+                <ul class="ent-todo-list" id="dash-todos"></ul>
+              </div>
+              <div class="ent-dash-block">
+                <h3 class="ent-dash-block-title">빠른 실행</h3>
+                <div class="ent-quick-actions">
+                  <a class="btn-primary" href="/enterprise/cert-application">인증 신청하기</a>
+                  <button type="button" class="ghost" id="dash-print-certs-btn">인증서 출력</button>
+                  <a class="ghost btn" href="#esg" data-panel-link="esg">ESG 설문 작성</a>
+                </div>
+              </div>
+              <div class="ent-dash-block">
+                <h3 class="ent-dash-block-title">최신 알림</h3>
+                <ul class="ent-notif-list" id="dash-notifs"></ul>
+              </div>
+            </aside>
+          </div>
         </section>
 
         <section class="card portal-form" id="panel-company">
@@ -274,14 +344,22 @@
         </section>
 
 <section class="card esg-panel" id="panel-esg" style="display:none;">
-          <div class="panel-header">
+          <div class="panel-header" style="flex-wrap:wrap;gap:10px;">
             <div>
-              <h2 style="margin:0 0 6px;font:var(--font-h3);">ESG KPI</h2>
-              <p class="muted" style="margin:0;">심사원이 입력하는 KPI와 공공데이터 연동 KPI를 함께 표시합니다.</p>
+              <h2 style="margin:0 0 6px;font:var(--font-h3);">ESG 관리</h2>
+              <p class="muted" style="margin:0;">KPI · 물질수지 · 탄소계산 (배출계수 마스터 실시간 연동)</p>
             </div>
-            <span class="count-badge">총 <span id="esg-total">0</span>건</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <div class="esg-subtabs" style="display:flex;gap:6px;">
+                <button type="button" class="btn-secondary esg-subtab active" data-esg-sub="kpi">ESG KPI</button>
+                <button type="button" class="btn-secondary esg-subtab" data-esg-sub="mb">물질수지</button>
+                <button type="button" class="btn-secondary esg-subtab" data-esg-sub="carbon">탄소계산</button>
+              </div>
+              <span class="count-badge" id="esg-kpi-count-wrap">총 <span id="esg-total">0</span>건</span>
+            </div>
           </div>
 
+          <div id="esg-sub-kpi">
           <div class="esg-legend-bar">
             <div class="esg-legend">
               <span class="esg-legend-title">데이터 입력 경로</span>
@@ -358,6 +436,35 @@
             </table>
           </div>
           <div class="pagination" id="esg-pagination"></div>
+          </div><!-- /#esg-sub-kpi -->
+
+          <div id="esg-sub-mb" style="display:none;">
+            <div class="panel-header" style="margin-bottom:12px;">
+              <div>
+                <h3 style="margin:0;font:var(--font-h3);">물질수지표</h3>
+                <p class="muted" style="margin:4px 0 0;">에너지 사용량 입력 시 해당 연도 배출계수로 GHG를 자동 계산합니다.</p>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <label for="mb-year-sel" class="muted" style="font-size:12px;">연도</label>
+                <select id="mb-year-sel"></select>
+              </div>
+            </div>
+            <div id="mb-body"><div class="muted" style="padding:24px;text-align:center;">데이터 로딩 중…</div></div>
+          </div>
+
+          <div id="esg-sub-carbon" style="display:none;">
+            <div class="panel-header" style="margin-bottom:12px;">
+              <div>
+                <h3 style="margin:0;font:var(--font-h3);">탄소계산</h3>
+                <p class="muted" style="margin:4px 0 0;">Admin 배출계수 마스터(적용연도·활성) 실시간 반영</p>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <label for="carbon-year-sel" class="muted" style="font-size:12px;">연도</label>
+                <select id="carbon-year-sel"></select>
+              </div>
+            </div>
+            <div id="carbon-body"><div class="muted" style="padding:24px;text-align:center;">데이터 로딩 중…</div></div>
+          </div>
         </section>
 
         
@@ -366,44 +473,20 @@
           <div class="ep-section">
             <div class="ep-section-head">
               <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>보유 인증 현황</h2>
-              <button type="button" id="cert-apply-open-btn">+ 인증 신청</button>
             </div>
+            <p class="muted" style="margin:0 0 12px;">보유 인증의 인정·인증기관, 최근·이번 심사 유형과 유효기간을 확인합니다. 만료 3개월 이내이면 안내가 표시됩니다.</p>
             <div id="held-certs"></div>
           </div>
+        </section>
 
+        <section class="card" id="panel-cert-apply" style="display:none;">
           <div class="ep-section">
             <div class="ep-section-head">
-              <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>인증 신청 관리</h2>
-              <span class="ep-section-note">신청부터 제안서, 계약, 심사, 시정조치까지 한 프로세스에서 확인합니다.</span>
+              <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>인증신청</h2>
+              <a class="btn-primary" id="cert-apply-open-btn" href="/enterprise/cert-application">+ 인증신청</a>
             </div>
+            <p class="muted" style="margin:0 0 12px;">신규 인증 신청은 별도 신청 페이지에서 진행합니다. 아래는 신청 후 진행 현황입니다.</p>
             <div id="cert-apps"></div>
-          </div>
-
-          <div class="ep-section" id="cert-apply-box" style="display:none;">
-            <div class="ep-section-head">
-              <h2 class="ep-section-title"><span class="ep-mark" aria-hidden="true"></span>인증 신청 · CB 선택</h2>
-            </div>
-            <p class="muted" style="margin:0 0 12px;">신청 ISO 표준과 기업 IAF를 기준으로 인정범위가 맞는 CB만 표시합니다. (인정번호/AB는 CB 전용)</p>
-            <div class="grid">
-              <div class="field" style="grid-column:1/-1;">
-                <label>신청 ISO 표준</label>
-                <div id="std-checks" style="display:flex;flex-wrap:wrap;gap:10px 14px;"></div>
-              </div>
-              <div class="field">
-                <label>IAF 코드 (비우면 기업 마스터 값)</label>
-                <input id="iaf-override" placeholder="예: 14,29" />
-              </div>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-              <button type="button" id="load-cbs-btn">신청 가능 CB 조회</button>
-              <a class="btn ghost" href="/client_portal.html">설문 신청 포털</a>
-              <span class="muted" id="cb-meta"></span>
-            </div>
-            <div class="cb-grid" id="cb-grid"><div class="muted">표준을 선택한 뒤 조회하세요.</div></div>
-            <div class="field" style="margin-top:14px;">
-              <label>선택된 CB</label>
-              <input id="selected-cb" readonly placeholder="CB를 선택하세요" />
-            </div>
           </div>
         </section>
 
@@ -475,7 +558,7 @@
       document.getElementById("admin-switch").style.display = "none";
     }
 
-    const PANELS = ["dashboard","company","cert","archive","ncr","esg"];
+    const PANELS = ["dashboard","company","cert","cert-apply","archive","ncr","esg"];
     const state = {
       selectedCbId: null,
       ncrId: null,
@@ -491,14 +574,18 @@
       esgRowsById: {},
       esgDrawerMode: null,
       esgDrawerKpiId: null,
+      esgSub: "kpi",
+      mbYear: new Date().getFullYear(),
+      mbCache: null,
     };
     const titles = {
       dashboard: ["대시보드", "기업 현황 요약"],
       company: ["기업정보", "기업 마스터 · 사업장 · 담당자"],
-      cert: ["인증현황", "보유 인증 · 신청 프로세스"],
+      cert: ["인증현황", "보유 인증 · 유효기간 · 만료 안내"],
+      "cert-apply": ["인증신청", "신규 신청 · 진행 현황"],
       archive: ["결과보관함", "최근 5개년 문서 보관"],
       ncr: ["시정조치 (NCR)", "개선조치서 제출"],
-      esg: ["ESG관리", "공공연동 · 심사노트 · 기업 직접입력 · 최근 5개년"],
+      esg: ["ESG관리", "KPI · 물질수지 · 탄소계산 (배출계수 실시간 연동)"],
     };
     const CONTACT_ROLES = ["인증담당","품질담당","환경담당","안전담당","총무","기타"];
     const orgState = { sites: [], departments: [], contacts: [], companySnapshot: null };
@@ -523,20 +610,256 @@
       const [t, s] = titles[name] || ["기업 포털", ""];
       document.getElementById("page-title").textContent = t;
       document.getElementById("page-sub").textContent = s;
-      if (name === "dashboard" || name === "company") loadCompany();
-      if (name === "company") { loadSites(); loadDepartments(); loadContacts(); loadPortalUsers(); }
-      if (name === "cert") loadCertStatus();
-      if (name === "esg") loadEsgKpis(true);
+      if (name === "dashboard") { loadCompany(); loadDashboard(); }
+      if (name === "company") { loadCompany(); loadSites(); loadDepartments(); loadContacts(); loadPortalUsers(); }
+      if (name === "cert" || name === "cert-apply") loadCertStatus();
+      if (name === "esg") switchEsgSub(state.esgSub || "kpi", true);
       if (name === "archive") loadArchiveByYear();
       if (name === "ncr") loadNcrs();
       if (location.hash.replace("#","") !== name) {
         history.replaceState(null, "", `#${name}`);
       }
     }
+
+    function fillMbYearSels() {
+      const cur = new Date().getFullYear();
+      const opts = [];
+      for (let y = cur; y >= cur - 5; y--) opts.push(`<option value="${y}">${y}년</option>`);
+      ["mb-year-sel", "carbon-year-sel"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el || el.options.length) return;
+        el.innerHTML = opts.join("");
+        el.value = String(state.mbYear);
+      });
+    }
+
+    function switchEsgSub(sub, forceLoad) {
+      state.esgSub = sub || "kpi";
+      document.querySelectorAll(".esg-subtab").forEach((b) => {
+        b.classList.toggle("active", b.dataset.esgSub === state.esgSub);
+      });
+      const kpi = document.getElementById("esg-sub-kpi");
+      const mb = document.getElementById("esg-sub-mb");
+      const carbon = document.getElementById("esg-sub-carbon");
+      if (kpi) kpi.style.display = state.esgSub === "kpi" ? "block" : "none";
+      if (mb) mb.style.display = state.esgSub === "mb" ? "block" : "none";
+      if (carbon) carbon.style.display = state.esgSub === "carbon" ? "block" : "none";
+      const countWrap = document.getElementById("esg-kpi-count-wrap");
+      if (countWrap) countWrap.style.display = state.esgSub === "kpi" ? "" : "none";
+      if (state.esgSub === "kpi") {
+        if (forceLoad) loadEsgKpis(true);
+      } else {
+        fillMbYearSels();
+        loadMaterialBalance();
+      }
+    }
+
+    async function loadMaterialBalance() {
+      fillMbYearSels();
+      const yearSel = document.getElementById(
+        state.esgSub === "carbon" ? "carbon-year-sel" : "mb-year-sel",
+      );
+      const year = parseInt(yearSel?.value || state.mbYear, 10);
+      state.mbYear = year;
+      const otherId = state.esgSub === "carbon" ? "mb-year-sel" : "carbon-year-sel";
+      const other = document.getElementById(otherId);
+      if (other) other.value = String(year);
+      try {
+        const res = await fetch(`${API}/user/material-balance?year=${year}`, {
+          headers: authHeaders(),
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `물질수지 조회 실패 (${res.status})`);
+        state.mbCache = data;
+        renderMB(data);
+        renderCarbon(data);
+      } catch (e) {
+        const msg = `<div class="muted" style="padding:24px;text-align:center;color:var(--sec-red);">${esc(e.message)}</div>`;
+        const mbBody = document.getElementById("mb-body");
+        const cBody = document.getElementById("carbon-body");
+        if (mbBody) mbBody.innerHTML = msg;
+        if (cBody) cBody.innerHTML = msg;
+      }
+    }
+
+    function renderMB(data) {
+      const body = document.getElementById("mb-body");
+      if (!body) return;
+      const items = data.items || [];
+      if (!items.length) {
+        body.innerHTML = '<div class="muted" style="padding:24px;text-align:center;">물질수지 항목이 없습니다.</div>';
+        return;
+      }
+      const groups = {};
+      items.forEach((it) => {
+        const key = it.category || "other";
+        (groups[key] = groups[key] || []).push(it);
+      });
+      const catLabel = { input: "INPUT · 투입", output: "OUTPUT · 산출" };
+      body.innerHTML = Object.keys(groups)
+        .map((cat) => {
+          const rows = groups[cat]
+            .map((it) => {
+              const val = it.measured_value;
+              const ghg = Number(it.ghg_calc || 0);
+              const showGhg = it.is_energy && ghg > 0;
+              return `<tr>
+                <td>${esc(it.item_name)}</td>
+                <td>${esc(it.unit || "—")}</td>
+                <td style="text-align:right;">
+                  <input type="number" step="any" min="0" data-mb-item="${it.id}"
+                    value="${val != null ? esc(val) : ""}"
+                    style="width:120px;text-align:right;padding:4px 8px;"
+                    ${it.is_energy ? 'title="에너지 — 저장 시 GHG 자동계산"' : ""} />
+                </td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums;">${
+                  showGhg ? ghg.toFixed(4) : '<span class="muted">—</span>'
+                }</td>
+              </tr>`;
+            })
+            .join("");
+          return `<div style="margin-bottom:18px;">
+            <div style="font-weight:700;margin:0 0 8px;">${esc(catLabel[cat] || cat)}</div>
+            <div class="table-responsive"><table class="data-table">
+              <thead><tr>
+                <th>항목</th><th>단위</th>
+                <th style="text-align:right;">실측값</th>
+                <th style="text-align:right;">GHG (tCO₂eq)</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table></div>
+          </div>`;
+        })
+        .join("");
+      body.querySelectorAll("[data-mb-item]").forEach((inp) => {
+        inp.addEventListener("change", () => saveMbValue(inp));
+      });
+    }
+
+    async function saveMbValue(inp) {
+      const itemId = parseInt(inp.dataset.mbItem, 10);
+      const raw = inp.value.trim();
+      const value = raw === "" ? null : Number(raw);
+      inp.disabled = true;
+      try {
+        const res = await fetch(`${API}/user/material-balance`, {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ item_id: itemId, year: state.mbYear, value }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "저장 실패");
+        setMsg("물질수지 저장 · GHG 재계산 완료", "");
+        await loadMaterialBalance();
+      } catch (e) {
+        setMsg("", e.message);
+        inp.disabled = false;
+      }
+    }
+
+    function renderCarbon(data) {
+      const body = document.getElementById("carbon-body");
+      if (!body) return;
+      const carbon = data.carbon || {};
+      const rows = (carbon.rows || []).filter((r) => r.is_energy);
+      if (!rows.length) {
+        body.innerHTML = '<div class="muted" style="padding:24px;text-align:center;">에너지 항목 데이터가 없습니다.<br><small>물질수지 탭에서 에너지 사용량을 먼저 입력해 주세요.</small></div>';
+        return;
+      }
+      const scope1 = Number(carbon.scope1 || 0);
+      const scope2 = Number(carbon.scope2 || 0);
+      const total = Number(carbon.total || 0);
+      const sources = carbon.sources || [];
+      const scopeBadge = (s) =>
+        s == 1
+          ? '<span class="badge" style="background:#fff1f2;color:#dc2626;">Scope 1</span>'
+          : s == 2
+            ? '<span class="badge" style="background:#fffbeb;color:#b45309;">Scope 2</span>'
+            : '<span class="badge">Scope 3</span>';
+      const fmtGhg = (v) =>
+        v > 0 ? v.toFixed(4) : '<span class="muted">—</span>';
+      const tableRows = rows
+        .map((it) => {
+          const ef = it.ef || null;
+          const val = it.measured_value;
+          const ghg = Number(it.ghg_calc || 0);
+          const factor =
+            ef && ef.total_ghg_factor != null
+              ? `${Number(ef.total_ghg_factor).toFixed(6)} tCO₂eq/${esc(ef.unit_input || it.unit || "")}`
+              : "—";
+          const src = ef ? esc(ef.source || ef.source_name || "—") : "—";
+          return `<tr>
+            <td><strong>${esc(it.item_name)}</strong><div class="muted" style="font-size:11px;">${src}</div></td>
+            <td style="text-align:center;">${ef ? scopeBadge(ef.scope_type) : "—"}</td>
+            <td style="text-align:right;">${val != null ? Number(val).toLocaleString("ko-KR") : "—"}</td>
+            <td>${esc(it.unit || "—")}</td>
+            <td style="text-align:right;font-size:12px;">${factor}</td>
+            <td style="text-align:right;font-weight:700;color:${ghg > 0 ? "#dc2626" : "inherit"};">${fmtGhg(ghg)}</td>
+            <td style="text-align:right;">${total > 0 && ghg > 0 ? ((ghg / total) * 100).toFixed(1) + "%" : "—"}</td>
+          </tr>`;
+        })
+        .join("");
+      body.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px;">
+          <div style="padding:14px 16px;border:1px solid #fecaca;background:#fff1f2;border-radius:8px;">
+            <div style="font-size:11px;font-weight:700;color:#dc2626;">SCOPE 1</div>
+            <div style="font-size:22px;font-weight:800;">${scope1.toLocaleString("ko-KR",{maximumFractionDigits:1})}</div>
+            <div class="muted" style="font-size:11px;">tCO₂eq</div>
+          </div>
+          <div style="padding:14px 16px;border:1px solid #fde68a;background:#fffbeb;border-radius:8px;">
+            <div style="font-size:11px;font-weight:700;color:#b45309;">SCOPE 2</div>
+            <div style="font-size:22px;font-weight:800;">${scope2.toLocaleString("ko-KR",{maximumFractionDigits:1})}</div>
+            <div class="muted" style="font-size:11px;">tCO₂eq</div>
+          </div>
+          <div style="padding:14px 16px;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px;">
+            <div style="font-size:11px;font-weight:700;color:#15803d;">합계 · TOTAL GHG</div>
+            <div style="font-size:22px;font-weight:800;">${total.toLocaleString("ko-KR",{maximumFractionDigits:1})}</div>
+            <div class="muted" style="font-size:11px;">${data.year}년 기준</div>
+          </div>
+        </div>
+        <div class="table-responsive"><table class="data-table">
+          <thead><tr>
+            <th>에너지원 / 출처</th><th>Scope</th><th style="text-align:right;">사용량</th><th>단위</th>
+            <th style="text-align:right;">배출계수</th>
+            <th style="text-align:right;">GHG (tCO₂eq)</th><th style="text-align:right;">비중</th>
+          </tr></thead>
+          <tbody>
+            ${tableRows}
+            <tr>
+              <td colspan="5" style="text-align:right;font-weight:600;">합계</td>
+              <td style="text-align:right;font-weight:800;">${total > 0 ? total.toFixed(4) : "—"}</td>
+              <td style="text-align:right;">${total > 0 ? "100%" : "—"}</td>
+            </tr>
+          </tbody>
+        </table></div>
+        <p class="muted" style="margin:10px 0 0;font-size:11px;line-height:1.6;">
+          * 배출계수: 적용연도 ${esc(data.year)} · is_active=1 마스터 DB 실시간 조회<br>
+          * 출처: ${sources.length ? esc(sources.join(" · ")) : "배출계수 마스터 source_name"}
+        </p>`;
+    }
+
+    document.querySelectorAll(".esg-subtab").forEach((btn) => {
+      btn.addEventListener("click", () => switchEsgSub(btn.dataset.esgSub, true));
+    });
+    document.getElementById("mb-year-sel")?.addEventListener("change", () => {
+      state.mbYear = parseInt(document.getElementById("mb-year-sel").value, 10);
+      loadMaterialBalance();
+    });
+    document.getElementById("carbon-year-sel")?.addEventListener("change", () => {
+      state.mbYear = parseInt(document.getElementById("carbon-year-sel").value, 10);
+      loadMaterialBalance();
+    });
     document.querySelectorAll(".side-link[data-panel]").forEach((b) => {
       b.addEventListener("click", (e) => {
         e.preventDefault();
         switchPanel(b.dataset.panel);
+      });
+    });
+    document.querySelectorAll("[data-panel-link]").forEach((b) => {
+      b.addEventListener("click", (e) => {
+        e.preventDefault();
+        switchPanel(b.dataset.panelLink);
       });
     });
 
@@ -545,24 +868,6 @@
       ["access_token","role","user_id","company_id","cb_id"].forEach((k) => localStorage.removeItem(k));
       window.location.href = "/login";
     });
-
-    function renderApplyStandards(standards) {
-      const box = document.getElementById("std-checks");
-      const list = standards?.length ? standards : state.availableStandards;
-      if (!list?.length) {
-        box.innerHTML = `<span class="muted">표준 목록을 불러오지 못했습니다.</span>`;
-        return;
-      }
-      box.innerHTML = list.map((s, i) => {
-        const code = s.standard_code || s;
-        const name = s.standard_name || "";
-        const checked = i === 0 ? "checked" : "";
-        return `<label style="display:inline-flex;align-items:center;gap:6px;">
-          <input type="checkbox" value="${esc(code)}" ${checked} />
-          <span>${esc(code)}${name ? ` · ${esc(name)}` : ""}</span>
-        </label>`;
-      }).join("");
-    }
 
     function heldDisplayLabel(item) {
       if (item == null) return "";
@@ -590,11 +895,17 @@
       const heldBox = document.getElementById("sidebar-held-badges");
       const otherBox = document.getElementById("sidebar-other-badges");
       heldBox.innerHTML = (held || []).length
-        ? held.map((b) => `<span class="sidebar-badge" title="${esc(heldDisplayLabel(b))}">${esc(heldBadgeText(b))}</span>`).join("")
-        : `<span class="sidebar-badge empty">등록된 표준 없음</span>`;
+        ? held.map((b) => {
+            const label = heldDisplayLabel(b);
+            return `<div class="sidebar-held-line" title="${esc(label)}">${esc(label || heldBadgeText(b))}</div>`;
+          }).join("")
+        : `<div class="sidebar-held-line empty">등록된 표준 없음</div>`;
       otherBox.innerHTML = (other || []).length
-        ? other.map((b) => `<span class="sidebar-badge other">${esc(typeof b === "string" ? b : heldDisplayLabel(b))}</span>`).join("")
-        : `<span class="sidebar-badge empty">기타 인증 없음</span>`;
+        ? other.map((b) => {
+            const label = typeof b === "string" ? b : heldDisplayLabel(b);
+            return `<div class="sidebar-held-line">${esc(label)}</div>`;
+          }).join("")
+        : `<div class="sidebar-held-line empty">기타 인증 없음</div>`;
     }
 
     function fillEsgStdOptions(standards) {
@@ -816,16 +1127,16 @@
       orgState.companySnapshot = c;
       fillHeadcountYearSelect(c);
       const map = {
-        name: c.name || "",
+        name: c.name || c.company_name || "",
         biz_no: c.biz_no || "",
         entity_type: c.entity_type || "",
         corp_no: c.corp_no || "",
-        name_en: c.name_en || "",
+        name_en: c.name_en || c.company_name_en || "",
         ceo_name: c.ceo_name || "",
         biz_type: c.biz_type || "",
-        biz_class: c.biz_class || "",
-        scope_kr: c.scope_kr || "",
-        scope_en: c.scope_en || "",
+        biz_class: c.biz_class || c.biz_item || "",
+        scope_kr: c.scope_kr || c.cert_scope_kr || "",
+        scope_en: c.scope_en || c.cert_scope_en || "",
         address: c.address || "",
         detail_address: c.detail_address || "",
         address_en: c.address_en || "",
@@ -837,23 +1148,123 @@
         headcount_outsourced: c.headcount_outsourced ?? "",
         headcount_regular: c.headcount_regular ?? "",
         headcount_non_regular: c.headcount_non_regular ?? "",
-        ksic_code: c.ksic_code || "",
-        iaf_code: c.iaf_code || (c.iaf_codes || []).join(",") || "",
+        ksic_code: c.ksic_code || c.ksic || "",
+        iaf_code: c.iaf_code || c.iaf || (c.iaf_codes || []).join(",") || "",
       };
       Object.entries(map).forEach(([k, v]) => {
         const el = document.getElementById(`f-${k}`);
         if (el) el.value = v;
       });
       document.getElementById("company-updated-at").textContent = c.updated_at ? `최종 수정: ${c.updated_at}` : "";
-      document.getElementById("dashboard-kv").innerHTML = `
-        <dt>기업명</dt><dd>${esc(c.name)}</dd>
-        <dt>기업번호</dt><dd>${esc(c.cert_no || c.id)}</dd>
-        <dt>사업자번호</dt><dd>${esc(c.biz_no || "-")}</dd>
-        <dt>대표자</dt><dd>${esc(c.ceo_name || "-")}</dd>
-        <dt>KSIC / IAF</dt><dd>${esc(c.ksic_code || "-")} / ${esc((c.iaf_codes||[]).join(", ") || c.iaf_code || "-")}</dd>
-        <dt>보유 표준</dt><dd>${esc((c.held_standards||[]).map(heldDisplayLabel).filter(Boolean).join(", ") || "-")}</dd>
-        <dt>인원(${esc(c.headcount_year || new Date().getFullYear())})</dt><dd>${esc(c.employee_count ?? "-")}</dd>`;
     }
+
+    function fmtDday(n) {
+      if (n == null || Number.isNaN(Number(n))) return "—";
+      const d = Number(n);
+      if (d === 0) return "D-Day";
+      if (d > 0) return `D-${d}`;
+      return `D+${Math.abs(d)}`;
+    }
+
+    function renderDashTimeline(tl, stages) {
+      const box = document.getElementById("dash-timeline");
+      if (!tl) {
+        box.innerHTML = `<div class="ep-empty">진행 중인 심사가 없습니다.<div class="sub">인증신청관리에서 신규 신청을 진행할 수 있습니다.</div></div>`;
+        return;
+      }
+      const stageList = (tl.stages && tl.stages.length ? tl.stages : stages) || [];
+      const cur = Number(tl.stage_step || 1);
+      const std = (tl.standards || []).join(", ") || "-";
+      box.innerHTML = `
+        <div class="ent-tl-meta">
+          <div>
+            <strong>${esc(tl.title || "진행 중인 심사")}</strong>
+            <div class="muted">${esc(tl.audit_type || "심사")} · ${esc(std)}</div>
+            <div class="muted">신청번호 ${esc(tl.application_no || "-")} · ${esc(tl.status_label || "")}</div>
+          </div>
+        </div>
+        <div class="stepper ent-tl-stepper">${stageList.map((s) => {
+          const n = Number(s.step);
+          const cls = n < cur ? "done" : (n === cur ? "active" : "");
+          return `<div class="stepper-item ${cls}"><span class="num">${n}</span><span class="lbl">${esc(s.label)}</span></div>`;
+        }).join("")}</div>`;
+    }
+
+    async function loadDashboard() {
+      const tbody = document.getElementById("dash-cert-tbody");
+      const todosEl = document.getElementById("dash-todos");
+      const notifsEl = document.getElementById("dash-notifs");
+      try {
+        const res = await fetch(`${API}/user/dashboard-summary${companyQuery()}`, {
+          headers: authHeaders(), cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `대시보드 조회 실패 (${res.status})`);
+        const k = data.kpis || {};
+        document.getElementById("kpi-active-certs").textContent = String(k.active_certifications ?? 0);
+        document.getElementById("kpi-next-dday").textContent = fmtDday(k.next_audit_dday);
+        document.getElementById("kpi-next-date").textContent = k.next_audit_date
+          ? `예정일 ${k.next_audit_date}` : "예정된 심사일 없음";
+        document.getElementById("kpi-pending-apps").textContent = String(k.pending_applications ?? 0);
+        document.getElementById("kpi-open-ncrs").textContent = String(k.open_ncrs ?? 0);
+
+        renderDashTimeline(data.timeline, data.stages);
+
+        const certs = data.held_certificates || [];
+        if (!certs.length) {
+          tbody.innerHTML = `<tr><td colspan="4" class="muted">등록된 보유 인증이 없습니다.</td></tr>`;
+        } else {
+          tbody.innerHTML = certs.map((c) => {
+            const label = c.standard_label || c.standards || "-";
+            const pdf = c.certificate_file_url
+              ? `<a class="btn-secondary ent-pdf-btn" href="${esc(c.certificate_file_url)}" target="_blank" rel="noopener">PDF</a>`
+              : `<span class="muted">파일 없음</span>`;
+            return `<tr>
+              <td>${esc(label)}</td>
+              <td>${esc(c.cb_name || "-")}</td>
+              <td>${esc(c.valid_until || "-")}</td>
+              <td>${pdf}</td>
+            </tr>`;
+          }).join("");
+        }
+
+        const todos = data.todos || [];
+        todosEl.innerHTML = todos.length
+          ? todos.map((t) => `
+            <li>
+              <a href="${esc(t.link || "#")}" ${t.link && t.link.startsWith("#") ? `data-panel-link="${esc(t.link.replace("#",""))}"` : ""}>
+                <span class="ent-todo-title">${esc(t.title)}</span>
+                <span class="ent-todo-dday">${esc(fmtDday(t.dday))}</span>
+              </a>
+            </li>`).join("")
+          : `<li class="muted">등록된 할 일이 없습니다.</li>`;
+        todosEl.querySelectorAll("[data-panel-link]").forEach((a) => {
+          a.addEventListener("click", (e) => {
+            e.preventDefault();
+            switchPanel(a.getAttribute("data-panel-link"));
+          });
+        });
+
+        const notifs = data.notifications || [];
+        notifsEl.innerHTML = notifs.length
+          ? notifs.map((n) => `
+            <li>
+              <strong>${esc(n.title)}</strong>
+              <div class="muted">${esc((n.body || "").slice(0, 120))}</div>
+              <div class="muted">${esc((n.sent_at || "").slice(0, 16).replace("T", " "))}</div>
+            </li>`).join("")
+          : `<li class="muted">새 알림이 없습니다.</li>`;
+      } catch (e) {
+        document.getElementById("dash-timeline").innerHTML = `<div class="ep-empty">${esc(e.message)}</div>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4">${esc(e.message)}</td></tr>`;
+        if (todosEl) todosEl.innerHTML = `<li class="muted">${esc(e.message)}</li>`;
+        if (notifsEl) notifsEl.innerHTML = `<li class="muted">${esc(e.message)}</li>`;
+      }
+    }
+    document.getElementById("dash-reload-btn")?.addEventListener("click", loadDashboard);
+    document.getElementById("dash-print-certs-btn")?.addEventListener("click", () => {
+      switchPanel("cert");
+    });
 
     async function loadCompany(opts = {}) {
       try {
@@ -870,10 +1281,6 @@
         document.getElementById("sidebar-company-code").textContent = c.cert_no || String(c.id || "");
         renderSidebarBadges(c.held_standards || [], c.other_certifications || []);
         fillCompanyForm(c);
-        if ((c.iaf_codes||[]).length && !document.getElementById("iaf-override").value) {
-          document.getElementById("iaf-override").placeholder = c.iaf_codes.join(",");
-        }
-        renderApplyStandards(c.available_standards || []);
       } catch (e) {
         document.getElementById("sidebar-company-name").textContent = "기업 정보 없음";
         document.getElementById("sidebar-company-code").textContent = "";
@@ -1204,34 +1611,57 @@
     async function loadCertStatus() {
       const heldBox = document.getElementById("held-certs");
       const appsBox = document.getElementById("cert-apps");
-      heldBox.innerHTML = `<div class="muted">불러오는 중…</div>`;
-      appsBox.innerHTML = "";
+      if (heldBox) heldBox.innerHTML = `<div class="muted">불러오는 중…</div>`;
+      if (appsBox) appsBox.innerHTML = `<div class="muted">불러오는 중…</div>`;
       try {
         const res = await fetch(`${API}/user/cert-status${companyQuery()}`, { headers: authHeaders(), cache: "no-store" });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `인증현황 조회 실패 (${res.status})`);
 
-        if (!data.held_certificates?.length) {
-          heldBox.innerHTML = `<div class="ep-empty">보유 인증서가 없습니다<div class="sub">+ 인증 신청 버튼을 눌러 인증을 시작하세요</div></div>`;
-        } else {
-          heldBox.innerHTML = `<div class="held-cert-grid">${data.held_certificates.map((c) => `
-            <div class="held-cert-card">
-              <h4>${esc(c.standards)}</h4>
-              <div class="muted">인증번호 ${esc(c.cert_no || "-")}</div>
-              <div class="muted">유효기간 ${esc(c.valid_from || "-")} ~ ${esc(c.valid_until || "-")}</div>
-              <div style="margin-top:6px;"><span class="cert-badge ok">${esc(c.status)}</span></div>
-            </div>`).join("")}</div>`;
+        if (heldBox) {
+          if (!data.held_certificates?.length) {
+            heldBox.innerHTML = `<div class="ep-empty">등록된 보유 인증이 없습니다.<div class="sub">인증신청관리에서 신규 신청을 진행할 수 있습니다.</div></div>`;
+          } else {
+            heldBox.innerHTML = `<div class="held-cert-grid">${data.held_certificates.map((c) => {
+              const label = c.standard_label || c.standards || "-";
+              const alertCls = c.expiry_within_3_months ? " is-expiring" : "";
+              const notice = c.expiry_notice
+                ? `<p class="held-cert-expiry-notice">${esc(c.expiry_notice)}</p>`
+                : "";
+              const lastType = c.last_audit_type_label || c.last_audit_type || "-";
+              const curType = c.current_audit_type_label || c.current_audit_type || "-";
+              const pdf = c.certificate_file_url
+                ? `<div><dt>인증서</dt><dd><a href="${esc(c.certificate_file_url)}" target="_blank" rel="noopener">PDF 다운로드</a></dd></div>`
+                : "";
+              return `<div class="held-cert-card${alertCls}">
+              <h4>${esc(label)}</h4>
+              <dl class="held-cert-meta">
+                <div><dt>인증기관</dt><dd>${esc(c.cb_name || "-")}</dd></div>
+                <div><dt>인정기관</dt><dd>${esc(c.ab_code || "-")}</dd></div>
+                <div><dt>최초인증일</dt><dd>${esc(c.issued_at || c.valid_from || "-")}</dd></div>
+                <div><dt>유효기간(만료일)</dt><dd>${esc(c.valid_until || "-")}</dd></div>
+                <div><dt>최근심사일</dt><dd>${esc(c.last_audit_date || "-")}</dd></div>
+                <div><dt>최근심사유형</dt><dd>${esc(lastType)}</dd></div>
+                <div><dt>이번심사유형</dt><dd>${esc(curType)}</dd></div>
+                <div><dt>인증서번호</dt><dd>${esc(c.cert_no || "-")}</dd></div>
+                ${pdf}
+              </dl>
+              ${notice}
+            </div>`;
+            }).join("")}</div>`;
+          }
         }
 
-        if (!data.applications?.length) {
-          appsBox.innerHTML = `<div class="ep-empty">진행 중인 인증 신청이 없습니다.<div class="sub">인증 신청 후 7단계 프로세스가 여기에 표시됩니다.</div></div>`;
-        } else {
-          appsBox.innerHTML = data.applications.map((a) => {
-            const badgeCls = a.process_step <= 1 ? "ok" : (a.process_step >= 7 ? "ok" : "warn");
-            const badgeText = a.process_step <= 1 ? "제출완료" : a.status_label;
-            const std = (a.standards || []).join(", ") || "-";
-            const submitted = (a.submitted_at || "").slice(0, 10);
-            return `<div class="cert-app-card">
+        if (appsBox) {
+          if (!data.applications?.length) {
+            appsBox.innerHTML = `<div class="ep-empty">진행 중인 인증 신청이 없습니다.<div class="sub">+ 인증신청 버튼으로 새 신청 페이지를 엽니다.</div></div>`;
+          } else {
+            appsBox.innerHTML = data.applications.map((a) => {
+              const badgeCls = a.process_step <= 1 ? "ok" : (a.process_step >= 7 ? "ok" : "warn");
+              const badgeText = a.process_step <= 1 ? "제출완료" : a.status_label;
+              const std = (a.standards || []).map((s) => heldDisplayLabel(s)).filter(Boolean).join(", ") || "-";
+              const submitted = (a.submitted_at || "").slice(0, 10);
+              return `<div class="cert-app-card">
               <div class="cert-app-top">
                 <div>
                   <h3>${esc(a.cb_name || a.company_name || "인증기관")}</h3>
@@ -1251,19 +1681,14 @@
               ${renderStepper(Number(a.process_step || 1))}
               <div class="cert-docs"><strong>단계별 문서</strong><div class="muted" style="margin-top:4px;">${esc(a.documents_hint || "")}</div></div>
             </div>`;
-          }).join("");
+            }).join("");
+          }
         }
-        renderApplyStandards(state.availableStandards || []);
       } catch (e) {
-        heldBox.innerHTML = `<div class="ep-empty">${esc(e.message)}</div>`;
+        if (heldBox) heldBox.innerHTML = `<div class="ep-empty">${esc(e.message)}</div>`;
+        if (appsBox) appsBox.innerHTML = `<div class="ep-empty">${esc(e.message)}</div>`;
       }
     }
-
-    document.getElementById("cert-apply-open-btn")?.addEventListener("click", () => {
-      const box = document.getElementById("cert-apply-box");
-      box.style.display = box.style.display === "none" ? "block" : "none";
-      if (box.style.display === "block") renderApplyStandards(state.availableStandards || []);
-    });
 
     async function loadArchiveByYear() {
       const box = document.getElementById("archive-years");
@@ -1419,12 +1844,17 @@
         updateEsgThead(years);
 
         const held = (data.held_standards || state.heldStandards || []).map(heldDisplayLabel).filter(Boolean).join(", ") || "없음";
-        document.getElementById("esg-meta").textContent = data.matched_to_held
+        const srcHint = data.data_source === "kpi_master" ? " · 출처 kpi_master/실적" : "";
+        let metaText = data.matched_to_held
           ? `보유 표준(${held})에 매칭된 KPI · ${state.esgPage * state.esgLimit + 1}–${Math.min((state.esgPage + 1) * state.esgLimit, state.esgTotal)} / ${state.esgTotal}`
           : `전체 카탈로그 · ${state.esgTotal}건 중 ${state.esgPage * state.esgLimit + 1}–${Math.min((state.esgPage + 1) * state.esgLimit, state.esgTotal)} 표시`;
+        if (data.notice) metaText = data.notice;
+        document.getElementById("esg-meta").textContent = metaText + (data.notice ? "" : srcHint);
 
         if (!data.data?.length) {
-          tbody.innerHTML = `<tr><td colspan="${3 + years.length + 3}">${heldOnly ? "보유 표준에 매칭되는 KPI가 없습니다. 필터를 해제해 보세요." : "조회 결과가 없습니다."}</td></tr>`;
+          const emptyMsg = data.notice
+            || (heldOnly ? "보유 표준에 매칭되는 KPI가 없습니다. 필터를 해제해 보세요." : "조회된 ESG KPI가 없습니다. 데이터 준비 상태를 확인하세요.");
+          tbody.innerHTML = `<tr><td colspan="${3 + years.length + 3}" class="muted">${esc(emptyMsg)}</td></tr>`;
           renderEsgPagination();
           return;
         }
@@ -1453,42 +1883,6 @@
     document.getElementById("esg-std").addEventListener("change", () => loadEsgKpis(true));
     document.getElementById("esg-mode").addEventListener("change", () => loadEsgKpis(true));
     document.getElementById("esg-held-only").addEventListener("change", () => loadEsgKpis(true));
-
-    async function loadAvailableCbs() {
-      setMsg("", "");
-      const standards = [...document.querySelectorAll("#std-checks input:checked")].map((el) => el.value);
-      if (!standards.length) { setMsg("", "신청 표준을 1개 이상 선택하세요."); return; }
-      const params = new URLSearchParams({ standards: standards.join(",") });
-      const iaf = document.getElementById("iaf-override").value.trim();
-      if (iaf) params.set("iaf_codes", iaf);
-      try {
-        const res = await fetch(`${API}/user/available-cbs?${params}`, { headers: authHeaders(), cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `조회 실패 (${res.status})`);
-        document.getElementById("cb-meta").textContent =
-          `${data.company_name || ""} · IAF [${(data.company_iaf_codes||[]).join(", ") || "-"}] · ${data.total}곳`;
-        const grid = document.getElementById("cb-grid");
-        if (!data.data?.length) {
-          grid.innerHTML = '<div class="muted">조건에 맞는 인증기관이 없습니다.</div>';
-          return;
-        }
-        grid.innerHTML = data.data.map((cb) => `
-          <div class="cb-card ${state.selectedCbId===cb.id?'selected':''}" data-id="${cb.id}" data-name="${esc(cb.cb_name)}">
-            <h4>${esc(cb.cb_name)}</h4>
-            <div class="muted">${esc(cb.cb_code)} · ${esc(cb.accreditation_body || "-")}</div>
-            <div class="muted">표준: ${esc((cb.matched_standards||[]).join(", "))}</div>
-            <div class="muted">IAF: ${esc((cb.matched_iaf_codes||[]).join(", "))}</div>
-          </div>`).join("");
-        grid.querySelectorAll(".cb-card").forEach((el) => {
-          el.addEventListener("click", () => {
-            state.selectedCbId = Number(el.dataset.id);
-            document.getElementById("selected-cb").value = `${el.dataset.name} (#${state.selectedCbId})`;
-            grid.querySelectorAll(".cb-card").forEach((c) => c.classList.toggle("selected", c === el));
-          });
-        });
-      } catch (e) { setMsg("", e.message); }
-    }
-    document.getElementById("load-cbs-btn").addEventListener("click", loadAvailableCbs);
 
     async function loadAudits() {
       const sel = document.getElementById("audit-select");

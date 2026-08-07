@@ -250,6 +250,13 @@ class AuditPlanItems(Base):
     auditor_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sort_order: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Scope keys for 심사노트 (additive — used when present)
+    auditor_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    process_group_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    clause_no: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    dept: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    standard_code: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    standard_key: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
 
 
 class AuditPlans(Base):

@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import date
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import inspect, text
@@ -84,6 +85,18 @@ def _row_key(standard: str, cb_id: Optional[int]) -> str:
     return f"{_norm_key(standard)}#{int(cb_id) if cb_id else 0}"
 
 
+def _iso_date(val: Any) -> Optional[str]:
+    if val is None:
+        return None
+    if hasattr(val, "isoformat"):
+        try:
+            return val.isoformat()
+        except Exception:
+            return None
+    text = str(val).strip()
+    return text[:10] if text else None
+
+
 def _merge_row(
     by_key: Dict[str, Dict[str, Any]],
     *,
@@ -94,6 +107,14 @@ def _merge_row(
     cb_initial: Optional[str] = None,
     cert_no: Optional[str] = None,
     status: Optional[str] = None,
+    issued_at: Any = None,
+    valid_from: Any = None,
+    valid_until: Any = None,
+    source_id: Optional[int] = None,
+    last_audit_date: Any = None,
+    last_audit_type: Optional[str] = None,
+    current_audit_type: Optional[str] = None,
+    certificate_file_url: Optional[str] = None,
 ) -> None:
     key = _row_key(standard, cb_id)
     if not _norm_key(standard):
@@ -111,6 +132,14 @@ def _merge_row(
         "cb_initial": None,
         "cert_no": None,
         "status": None,
+        "issued_at": None,
+        "valid_from": None,
+        "valid_until": None,
+        "source_id": None,
+        "last_audit_date": None,
+        "last_audit_type": None,
+        "current_audit_type": None,
+        "certificate_file_url": None,
     }
     if ab_code and not row.get("ab_code"):
         row["ab_code"] = ab_code.strip()
@@ -124,6 +153,26 @@ def _merge_row(
         row["cert_no"] = cert_no
     if status and not row.get("status"):
         row["status"] = status
+    issued_s = _iso_date(issued_at)
+    from_s = _iso_date(valid_from)
+    until_s = _iso_date(valid_until)
+    last_s = _iso_date(last_audit_date)
+    if issued_s and not row.get("issued_at"):
+        row["issued_at"] = issued_s
+    if from_s and not row.get("valid_from"):
+        row["valid_from"] = from_s
+    if until_s and not row.get("valid_until"):
+        row["valid_until"] = until_s
+    if last_s and not row.get("last_audit_date"):
+        row["last_audit_date"] = last_s
+    if last_audit_type and not row.get("last_audit_type"):
+        row["last_audit_type"] = str(last_audit_type).strip()
+    if current_audit_type and not row.get("current_audit_type"):
+        row["current_audit_type"] = str(current_audit_type).strip()
+    if certificate_file_url and not row.get("certificate_file_url"):
+        row["certificate_file_url"] = str(certificate_file_url).strip()
+    if source_id is not None and row.get("source_id") is None:
+        row["source_id"] = int(source_id)
     by_key[key] = row
 
 
@@ -195,18 +244,35 @@ def list_company_held_standards(
     # 1) company_certificates
     if _table_exists(db, "company_certificates"):
         try:
-            sql = (
-                "SELECT standard_code, ab_code, cb_id, cert_no, status "
-                "FROM company_certificates WHERE company_id = :cid"
+            # Prefer extended audit/PDF columns when present (additive migration).
+            cols = {c["name"] for c in inspect(db.get_bind()).get_columns("company_certificates")}
+            has_audit = "last_audit_date" in cols
+            has_pdf = "certificate_file_url" in cols
+            select_cols = (
+                "id, standard_code, ab_code, cb_id, cert_no, status, "
+                "valid_from, valid_until"
             )
+            if has_audit:
+                select_cols += ", last_audit_date, last_audit_type, current_audit_type"
+            if has_pdf:
+                select_cols += ", certificate_file_url"
+            sql = f"SELECT {select_cols} FROM company_certificates WHERE company_id = :cid"
             params: Dict[str, Any] = {"cid": company_id}
             if filter_cb is not None:
                 sql += " AND cb_id = :cb_id"
                 params["cb_id"] = filter_cb
             rows = db.execute(text(sql), params).fetchall()
-            cb_ids = {int(r[2]) for r in rows if r[2]}
+            cb_ids = {int(r[3]) for r in rows if r[3]}
             cbs = _cb_map(db, cb_ids)
-            for std, ab, row_cb_id, cert_no, status in rows:
+            for row in rows:
+                row_id, std, ab, row_cb_id, cert_no, status, vf, vu = row[:8]
+                idx = 8
+                lad = lat = cat = pdf = None
+                if has_audit:
+                    lad, lat, cat = row[idx : idx + 3]
+                    idx += 3
+                if has_pdf:
+                    pdf = row[idx]
                 name, ini = (None, None)
                 if row_cb_id and int(row_cb_id) in cbs:
                     name, ini = cbs[int(row_cb_id)]
@@ -219,6 +285,14 @@ def list_company_held_standards(
                     cb_initial=ini,
                     cert_no=cert_no,
                     status=status,
+                    issued_at=vf,
+                    valid_from=vf,
+                    valid_until=vu,
+                    source_id=int(row_id) if row_id is not None else None,
+                    last_audit_date=lad,
+                    last_audit_type=lat,
+                    current_audit_type=cat,
+                    certificate_file_url=pdf,
                 )
                 if row_cb_id and not ab:
                     pending_ab.add((int(row_cb_id), _norm_key(str(std))))
@@ -258,6 +332,7 @@ def list_company_held_standards(
             name, ini = (None, None)
             if cid and cid in cbs:
                 name, ini = cbs[cid]
+            pdf = getattr(cert, "certificate_file_url", None)
             for std in _split_standards(cert.standards):
                 _merge_row(
                     by_key,
@@ -267,6 +342,11 @@ def list_company_held_standards(
                     cb_initial=ini,
                     cert_no=cert.cert_no,
                     status=cert.status,
+                    issued_at=cert.issued_at,
+                    valid_from=cert.valid_from,
+                    valid_until=cert.valid_until,
+                    source_id=int(cert.id) if getattr(cert, "id", None) is not None else None,
+                    certificate_file_url=pdf,
                 )
                 if cid:
                     pending_ab.add((cid, _norm_key(std)))
@@ -363,6 +443,107 @@ def company_held_standards(
     return list_company_held_standards(
         db, company_id, cb_id=cb_id, display_mode=display_mode
     )
+
+
+def _parse_iso_date(raw: Optional[str]) -> Optional[date]:
+    if not raw:
+        return None
+    text = str(raw).strip()[:10]
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def expiry_alert_fields(valid_until: Optional[str]) -> Dict[str, Any]:
+    """Alert when expiry is within 3 months (≈92 days), including already expired."""
+    until = _parse_iso_date(valid_until)
+    if not until:
+        return {
+            "expiry_within_3_months": False,
+            "days_to_expiry": None,
+            "expiry_notice": None,
+        }
+    days = (until - date.today()).days
+    within = days <= 92
+    notice = None
+    if within:
+        if days < 0:
+            notice = (
+                f"인증 유효기간이 {abs(days)}일 전에 만료되었습니다. "
+                "갱신·전환 심사를 검토하세요."
+            )
+        elif days == 0:
+            notice = "인증 유효기간이 오늘 만료됩니다. 갱신·전환 심사를 검토하세요."
+        else:
+            notice = (
+                f"인증 만료까지 {days}일 남았습니다(3개월 이내). "
+                "갱신·전환 심사를 검토하세요."
+            )
+    return {
+        "expiry_within_3_months": within,
+        "days_to_expiry": days,
+        "expiry_notice": notice,
+    }
+
+
+def list_company_held_cert_status(
+    db: Session,
+    company_id: int,
+    cb_id: Optional[int] = None,
+    display_mode: StandardDisplayMode = "enterprise",
+) -> List[Dict[str, Any]]:
+    """Held standards + expiry alert fields for Admin/CB/Enterprise cert status.
+
+    Same sources as ``list_company_held_standards``; CB portal passes ``cb_id``.
+    Soft-fails to ``[]``.
+    """
+    try:
+        rows = list_company_held_standards(
+            db, company_id, cb_id=cb_id, display_mode=display_mode
+        )
+    except Exception:
+        logger.exception(
+            "held cert status soft-fail company_id=%s cb_id=%s", company_id, cb_id
+        )
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return []
+
+    out: List[Dict[str, Any]] = []
+    for idx, r in enumerate(rows):
+        label = (
+            r.get("label")
+            or format_standard_label(
+                r.get("initial") or r.get("standard_code") or "",
+                mode=display_mode,
+            )
+            or str(r.get("standard_code") or "-")
+        )
+        item = {
+            "id": int(r.get("source_id") or (idx + 1)),
+            "cert_no": r.get("cert_no"),
+            "standards": label,
+            "standard_label": label,
+            "standard_code": r.get("standard_code"),
+            "initial": r.get("initial"),
+            "cb_id": r.get("cb_id"),
+            "cb_name": r.get("cb_name"),
+            "ab_code": r.get("ab_code"),
+            "valid_from": r.get("valid_from"),
+            "valid_until": r.get("valid_until"),
+            "status": r.get("status") or "held",
+            "issued_at": r.get("issued_at") or r.get("valid_from"),
+            "last_audit_date": r.get("last_audit_date"),
+            "last_audit_type": r.get("last_audit_type"),
+            "current_audit_type": r.get("current_audit_type"),
+            "certificate_file_url": r.get("certificate_file_url"),
+        }
+        item.update(expiry_alert_fields(r.get("valid_until")))
+        out.append(item)
+    return out
 
 
 def company_held_standard_labels(

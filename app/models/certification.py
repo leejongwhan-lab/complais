@@ -24,6 +24,7 @@ class Certificates(Base):
     valid_until: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     issued_by: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False)
+    certificate_file_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
@@ -149,6 +150,10 @@ class CompanyCertificates(Base):
     status: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     valid_from: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     valid_until: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    last_audit_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    last_audit_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    current_audit_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    certificate_file_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 

@@ -8,14 +8,31 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.core.security import CurrentUser, get_current_user
-from app.models.auditor import Auditor, AuditorCbMemberships
+from app.models.auditor import Auditor, AuditorCbMemberships, AuditorEducation
 from app.models.cb import CertificationBodies
 from app.models.enums import AuditorCbMembershipsStatus, UsersRole
+from app.services.auditor_grade import to_db_grade, to_ui_grade
+from app.services.auditor_profile_persist import (
+    add_educations,
+    add_qualifications,
+    add_work_experiences,
+    career_from_affiliation,
+    normalize_iaf_codes,
+)
 
 router = APIRouter(prefix="/auditor/memberships", tags=["Auditor Memberships"])
 
 # DB ENUM은 requested — 요구사항의 pending 과 동일 의미
 _PENDING_STATUS = AuditorCbMembershipsStatus.REQUESTED.value
+
+
+class QualificationApplyItem(BaseModel):
+    standard_code: str
+    cert_body_name: Optional[str] = None
+    cert_no: Optional[str] = None
+    auditor_grade: Optional[str] = None
+    iaf_codes: List[str] = Field(default_factory=list)
+    major_name: Optional[str] = None
 
 
 class MembershipRequestBody(BaseModel):
@@ -29,10 +46,24 @@ class MembershipRequestBody(BaseModel):
     major: Optional[str] = Field(None, description="전공학과명")
     company_id: Optional[int] = Field(None, description="경력 기업 ID")
     company_name: Optional[str] = Field(None, description="경력 기업명")
+    biz_no: Optional[str] = None
     ksic_code: Optional[str] = None
+    is_temporary: bool = Field(False, description="미등록 기업 직접입력")
+    career_start_date: Optional[str] = None
+    career_end_date: Optional[str] = None
+    duties: Optional[str] = None
+    position: Optional[str] = None
     requested_iaf_codes: List[str] = Field(
         default_factory=list,
         description="신청 Scope IAF 코드 목록 (예: ['14','19'])",
+    )
+    qualifications: List[QualificationApplyItem] = Field(
+        default_factory=list,
+        description="심사 자격 정보 (표준/발급기관/번호/등급)",
+    )
+    cert_standards: Optional[List[str]] = Field(
+        default=None,
+        description="신청 표준 코드 목록 (없으면 qualifications에서 도출)",
     )
 
 
@@ -45,6 +76,8 @@ class MembershipRequestResponse(BaseModel):
     status: str
     apply_grade: Optional[str] = None
     requested_iaf_codes: List[str] = Field(default_factory=list)
+    qualification_count: int = 0
+    career_saved: bool = False
 
 
 class MyMembershipItem(BaseModel):
@@ -86,30 +119,35 @@ def _get_auditor_for_user(db: Session, user_id: int) -> Auditor:
     return auditor
 
 
-def _normalize_iaf_codes(codes: List[str]) -> List[str]:
-    out: List[str] = []
-    seen = set()
-    for c in codes or []:
-        text = str(c).strip()
-        if not text or text in seen:
-            continue
-        seen.add(text)
-        out.append(text)
-    return out
-
-
 def _build_request_metadata(payload: MembershipRequestBody) -> Dict[str, Any]:
-    iaf_codes = _normalize_iaf_codes(payload.requested_iaf_codes)
+    iaf_codes = normalize_iaf_codes(payload.requested_iaf_codes)
+    quals = [
+        {
+            "standard_code": q.standard_code,
+            "cert_body_name": q.cert_body_name,
+            "cert_no": q.cert_no,
+            "auditor_grade": q.auditor_grade or payload.apply_grade,
+            "iaf_codes": normalize_iaf_codes(q.iaf_codes or iaf_codes),
+            "major_name": q.major_name or payload.major,
+        }
+        for q in (payload.qualifications or [])
+    ]
     return {
         "requested_iaf_codes": iaf_codes,
         "education": {"major": payload.major.strip()} if payload.major and payload.major.strip() else None,
         "career": {
             "company_id": payload.company_id,
             "company_name": payload.company_name,
+            "biz_no": payload.biz_no,
             "ksic_code": payload.ksic_code,
+            "is_temporary": payload.is_temporary,
+            "duties": payload.duties,
+            "start_date": payload.career_start_date,
+            "end_date": payload.career_end_date,
         }
         if payload.company_id or payload.company_name
         else None,
+        "qualifications": quals or None,
     }
 
 
@@ -142,12 +180,120 @@ def _meta_company_name(meta: Optional[dict]) -> Optional[str]:
     return None
 
 
+def _standards_csv(payload: MembershipRequestBody) -> Optional[str]:
+    codes: List[str] = []
+    seen = set()
+    for s in payload.cert_standards or []:
+        t = str(s).strip().upper()
+        if t and t not in seen:
+            seen.add(t)
+            codes.append(t)
+    for q in payload.qualifications or []:
+        t = (q.standard_code or "").strip().upper()
+        if t and t not in seen:
+            seen.add(t)
+            codes.append(t)
+    return ",".join(codes) if codes else None
+
+
+def _persist_affiliation_rows(
+    db: Session,
+    *,
+    auditor: Auditor,
+    membership: AuditorCbMemberships,
+    payload: MembershipRequestBody,
+    now: datetime,
+) -> tuple[int, bool]:
+    """학력/경력/자격 행을 실제 테이블에 저장. (metadata 스냅샷과 병행)"""
+    major = (payload.major or "").strip() or None
+    if major:
+        auditor.major = major
+        has_edu = (
+            db.query(AuditorEducation.id)
+            .filter(AuditorEducation.auditor_id == auditor.id)
+            .first()
+        )
+        if not has_edu:
+            add_educations(
+                db,
+                auditor_id=auditor.id,
+                items=[
+                    {
+                        "school_name": "미입력",
+                        "degree": "bachelor",
+                        "major": major,
+                    }
+                ],
+                now=now,
+            )
+
+    career_item = career_from_affiliation(
+        company_id=payload.company_id,
+        company_name=payload.company_name,
+        biz_no=payload.biz_no,
+        ksic_code=payload.ksic_code,
+        is_temporary=payload.is_temporary,
+        start_date=payload.career_start_date,
+        end_date=payload.career_end_date,
+        duties=payload.duties,
+        position=payload.position,
+        iaf_codes=payload.requested_iaf_codes,
+    )
+    career_saved = False
+    if career_item:
+        add_work_experiences(db, auditor_id=auditor.id, items=[career_item], now=now)
+        career_saved = True
+
+    iaf_codes = normalize_iaf_codes(payload.requested_iaf_codes)
+    qual_items: List[Any] = list(payload.qualifications or [])
+    if not qual_items and _standards_csv(payload):
+        # cert_standards only
+        for s in (payload.cert_standards or []):
+            qual_items.append(
+                {
+                    "standard_code": s,
+                    "auditor_grade": payload.apply_grade,
+                    "iaf_codes": iaf_codes,
+                    "major_name": major,
+                }
+            )
+    # 자격 미입력 + IAF만 있는 경우에도 표준 없으면 스킵
+    for q in qual_items:
+        if isinstance(q, dict):
+            if not q.get("auditor_grade"):
+                q["auditor_grade"] = payload.apply_grade
+            if not q.get("major_name") and major:
+                q["major_name"] = major
+            if not q.get("iaf_codes"):
+                q["iaf_codes"] = iaf_codes
+        else:
+            if not q.auditor_grade:
+                q.auditor_grade = payload.apply_grade
+            if not q.major_name and major:
+                q.major_name = major
+            if not q.iaf_codes:
+                q.iaf_codes = iaf_codes
+
+    qual_count = add_qualifications(
+        db,
+        auditor_id=auditor.id,
+        items=qual_items,
+        now=now,
+        cb_id=payload.cb_id,
+        membership_id=membership.id,
+        default_major=major,
+        default_iaf_codes=iaf_codes,
+    )
+    return qual_count, career_saved
+
+
 def _apply_request_fields(membership: AuditorCbMemberships, payload: MembershipRequestBody) -> None:
-    membership.apply_grade = payload.apply_grade
+    membership.apply_grade = to_db_grade(payload.apply_grade)
     membership.employment_type = payload.employment_type
     membership.is_freelance = payload.is_freelance
     membership.apply_message = payload.apply_message
     membership.daily_rate = payload.daily_rate
+    membership.cert_standards = _standards_csv(payload)
     membership.extra_metadata = _build_request_metadata(payload)
 
 
@@ -193,6 +339,10 @@ def request_cb_membership(
         existing.reject_reason = None
         existing.requested_at = now
         existing.updated_at = now
+        db.flush()
+        qual_count, career_saved = _persist_affiliation_rows(
+            db, auditor=auditor, membership=existing, payload=payload, now=now
+        )
         db.commit()
         db.refresh(existing)
         return MembershipRequestResponse(
@@ -202,8 +352,10 @@ def request_cb_membership(
             cb_id=cb.id,
             cb_name=cb.name,
             status=existing.status,
-            apply_grade=existing.apply_grade,
-            requested_iaf_codes=_normalize_iaf_codes(payload.requested_iaf_codes),
+            apply_grade=to_ui_grade(existing.apply_grade),
+            requested_iaf_codes=normalize_iaf_codes(payload.requested_iaf_codes),
+            qualification_count=qual_count,
+            career_saved=career_saved,
         )
 
     now = datetime.utcnow()
@@ -220,15 +372,20 @@ def request_cb_membership(
         is_freelance=payload.is_freelance,
         status=_PENDING_STATUS,
         is_primary=not has_any,
-        apply_grade=payload.apply_grade,
+        apply_grade=to_db_grade(payload.apply_grade),
         apply_message=payload.apply_message,
         daily_rate=payload.daily_rate,
+        cert_standards=_standards_csv(payload),
         extra_metadata=_build_request_metadata(payload),
         requested_at=now,
         created_at=now,
         updated_at=now,
     )
     db.add(membership)
+    db.flush()
+    qual_count, career_saved = _persist_affiliation_rows(
+        db, auditor=auditor, membership=membership, payload=payload, now=now
+    )
     db.commit()
     db.refresh(membership)
 
@@ -239,8 +396,10 @@ def request_cb_membership(
         cb_id=cb.id,
         cb_name=cb.name,
         status=membership.status,
-        apply_grade=membership.apply_grade,
-        requested_iaf_codes=_normalize_iaf_codes(payload.requested_iaf_codes),
+        apply_grade=to_ui_grade(membership.apply_grade),
+        requested_iaf_codes=normalize_iaf_codes(payload.requested_iaf_codes),
+        qualification_count=qual_count,
+        career_saved=career_saved,
     )
 
 
@@ -270,8 +429,8 @@ def list_my_memberships(
             cb_name=cb.name if cb else None,
             cb_code=cb.code if cb else None,
             status=m.status,
-            apply_grade=m.apply_grade,
-            approved_grade=m.approved_grade,
+            apply_grade=to_ui_grade(m.apply_grade),
+            approved_grade=to_ui_grade(m.approved_grade),
             cert_standards=m.cert_standards,
             approved_iaf_codes=m.approved_iaf_codes,
             requested_iaf_codes=_meta_list(m.extra_metadata, "requested_iaf_codes"),

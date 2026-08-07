@@ -14,7 +14,13 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from app.data.standards_catalog import format_standard_label, standard_display_payload
+from app.data.standards_catalog import (
+    OPERATING_STANDARDS,
+    STANDARD_BY_KEY,
+    format_standard_label,
+    standard_display_payload,
+    to_family_initial,
+)
 
 
 def _q(
@@ -187,6 +193,45 @@ QUESTIONNAIRE_CATALOG: Dict[str, Dict[str, Any]] = {
             ),
         ],
     },
+    "19443": {
+        "title": "ISO 19443",
+        "items": [
+            _q(
+                "19443_q1",
+                "원자력 시설/공급망(안전중요 품목·서비스)에 제품을 공급합니까?",
+                "yes_no",
+            ),
+            _q("19443_q2", "설계/개발을 직접 수행합니까?", "yes_no"),
+            _q(
+                "19443_q3",
+                "안전등급·품질등급이 지정된 품목을 취급합니까?",
+                "yes_no",
+            ),
+            _q(
+                "19443_q4",
+                "원자력 관련 규제·고객 특수 요구사항이 적용됩니까?",
+                "yes_no",
+            ),
+        ],
+    },
+    "42001": {
+        "title": "ISO/IEC 42001",
+        "items": [
+            _q("42001_q1", "자체 AI 시스템·모델을 개발/학습합니까?", "yes_no"),
+            _q("42001_q2", "외부 AI 서비스(API·SaaS)를 업무에 사용합니까?", "yes_no"),
+            _q(
+                "42001_q3",
+                "AI가 개인·권리에 영향을 주는 의사결정에 사용됩니까?",
+                "yes_no",
+            ),
+            _q(
+                "42001_q4",
+                "고위험 AI(안전·채용·신용 등) 적용 영역이 있습니까?",
+                "yes_no",
+            ),
+        ],
+    },
+    # BCMS(ISO 22301) — 운영 14 밖. 레거시 신청 호환용으로 설문만 유지.
     "22301": {
         "title": "ISO 22301",
         "items": [
@@ -201,6 +246,11 @@ QUESTIONNAIRE_CATALOG: Dict[str, Dict[str, Any]] = {
         ],
     },
 }
+
+# ISO 번호 → 설문 카탈로그 키 (운영 14 + 레거시 BCMS)
+_ISO_DIGIT_RE = (
+    r"(9001|14001|45001|27001|37001|37301|50001|22000|13485|19443|27701|42001|22301)"
+)
 
 
 # ── C. IAF MD11 통합심사 7문항 (표준별 설문과 별도) ─────────────────
@@ -240,36 +290,69 @@ INTEGRATED_CHECK_ITEMS: List[Dict[str, str]] = [
     },
 ]
 
-_STANDARD_CODES = [
-    "9001",
-    "14001",
-    "45001",
-    "27001",
-    "27701",
-    "22000",
-    "50001",
-    "13485",
-    "22301",
-    "37001",
-    "37301",
-]
+def _questionnaire_lookup(code: str) -> str | None:
+    """Map standard_key / display / bare code → QUESTIONNAIRE_CATALOG key."""
+    import re
 
+    text = (code or "").strip()
+    if not text:
+        return None
+    if text in QUESTIONNAIRE_CATALOG:
+        return text
+    digits_only = "".join(ch for ch in text if ch.isdigit())
+    if text == digits_only and digits_only in QUESTIONNAIRE_CATALOG:
+        return digits_only
+
+    by_key = STANDARD_BY_KEY.get(text) or STANDARD_BY_KEY.get(text.upper())
+    if by_key:
+        m = re.search(_ISO_DIGIT_RE, by_key.iso_number or by_key.display_code, re.I)
+        if m and m.group(1) in QUESTIONNAIRE_CATALOG:
+            return m.group(1)
+
+    m = re.search(_ISO_DIGIT_RE, text, re.I)
+    if m and m.group(1) in QUESTIONNAIRE_CATALOG:
+        return m.group(1)
+
+    fam = to_family_initial(text)
+    if fam:
+        for s in OPERATING_STANDARDS:
+            if s.family_code != fam:
+                continue
+            m = re.search(_ISO_DIGIT_RE, s.iso_number or s.display_code, re.I)
+            if m and m.group(1) in QUESTIONNAIRE_CATALOG:
+                return m.group(1)
+    return None
+
+
+# 운영 14규격 (QMS/EMS 2015·2026 포함). BCMS(22301) 제외.
 STANDARD_OPTIONS: List[Dict[str, str]] = [
-    standard_display_payload(code, mode="enterprise") for code in _STANDARD_CODES
+    standard_display_payload(s.standard_key, code=s.standard_key, mode="enterprise")
+    for s in OPERATING_STANDARDS
 ]
+assert len(STANDARD_OPTIONS) == 14, (
+    f"신청 표준 옵션은 14개여야 함: {len(STANDARD_OPTIONS)}"
+)
 
 
 def catalog_for_standards(codes: List[str]) -> Dict[str, Dict[str, Any]]:
     out: Dict[str, Dict[str, Any]] = {}
     for code in codes:
-        key = (code or "").strip().lower()
-        # strip non-digits for keys like "9001"
-        digits = "".join(ch for ch in key if ch.isdigit())
-        lookup = digits if digits in QUESTIONNAIRE_CATALOG else key
-        if lookup in QUESTIONNAIRE_CATALOG:
-            block = dict(QUESTIONNAIRE_CATALOG[lookup])
-            block["title"] = format_standard_label(lookup, mode="enterprise")
-            block["display"] = standard_display_payload(lookup, mode="enterprise")
+        raw = (code or "").strip()
+        if not raw:
+            continue
+        lookup = _questionnaire_lookup(raw)
+        if not lookup or lookup not in QUESTIONNAIRE_CATALOG:
+            continue
+        block = dict(QUESTIONNAIRE_CATALOG[lookup])
+        block["title"] = format_standard_label(raw, mode="enterprise")
+        block["display"] = standard_display_payload(
+            raw,
+            code=raw if raw in STANDARD_BY_KEY else lookup,
+            mode="enterprise",
+        )
+        # Form selects by standard_key (QMS_2015) — key under selection code.
+        out[raw] = block
+        if lookup not in out:
             out[lookup] = block
     return out
 

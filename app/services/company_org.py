@@ -104,6 +104,61 @@ def get_company_or_404(db: Session, company_id: int) -> Companies:
     return company
 
 
+def company_to_spec_dict(
+    company: Companies,
+    *,
+    headcount: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """마스터 기업 필드 + 포털 공통 별칭.
+
+    Admin / CB / Enterprise 가 동일 키로 읽고 채우도록 한다.
+    DB 컬럼명(name, address, …)과 API 표준 용어(company_id, company_name,
+    address_kr, cert_scope_kr, …)를 함께 제공한다.
+    """
+    biz_display = format_biz_no(company.biz_no) or company.biz_no
+    out: Dict[str, Any] = {
+        "id": company.id,
+        "company_id": company.id,
+        "cert_no": company.cert_no,
+        "name": company.name,
+        "company_name": company.name,
+        "name_en": company.name_en,
+        "company_name_en": company.name_en,
+        "biz_no": biz_display,
+        "corp_no": company.corp_no,
+        "entity_type": company.entity_type,
+        "ceo_name": company.ceo_name,
+        "biz_type": company.biz_type,
+        "biz_class": company.biz_class,
+        "biz_item": company.biz_class,
+        "address": company.address,
+        "address_kr": company.address,
+        "detail_address": company.detail_address,
+        "address_en": company.address_en,
+        "zip_code": getattr(company, "zip_code", None),
+        "tel": company.tel,
+        "email": company.email,
+        "website": company.website,
+        "ksic_code": company.ksic_code,
+        "ksic": company.ksic_code,
+        "iaf_code": company.iaf_code,
+        "iaf": company.iaf_code,
+        "scope_kr": company.scope_kr,
+        "scope_en": company.scope_en,
+        "cert_scope_kr": company.scope_kr,
+        "cert_scope_en": company.scope_en,
+        "status": company.status,
+        "updated_at": (
+            company.updated_at.isoformat(sep=" ", timespec="minutes")
+            if company.updated_at
+            else None
+        ),
+    }
+    if headcount:
+        out.update(headcount)
+    return out
+
+
 def resolve_headcount_snapshot(
     db: Session,
     company: Companies,
@@ -261,40 +316,16 @@ def build_company_org_detail(
     company_id: int,
     headcount_year: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Admin/enterprise 공통 — 마스터 기업 상세 + org 연관 데이터."""
+    """Admin/CB/Enterprise 공통 — 마스터 기업 상세 + org 연관 데이터."""
     company = get_company_or_404(db, company_id)
     hc = resolve_headcount_snapshot(db, company, headcount_year)
-    biz_display = format_biz_no(company.biz_no) or company.biz_no
-
-    return {
-        "id": company.id,
-        "cert_no": company.cert_no,
-        "name": company.name,
-        "name_en": company.name_en,
-        "biz_no": biz_display,
-        "corp_no": company.corp_no,
-        "entity_type": company.entity_type,
-        "ceo_name": company.ceo_name,
-        "biz_type": company.biz_type,
-        "biz_class": company.biz_class,
-        "address": company.address,
-        "detail_address": company.detail_address,
-        "address_en": company.address_en,
-        "zip_code": getattr(company, "zip_code", None),
-        "tel": company.tel,
-        "email": company.email,
-        "website": company.website,
-        "ksic_code": company.ksic_code,
-        "iaf_code": company.iaf_code,
-        "scope_kr": company.scope_kr,
-        "scope_en": company.scope_en,
-        "status": company.status,
-        "updated_at": company.updated_at.isoformat(sep=" ", timespec="minutes") if company.updated_at else None,
-        **hc,
-        "sites": [site_to_dict(r) for r in list_additional_sites(db, company_id)],
-        "departments": [dept_to_dict(r) for r in list_active_departments(db, company_id)],
-        "staff": [staff_to_dict(r) for r in list_staff_members(db, company_id)],
-    }
+    detail = company_to_spec_dict(company, headcount=hc)
+    detail["sites"] = [site_to_dict(r) for r in list_additional_sites(db, company_id)]
+    detail["departments"] = [
+        dept_to_dict(r) for r in list_active_departments(db, company_id)
+    ]
+    detail["staff"] = [staff_to_dict(r) for r in list_staff_members(db, company_id)]
+    return detail
 
 
 def update_company_profile(

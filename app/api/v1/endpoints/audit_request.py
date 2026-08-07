@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
 from typing import Any, List, Optional, Set, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,11 +12,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.api.v1.endpoints.user_common import require_enterprise_user, resolve_company_id
 from app.core.security import CurrentUser, get_current_user
-from app.core.validators import format_biz_no
 from app.models.cb import CertificationBodies, CbAccreditationScopes
 from app.models.certification_body import CbAccreditationScope
-from app.models.company import Companies, CompanyHeadcountYearly
+from app.models.company import Companies
 from app.models.standard import StandardMaster
+from app.services import company_org as org
 
 router = APIRouter(prefix="/user", tags=["User Enterprise"])
 
@@ -96,6 +95,14 @@ class CompanyProfileOut(BaseModel):
     headcount_years: List[int] = Field(default_factory=list)
     # deprecated: 외부 API 불러오기 UX 제거 — 빈 객체 유지(하위 호환)
     field_sources: dict = Field(default_factory=dict)
+    # PHP company_info.php 호환 별칭 (DB 컬럼과 동일 값)
+    company_name: Optional[str] = None
+    company_name_en: Optional[str] = None
+    biz_item: Optional[str] = None  # = biz_class (업종)
+    cert_scope_kr: Optional[str] = None  # = scope_kr
+    cert_scope_en: Optional[str] = None  # = scope_en
+    ksic: Optional[str] = None  # = ksic_code
+    iaf: Optional[str] = None  # = iaf_code
 
 
 def _iter_token_list(raw: Any) -> List[str]:
@@ -242,12 +249,10 @@ def get_my_company_profile(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """개요/기업정보 — DB 저장된 기업 마스터(수정·저장 모드)."""
+    """개요/기업정보 — 마스터 DB 공통 serializer (Admin/CB와 동일 필드·별칭)."""
     require_enterprise_user(current_user)
     cid = resolve_company_id(current_user, company_id)
-    company = db.get(Companies, cid)
-    if not company:
-        raise HTTPException(status_code=404, detail="기업 정보를 찾을 수 없습니다.")
+    company = org.get_company_or_404(db, cid)
 
     mapped: List[dict] = []
     try:
@@ -271,73 +276,51 @@ def get_my_company_profile(
         mapped = []
 
     held, other = _collect_company_cert_badges(db, company)
-    biz_display = format_biz_no(company.biz_no) or company.biz_no
-
-    year_rows = (
-        db.query(CompanyHeadcountYearly.year)
-        .filter(CompanyHeadcountYearly.company_id == cid)
-        .order_by(CompanyHeadcountYearly.year.desc())
-        .all()
-    )
-    years = [int(r[0]) for r in year_rows]
-    current_year = datetime.now().year
-    if current_year not in years:
-        years = [current_year] + years
-    selected_year = int(headcount_year or current_year)
-
-    emp = company.employee_count
-    hc_out = company.headcount_outsourced
-    hc_reg = company.headcount_regular
-    hc_non = company.headcount_non_regular
-    snap = (
-        db.query(CompanyHeadcountYearly)
-        .filter(
-            CompanyHeadcountYearly.company_id == cid,
-            CompanyHeadcountYearly.year == selected_year,
-        )
-        .first()
-    )
-    if snap:
-        emp = snap.employee_count if snap.employee_count is not None else emp
-        hc_out = snap.headcount_outsourced if snap.headcount_outsourced is not None else hc_out
-        hc_reg = snap.headcount_regular if snap.headcount_regular is not None else hc_reg
-        hc_non = snap.headcount_non_regular if snap.headcount_non_regular is not None else hc_non
+    hc = org.resolve_headcount_snapshot(db, company, headcount_year)
+    spec = org.company_to_spec_dict(company, headcount=hc)
 
     return CompanyProfileOut(
-        id=company.id,
-        cert_no=company.cert_no,
-        name=company.name,
-        name_en=company.name_en,
-        biz_no=biz_display,
-        corp_no=company.corp_no,
-        entity_type=company.entity_type,
-        ceo_name=company.ceo_name,
-        biz_type=company.biz_type,
-        biz_class=company.biz_class,
-        address=company.address,
-        detail_address=company.detail_address,
-        address_en=company.address_en,
-        zip_code=getattr(company, "zip_code", None),
-        tel=company.tel,
-        email=company.email,
-        website=company.website,
-        ksic_code=company.ksic_code,
-        iaf_code=company.iaf_code,
-        iaf_codes=_parse_codes(company.iaf_code),
-        scope_kr=company.scope_kr,
-        scope_en=company.scope_en,
-        employee_count=emp,
-        headcount_outsourced=hc_out,
-        headcount_regular=hc_reg,
-        headcount_non_regular=hc_non,
+        id=spec["id"],
+        cert_no=spec.get("cert_no"),
+        name=spec.get("name") or "",
+        name_en=spec.get("name_en"),
+        biz_no=spec.get("biz_no"),
+        corp_no=spec.get("corp_no"),
+        entity_type=spec.get("entity_type"),
+        ceo_name=spec.get("ceo_name"),
+        biz_type=spec.get("biz_type"),
+        biz_class=spec.get("biz_class"),
+        address=spec.get("address"),
+        detail_address=spec.get("detail_address"),
+        address_en=spec.get("address_en"),
+        zip_code=spec.get("zip_code"),
+        tel=spec.get("tel"),
+        email=spec.get("email"),
+        website=spec.get("website"),
+        ksic_code=spec.get("ksic_code"),
+        iaf_code=spec.get("iaf_code"),
+        iaf_codes=_parse_codes(spec.get("iaf_code")),
+        scope_kr=spec.get("scope_kr"),
+        scope_en=spec.get("scope_en"),
+        employee_count=spec.get("employee_count"),
+        headcount_outsourced=spec.get("headcount_outsourced"),
+        headcount_regular=spec.get("headcount_regular"),
+        headcount_non_regular=spec.get("headcount_non_regular"),
         mapped_iaf=mapped,
         available_standards=_list_available_standards(db),
         held_standards=held,
         other_certifications=other,
-        updated_at=company.updated_at.isoformat(sep=" ", timespec="minutes") if company.updated_at else None,
-        headcount_year=selected_year,
-        headcount_years=years,
+        updated_at=spec.get("updated_at"),
+        headcount_year=spec.get("headcount_year"),
+        headcount_years=spec.get("headcount_years") or [],
         field_sources={},
+        company_name=spec.get("company_name"),
+        company_name_en=spec.get("company_name_en"),
+        biz_item=spec.get("biz_item"),
+        cert_scope_kr=spec.get("cert_scope_kr"),
+        cert_scope_en=spec.get("cert_scope_en"),
+        ksic=spec.get("ksic"),
+        iaf=spec.get("iaf"),
     )
 
 

@@ -5,9 +5,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>심사원 개인 가입 - complAIs</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=20260807su" />
-  <link rel="stylesheet" href="/static/css/portal.css?v=20260807su" />
-  <link rel="stylesheet" href="/static/css/style.css?v=20260807su" />
+  <link rel="stylesheet" href="/static/css/main.css?v=20260807id" />
+  <link rel="stylesheet" href="/static/css/portal.css?v=20260807id" />
+  <link rel="stylesheet" href="/static/css/style.css?v=20260807id" />
+  <!-- PortOne V1 (IMP) + V2 browser SDK — test/sandbox -->
+  <script src="https://cdn.iamport.kr/v1/iamport.js"></script>
+  <script src="https://cdn.portone.io/v2/browser-sdk.js"></script>
   <style>
     body.register-page {
       min-height: 100vh;
@@ -18,39 +21,59 @@
       background: var(--bg-secondary, #f5f7fb);
     }
     .register-card {
-      width: min(560px, 92vw);
+      width: min(720px, 94vw);
       background: #fff;
       border-radius: 12px;
       padding: 28px;
       box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
     }
-    .brand-wrap {
-      display: flex;
-      justify-content: center;
-      margin-bottom: 16px;
-    }
+    .brand-wrap { display: flex; justify-content: center; margin-bottom: 16px; }
     .brand-wrap .brand-logo { height: 34px; }
     h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    h2.section { margin: 22px 0 10px; font-size: 1.05rem; border-top: 1px solid #e2e8f0; padding-top: 16px; }
     .lead { margin: 0 0 18px; color: #64748b; font-size: 0.95rem; }
     .btn-primary {
-      width: 100%;
-      margin-top: 8px;
-      padding: 12px;
-      border: 0;
-      border-radius: 8px;
-      background: #2563eb;
-      color: #fff;
-      font-weight: 700;
-      cursor: pointer;
+      width: 100%; margin-top: 8px; padding: 12px; border: 0; border-radius: 8px;
+      background: #2563eb; color: #fff; font-weight: 700; cursor: pointer;
     }
+    .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-ghost {
+      padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+      background: #fff; cursor: pointer; font-size: 0.85rem;
+    }
+    .btn-kakao { background: #fee500; color: #191919; border: 0; font-weight: 700; }
+    .btn-naver { background: #03c75a; color: #fff; border: 0; font-weight: 700; }
+    .btn-mock { background: #fff7ed; color: #c2410c; border: 1px dashed #fdba74; font-weight: 700; }
+    .auth-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .auth-actions button { flex: 1; min-width: 140px; padding: 12px 10px; border-radius: 8px; cursor: pointer; }
+    .auth-status {
+      margin-top: 10px; padding: 10px 12px; border-radius: 8px; font-size: 0.9rem;
+      background: #f8fafc; border: 1px solid #e2e8f0; color: #475569;
+    }
+    .auth-status.ok { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
     .error { color: #dc2626; margin-top: 12px; min-height: 1.2em; }
     .links { margin-top: 16px; text-align: center; font-size: 0.9rem; }
     .links a { color: #2563eb; text-decoration: none; }
     .hint { font-size: 0.85rem; color: #64748b; margin-top: 6px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; }
+    .chip-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; }
+    .suggest-box {
+      border: 1px solid #e2e8f0; border-radius: 8px; max-height: 160px; overflow: auto;
+      margin-top: 6px; display: none;
+    }
+    .suggest-box button {
+      display: block; width: 100%; text-align: left; border: 0; background: #fff;
+      padding: 8px 10px; cursor: pointer; font-size: 0.9rem;
+    }
+    .suggest-box button:hover { background: #f1f5f9; }
+    .temp-fields { display: none; margin-top: 10px; padding: 12px; background: #f8fafc; border-radius: 8px; }
+    .qual-block { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 10px; }
   </style>
   <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-  <script src="/static/js/daum_postcode.js?v=20260807su"></script>
-  <script src="/static/js/validation.js?v=20260807su"></script>
+  <script src="/static/js/daum_postcode.js?v=20260807id"></script>
+  <script src="/static/js/validation.js?v=20260807id"></script>
 </head>
 <body class="portal-page register-page">
   <form class="register-card portal-form" id="form">
@@ -58,7 +81,21 @@
       <img src="/static/brand/complais-logo.png" alt="complAIs" class="brand-logo" />
     </div>
     <h1>심사원 개인 회원가입</h1>
-    <p class="lead">특정 인증기관(CB)에 종속되지 않는 개인 Identity로 가입합니다. 소속/자격은 로그인 후 신청합니다.</p>
+    <p class="lead">본인인증 후 계정을 생성합니다. 사전 등록된 심사원이면 자격 이력을 자동으로 불러옵니다.</p>
+
+    <input type="hidden" id="ci_key" />
+    <input type="hidden" id="user_name" />
+    <input type="hidden" id="user_phone" />
+    <input type="hidden" id="pre_registered_id" />
+
+    <h2 class="section" style="border-top:0;padding-top:0;margin-top:0;">본인인증</h2>
+    <p class="hint">카카오/네이버 간편인증(PortOne 테스트). 키가 없으면 로컬 테스트 인증을 사용하세요.</p>
+    <div class="auth-actions">
+      <button type="button" class="btn-kakao" id="btn-kakao">카카오 간편인증</button>
+      <button type="button" class="btn-naver" id="btn-naver">네이버 간편인증</button>
+      <button type="button" class="btn-mock" id="btn-mock" style="display:none;">테스트 본인인증 (mock)</button>
+    </div>
+    <div class="auth-status" id="auth-status">본인인증이 필요합니다. 인증 완료 후 가입할 수 있습니다.</div>
 
     <div class="form-row">
       <label for="name">성명</label>
@@ -105,15 +142,107 @@
     <div class="form-row">
       <label for="apply_grade">희망 등급</label>
       <select id="apply_grade">
-        <option value="trainee">심사원보</option>
+        <option value="trainee">보 (심사원보)</option>
         <option value="auditor" selected>심사원</option>
         <option value="lead_auditor">선임심사원</option>
-        <option value="verified_auditor">검증심사원</option>
+        <option value="reviewer">검토자</option>
       </select>
     </div>
-    <div class="hint">CB 승인 등급과 별개입니다. 실제 자격은 CB 승인 후 부여됩니다.</div>
 
-    <button type="submit" class="btn-primary">개인 계정 생성</button>
+    <h2 class="section">학력 / 전공</h2>
+    <div class="form-row">
+      <label for="major_name">전공학과명</label>
+      <input id="major_name" placeholder="예: 화학공학" autocomplete="off" />
+      <div class="suggest-box" id="major-suggest"></div>
+      <div class="hint">마스터 검색 후 선택하거나 직접 입력하세요.</div>
+    </div>
+
+    <h2 class="section">경력 정보</h2>
+    <div class="form-row">
+      <label>경력 기업</label>
+      <div class="addr-row">
+        <input id="company_keyword" placeholder="기업명 또는 사업자번호 (2자 이상)" />
+        <button type="button" class="btn-ghost" id="btn-company-search">기업 검색</button>
+      </div>
+      <div id="company-search-results" class="suggest-box" style="display:block;margin-top:8px;"></div>
+      <div id="selected-company" class="hint" style="display:none;"></div>
+    </div>
+    <div class="temp-fields" id="temp-company-fields">
+      <div class="grid-2">
+        <div class="form-row">
+          <label for="temp_company_name">기업명 (직접입력)</label>
+          <input id="temp_company_name" />
+        </div>
+        <div class="form-row">
+          <label for="temp_biz_no">사업자번호 (선택)</label>
+          <input id="temp_biz_no" />
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-row">
+          <label for="career_start">근무 시작일</label>
+          <input id="career_start" type="date" />
+        </div>
+        <div class="form-row">
+          <label for="career_end">근무 종료일</label>
+          <input id="career_end" type="date" />
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="career_duties">담당 업무</label>
+        <input id="career_duties" placeholder="주요 담당 업무" />
+      </div>
+    </div>
+
+    <h2 class="section">심사 자격 정보</h2>
+    <div class="qual-block">
+      <div class="form-row">
+        <label>표준 (복수 선택)</label>
+        <div class="chip-row" id="std-chips">
+          <label><input type="checkbox" name="std" value="QMS" /> QMS</label>
+          <label><input type="checkbox" name="std" value="EMS" /> EMS</label>
+          <label><input type="checkbox" name="std" value="OHSMS" /> OHSMS</label>
+          <label><input type="checkbox" name="std" value="ISMS" /> ISMS</label>
+          <label><input type="checkbox" name="std" value="EnMS" /> EnMS</label>
+          <label><input type="checkbox" name="std" value="FSMS" /> FSMS</label>
+          <label><input type="checkbox" name="std" value="MDQMS" /> MDQMS</label>
+        </div>
+        <div class="hint">화면에는 약어로 표시합니다. (관리 화면에서는 ISO ####:#### 표기)</div>
+      </div>
+      <div class="grid-2">
+        <div class="form-row">
+          <label for="cert_body">자격 발급기관</label>
+          <select id="cert_body">
+            <option value="">선택</option>
+            <option value="KAR">KAR</option>
+            <option value="IRCA">IRCA</option>
+            <option value="Exemplar Global">Exemplar Global</option>
+            <option value="Other">기타</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="cert_no">자격증 번호</label>
+          <input id="cert_no" placeholder="자격증 번호" />
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="qual_grade">자격 등급</label>
+        <select id="qual_grade">
+          <option value="lead_auditor">선임심사원</option>
+          <option value="auditor" selected>심사원</option>
+          <option value="reviewer">검토자</option>
+          <option value="trainee">보</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="iaf_codes">IAF 코드 (쉼표 구분, 선택)</label>
+        <input id="iaf_codes" placeholder="예: 14, 19, 28" list="iaf-datalist" />
+        <datalist id="iaf-datalist"></datalist>
+      </div>
+    </div>
+
+    <div class="hint" style="margin-top:14px;">본인인증 완료 후에만 가입이 가능합니다.</div>
+    <button type="submit" class="btn-primary" id="submit-btn" disabled>회원가입 완료</button>
     <div class="error" id="error"></div>
     <div class="links">
       <a href="/signup.html">← 가입 유형 선택</a> ·
@@ -121,14 +250,346 @@
     </div>
   </form>
   <script>
+    const API = "/api/v1";
+    const state = {
+      companyId: null,
+      companyName: "",
+      bizNo: "",
+      ksicCode: "",
+      isTemporary: false,
+      verified: false,
+      identityCfg: null,
+      prematch: null,
+    };
+
     if (window.ComplaisValidation) {
       ComplaisValidation.bindField(document.getElementById("phone"), "phone");
       ComplaisValidation.bindField(document.getElementById("email"), "email");
     }
+
+    function setVerified(ok, msg) {
+      state.verified = !!ok;
+      const st = document.getElementById("auth-status");
+      const btn = document.getElementById("submit-btn");
+      st.textContent = msg;
+      st.classList.toggle("ok", !!ok);
+      btn.disabled = !ok;
+    }
+
+    async function loadIdentityConfig() {
+      try {
+        const res = await fetch(`${API}/auth/identity-config`);
+        const cfg = await res.json();
+        state.identityCfg = cfg;
+        const mockBtn = document.getElementById("btn-mock");
+        if (cfg.mock_allowed || !cfg.configured) {
+          mockBtn.style.display = "inline-block";
+        }
+        if (!cfg.configured) {
+          document.getElementById("auth-status").textContent =
+            "PortOne 키가 없어 테스트 본인인증(mock)을 사용하세요. (카카오/네이버 버튼은 키 설정 후 동작)";
+        }
+      } catch (_) {
+        document.getElementById("btn-mock").style.display = "inline-block";
+      }
+    }
+
+    async function loadIafDatalist() {
+      try {
+        const res = await fetch(`${API}/meta/iaf-codes`);
+        const list = await res.json().catch(() => []);
+        document.getElementById("iaf-datalist").innerHTML = (list || []).map((r) =>
+          `<option value="${r.iaf_code}">${r.iaf_code} — ${r.industry_name_ko || ""}</option>`
+        ).join("");
+      } catch (_) { /* ignore */ }
+    }
+
+    async function runPrematch({ ci_key, name, phone }) {
+      const res = await fetch(`${API}/auth/auditor-prematch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ci_key, name, phone }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "사전등록 조회 실패");
+      state.prematch = data;
+      if (data.matched) {
+        alert(data.message || "등록된 심사원 정보가 확인되었습니다. 기존 자격 이력을 불러옵니다.");
+        autofillFromPrematch(data);
+      }
+      return data;
+    }
+
+    function autofillFromPrematch(data) {
+      document.getElementById("pre_registered_id").value = data.pre_registered_id || "";
+      if (data.name) {
+        document.getElementById("name").value = data.name;
+        document.getElementById("user_name").value = data.name;
+      }
+      if (data.phone) {
+        document.getElementById("phone").value = data.phone;
+        document.getElementById("user_phone").value = data.phone;
+      }
+      if (data.major_name) document.getElementById("major_name").value = data.major_name;
+      if (data.apply_grade) document.getElementById("apply_grade").value = data.apply_grade;
+      if (data.email && !document.getElementById("email").value) {
+        document.getElementById("email").value = data.email;
+      }
+
+      const educations = data.educations || [];
+      if (educations[0] && educations[0].major) {
+        document.getElementById("major_name").value = educations[0].major;
+      }
+
+      const careers = data.careers || [];
+      if (careers[0]) {
+        const c = careers[0];
+        state.companyId = c.company_id || null;
+        state.companyName = c.company_name || "";
+        state.bizNo = c.biz_no || "";
+        state.isTemporary = !!c.is_temporary || !c.company_id;
+        document.getElementById("temp-company-fields").style.display = "block";
+        document.getElementById("temp_company_name").value = c.company_name || "";
+        document.getElementById("temp_biz_no").value = c.biz_no || "";
+        document.getElementById("career_start").value = (c.start_date || "").slice(0, 10);
+        document.getElementById("career_end").value = (c.end_date || "").slice(0, 10);
+        document.getElementById("career_duties").value = c.duties || c.note || "";
+        document.getElementById("company_keyword").value = c.company_name || "";
+        document.getElementById("selected-company").style.display = "block";
+        document.getElementById("selected-company").textContent =
+          `사전등록 경력: ${c.company_name || "-"}`;
+      }
+
+      const quals = data.qualifications || [];
+      document.querySelectorAll("input[name=std]").forEach((el) => { el.checked = false; });
+      if (quals.length) {
+        const first = quals[0];
+        quals.forEach((q) => {
+          const el = document.querySelector(`input[name=std][value="${q.standard_code}"]`);
+          if (el) el.checked = true;
+        });
+        if (first.cert_body_name) document.getElementById("cert_body").value = first.cert_body_name;
+        if (first.cert_no) document.getElementById("cert_no").value = first.cert_no;
+        if (first.auditor_grade) document.getElementById("qual_grade").value = first.auditor_grade;
+      }
+
+      const iaf = data.iaf_codes && data.iaf_codes.length
+        ? data.iaf_codes
+        : (quals[0] && quals[0].iaf_codes) || [];
+      if (iaf.length) document.getElementById("iaf_codes").value = iaf.join(", ");
+    }
+
+    async function onIdentitySuccess({ ci_key, name, phone, source }) {
+      document.getElementById("ci_key").value = ci_key || "";
+      document.getElementById("user_name").value = name || "";
+      document.getElementById("user_phone").value = phone || "";
+      if (name && !document.getElementById("name").value) document.getElementById("name").value = name;
+      if (phone && !document.getElementById("phone").value) document.getElementById("phone").value = phone;
+
+      setVerified(true, `본인인증 완료 (${source}) · CI 수신`);
+      try {
+        await runPrematch({ ci_key, name: name || document.getElementById("name").value, phone: phone || document.getElementById("phone").value });
+      } catch (e) {
+        document.getElementById("error").textContent = e.message;
+      }
+    }
+
+    function startPortOneV1(pgHint) {
+      const cfg = state.identityCfg || {};
+      if (!cfg.imp_code || !window.IMP) {
+        alert("PortOne V1(IMP) 설정/SDK가 없습니다. 테스트 본인인증을 사용하세요.");
+        return;
+      }
+      IMP.init(cfg.imp_code);
+      IMP.certification(
+        {
+          merchant_uid: `auditor-id-${Date.now()}`,
+          company: "complAIs",
+          popup: true,
+          // 테스트 채널 pg 값은 콘솔 설정에 맞게 환경에서 조정
+          pg: pgHint || undefined,
+        },
+        function (rsp) {
+          if (rsp.success) {
+            onIdentitySuccess({
+              ci_key: rsp.unique_key || rsp.imp_uid || `PORTONE-V1-${Date.now()}`,
+              name: rsp.name || "",
+              phone: rsp.phone || "",
+              source: "PortOne V1",
+            });
+          } else {
+            setVerified(false, `본인인증 실패: ${rsp.error_msg || "취소/오류"}`);
+          }
+        }
+      );
+    }
+
+    async function startPortOneV2(channelKey, label) {
+      const cfg = state.identityCfg || {};
+      if (!cfg.store_id || !channelKey || !window.PortOne) {
+        alert(`${label} 채널 키가 없거나 PortOne V2 SDK를 불러오지 못했습니다. 테스트 본인인증을 사용하세요.`);
+        return;
+      }
+      try {
+        const identityVerificationId = `identity-verification-${crypto.randomUUID()}`;
+        const response = await PortOne.requestIdentityVerification({
+          storeId: cfg.store_id,
+          identityVerificationId,
+          channelKey,
+        });
+        if (response && (response.code == null || response.code === "SUCCESS" || response.status === "VERIFIED")) {
+          const ci = response.ci
+            || (response.verifiedCustomer && response.verifiedCustomer.ci)
+            || identityVerificationId;
+          const name = (response.verifiedCustomer && response.verifiedCustomer.name)
+            || response.name
+            || "";
+          const phone = (response.verifiedCustomer && response.verifiedCustomer.phoneNumber)
+            || response.phone
+            || "";
+          await onIdentitySuccess({ ci_key: ci, name, phone, source: `PortOne V2 ${label}` });
+        } else {
+          setVerified(false, `본인인증 실패: ${(response && (response.message || response.code)) || "취소/오류"}`);
+        }
+      } catch (e) {
+        setVerified(false, `본인인증 오류: ${e.message || e}`);
+      }
+    }
+
+    document.getElementById("btn-kakao").addEventListener("click", () => {
+      const cfg = state.identityCfg || {};
+      if (cfg.sdk === "v2" && cfg.channel_key_kakao) {
+        startPortOneV2(cfg.channel_key_kakao, "카카오");
+      } else if (cfg.sdk === "v1" && cfg.imp_code) {
+        startPortOneV1("inicis_unified");
+      } else {
+        alert("카카오 채널 키가 없습니다. [테스트 본인인증]을 사용하세요.");
+      }
+    });
+    document.getElementById("btn-naver").addEventListener("click", () => {
+      const cfg = state.identityCfg || {};
+      if (cfg.sdk === "v2" && cfg.channel_key_naver) {
+        startPortOneV2(cfg.channel_key_naver, "네이버");
+      } else if (cfg.sdk === "v1" && cfg.imp_code) {
+        startPortOneV1("inicis_unified");
+      } else {
+        alert("네이버 채널 키가 없습니다. [테스트 본인인증]을 사용하세요.");
+      }
+    });
+    document.getElementById("btn-mock").addEventListener("click", async () => {
+      const name = prompt("테스트 성명 (사전등록 매칭용)", "테스트심사원") || "테스트심사원";
+      const phone = prompt("테스트 연락처", "01012345678") || "01012345678";
+      // Seed CI: MOCK-CI-TEST-001 matches 테스트심사원 / 01012345678
+      const useSeed = name.replace(/\s/g, "") === "테스트심사원" && phone.replace(/\D/g, "") === "01012345678";
+      const ci = useSeed ? "MOCK-CI-TEST-001" : `MOCK-CI-${Date.now()}`;
+      await onIdentitySuccess({ ci_key: ci, name, phone, source: "테스트(mock)" });
+    });
+
+    let majorTimer = null;
+    document.getElementById("major_name").addEventListener("input", () => {
+      clearTimeout(majorTimer);
+      majorTimer = setTimeout(searchMajors, 250);
+    });
+
+    async function searchMajors() {
+      const q = document.getElementById("major_name").value.trim();
+      const box = document.getElementById("major-suggest");
+      if (q.length < 1) { box.style.display = "none"; box.innerHTML = ""; return; }
+      try {
+        const res = await fetch(`${API}/meta/majors?q=${encodeURIComponent(q)}`);
+        const list = await res.json().catch(() => []);
+        if (!list.length) { box.style.display = "none"; return; }
+        box.style.display = "block";
+        box.innerHTML = list.map((m) =>
+          `<button type="button" data-name="${m.name.replace(/"/g, "&quot;")}">${m.name}</button>`
+        ).join("");
+        box.querySelectorAll("button").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            document.getElementById("major_name").value = btn.dataset.name;
+            box.style.display = "none";
+          });
+        });
+      } catch (_) {
+        box.style.display = "none";
+      }
+    }
+
+    document.getElementById("btn-company-search").addEventListener("click", searchCompany);
+    document.getElementById("company_keyword").addEventListener("keyup", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); searchCompany(); }
+    });
+
+    async function searchCompany() {
+      const q = document.getElementById("company_keyword").value.trim();
+      const box = document.getElementById("company-search-results");
+      box.innerHTML = "";
+      if (q.length < 2) { box.innerHTML = "<p class='hint'>검색어를 2자 이상 입력하세요.</p>"; return; }
+      try {
+        const res = await fetch(`${API}/companies/search?q=${encodeURIComponent(q)}`);
+        const list = await res.json().catch(() => []);
+        if (!res.ok) throw new Error(list.detail || "검색 실패");
+        if (!list.length) {
+          if (confirm("등록된 기업이 없습니다. 직접 입력하시겠습니까?")) {
+            showTempCompany(q);
+          } else {
+            box.innerHTML = "<p class='hint'>검색 결과가 없습니다.</p>";
+          }
+          return;
+        }
+        hideTempCompanyKeepDates();
+        window._companyCache = {};
+        box.innerHTML = list.map((c) => {
+          window._companyCache[c.id] = c;
+          return `<button type="button" onclick="selectCompany(${c.id})"><strong>${c.name}</strong> · ${c.biz_no || "-"}</button>`;
+        }).join("");
+        box.style.display = "block";
+      } catch (e) {
+        box.innerHTML = `<p class='hint'>${e.message}</p>`;
+      }
+    }
+
+    function showTempCompany(name) {
+      state.companyId = null;
+      state.companyName = name;
+      state.isTemporary = true;
+      document.getElementById("temp-company-fields").style.display = "block";
+      document.getElementById("temp_company_name").value = name;
+      document.getElementById("selected-company").style.display = "block";
+      document.getElementById("selected-company").textContent = "임시 기업 직접입력 모드";
+      document.getElementById("company-search-results").innerHTML = "";
+    }
+
+    function hideTempCompanyKeepDates() {
+      state.isTemporary = false;
+    }
+
+    function selectCompany(id) {
+      const c = (window._companyCache || {})[id];
+      if (!c) return;
+      state.companyId = c.id;
+      state.companyName = c.name;
+      state.bizNo = c.biz_no || "";
+      state.ksicCode = c.ksic_code || "";
+      state.isTemporary = false;
+      document.getElementById("company_keyword").value = c.name;
+      document.getElementById("company-search-results").innerHTML = "";
+      document.getElementById("selected-company").style.display = "block";
+      document.getElementById("selected-company").textContent =
+        `선택: ${c.name} (${c.biz_no || "-"}) · KSIC ${c.ksic_code || "-"}`;
+      document.getElementById("temp-company-fields").style.display = "block";
+      document.getElementById("temp_company_name").value = c.name;
+      document.getElementById("temp_biz_no").value = c.biz_no || "";
+    }
+    window.selectCompany = selectCompany;
+
     document.getElementById("form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const errorEl = document.getElementById("error");
       errorEl.textContent = "";
+      if (!state.verified || !document.getElementById("ci_key").value) {
+        errorEl.textContent = "본인인증을 먼저 완료해 주세요.";
+        return;
+      }
       if (window.ComplaisValidation) {
         const v = ComplaisValidation.validateFields([
           { el: document.getElementById("phone"), kind: "phone", required: true },
@@ -136,9 +597,84 @@
         ]);
         if (!v.ok) { errorEl.textContent = v.message; return; }
       }
+
       const zip = (document.getElementById("zipcode").value || "").trim();
       const baseAddr = (document.getElementById("address").value || "").trim();
       const detail = (document.getElementById("address_detail").value || "").trim();
+      const major = document.getElementById("major_name").value.trim();
+      const standards = [...document.querySelectorAll("input[name=std]:checked")].map((el) => el.value);
+      const certBody = document.getElementById("cert_body").value;
+      const certNo = document.getElementById("cert_no").value.trim();
+      const qualGrade = document.getElementById("qual_grade").value;
+      const iafRaw = document.getElementById("iaf_codes").value.trim();
+      const iafCodes = iafRaw ? iafRaw.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean) : [];
+
+      const companyName = state.isTemporary
+        ? (document.getElementById("temp_company_name").value.trim() || state.companyName)
+        : (state.companyName || document.getElementById("temp_company_name").value.trim());
+      const bizNo = state.isTemporary
+        ? document.getElementById("temp_biz_no").value.trim()
+        : (state.bizNo || document.getElementById("temp_biz_no").value.trim());
+      const careerStart = document.getElementById("career_start").value;
+      const careerEnd = document.getElementById("career_end").value;
+      const duties = document.getElementById("career_duties").value.trim();
+
+      let work_experiences = [];
+      let educations = [];
+      let qualifications = [];
+
+      if (state.prematch && state.prematch.matched) {
+        educations = state.prematch.educations || [];
+        work_experiences = (state.prematch.careers || []).map((c) => ({
+          company_name: c.company_name,
+          company_id: c.company_id || null,
+          biz_no: c.biz_no || null,
+          position: c.position || null,
+          start_date: c.start_date,
+          end_date: c.end_date || null,
+          is_current: !!c.is_current,
+          is_temporary: !!c.is_temporary || !c.company_id,
+          duties: c.duties || c.note || null,
+          note: c.note || null,
+        }));
+        qualifications = (state.prematch.qualifications || []).map((q) => ({
+          standard_code: q.standard_code,
+          cert_body_name: q.cert_body_name || null,
+          cert_no: q.cert_no || null,
+          auditor_grade: q.auditor_grade || qualGrade,
+          iaf_codes: q.iaf_codes || iafCodes,
+          major_name: q.major_name || major || null,
+        }));
+      }
+
+      if (!work_experiences.length && companyName && careerStart) {
+        work_experiences.push({
+          company_name: companyName,
+          company_id: state.companyId,
+          biz_no: bizNo || null,
+          start_date: careerStart,
+          end_date: careerEnd || null,
+          is_current: !careerEnd,
+          is_temporary: !!state.isTemporary || !state.companyId,
+          duties: duties || null,
+          ksic_code: state.ksicCode || null,
+          note: duties || null,
+        });
+      }
+      if (!qualifications.length && standards.length) {
+        qualifications = standards.map((std) => ({
+          standard_code: std,
+          cert_body_name: certBody || null,
+          cert_no: certNo || null,
+          auditor_grade: qualGrade,
+          iaf_codes: iafCodes,
+          major_name: major || null,
+        }));
+      }
+      if (!educations.length && major) {
+        educations = [{ school_name: "미입력", degree: "bachelor", major }];
+      }
+
       const payload = {
         name: document.getElementById("name").value.trim(),
         email: document.getElementById("email").value.trim(),
@@ -149,7 +685,16 @@
         zip_code: zip || null,
         address: baseAddr || "미입력",
         detail_address: detail || "미입력",
+        major_name: major || null,
+        ci_key: document.getElementById("ci_key").value || null,
+        pre_registered_id: document.getElementById("pre_registered_id").value
+          ? Number(document.getElementById("pre_registered_id").value)
+          : null,
+        educations,
+        work_experiences,
+        qualifications,
       };
+
       try {
         const res = await fetch("/api/v1/auth/register/auditor", {
           method: "POST",
@@ -157,13 +702,19 @@
           body: JSON.stringify(payload),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || `가입 실패 (HTTP ${res.status})`);
+        if (!res.ok) {
+          const detail = data.detail;
+          throw new Error(typeof detail === "string" ? detail : `가입 실패 (HTTP ${res.status})`);
+        }
         alert(data.message || "가입이 완료되었습니다.");
         window.location.href = "/login.html";
       } catch (err) {
         errorEl.textContent = err.message;
       }
     });
+
+    loadIdentityConfig();
+    loadIafDatalist();
   </script>
 </body>
 </html>

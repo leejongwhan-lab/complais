@@ -19,9 +19,33 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "YOUR_SUPER_SECRET_KEY_CHANGE_THIS"
     UPLOAD_DIR: str = "uploads"
 
+    # PortOne identity verification (test/sandbox) — never commit real secrets
+    # V1 SDK: IMP.init(PORTONE_IMP_CODE) + IMP.certification
+    # V2 SDK: PortOne.requestIdentityVerification({ storeId, channelKey })
+    PORTONE_IMP_CODE: str = ""
+    PORTONE_STORE_ID: str = ""
+    PORTONE_CHANNEL_KEY_KAKAO: str = ""
+    PORTONE_CHANNEL_KEY_NAVER: str = ""
+    PORTONE_API_SECRET: str = ""
+    # true|1|yes → always allow mock identity button; also auto-enabled when keys missing
+    PORTONE_ALLOW_MOCK: bool = True
+
     @property
     def database_url(self) -> str:
         return _normalize_database_url(self.DATABASE_URL)
+
+    @property
+    def portone_configured(self) -> bool:
+        return bool(
+            (self.PORTONE_IMP_CODE or "").strip()
+            or (
+                (self.PORTONE_STORE_ID or "").strip()
+                and (
+                    (self.PORTONE_CHANNEL_KEY_KAKAO or "").strip()
+                    or (self.PORTONE_CHANNEL_KEY_NAVER or "").strip()
+                )
+            )
+        )
 
 
 settings = Settings()

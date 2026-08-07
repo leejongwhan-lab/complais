@@ -193,6 +193,17 @@ class AuditorActionResponse(BaseModel):
     message: Optional[str] = None
 
 
+class AffiliationItem(BaseModel):
+    """소속 인증기관 — 다수 CB. 계약조건(수수료·근무형태 등) 미포함."""
+
+    cb_id: int
+    cb_name: Optional[str] = None
+    cb_code: Optional[str] = None
+    status: str
+    is_primary: bool = False
+    membership_id: Optional[int] = None
+
+
 class MembershipItem(BaseModel):
     id: int
     auditor_id: int
@@ -272,7 +283,14 @@ class ExternalCertItem(BaseModel):
 
 class AuditorDetailResponse(BaseModel):
     profile: AuditorProfileDetail
-    memberships: List[MembershipItem]
+    affiliations: List[AffiliationItem] = Field(
+        default_factory=list,
+        description="소속 인증기관 목록 (다수). UI는 이 필드를 사용하며 계약조건은 제외.",
+    )
+    memberships: List[MembershipItem] = Field(
+        default_factory=list,
+        description="레거시 전체 membership 행 (내부/호환). Admin UI는 affiliations 사용.",
+    )
     educations: List[EducationItem]
     careers: List[CareerItem]
     external_certs: List[ExternalCertItem] = Field(default_factory=list)
@@ -420,9 +438,30 @@ def _build_detail_response(db: Session, auditor: Auditor) -> AuditorDetailRespon
         [m["cb_id"] for m in memberships]
         + ([auditor.primary_cb_id] if auditor.primary_cb_id else []),
     )
+    membership_items = _membership_items(memberships, cbs)
+    affiliations = [
+        AffiliationItem(
+            cb_id=m.cb_id,
+            cb_name=m.cb_name,
+            cb_code=m.cb_code,
+            status=m.status,
+            is_primary=bool(m.is_primary),
+            membership_id=m.id,
+        )
+        for m in membership_items
+    ]
+    # Deduplicate by cb_id (prefer primary / first)
+    seen_cb: set[int] = set()
+    unique_affiliations: List[AffiliationItem] = []
+    for a in sorted(affiliations, key=lambda x: (not x.is_primary, x.cb_id)):
+        if a.cb_id in seen_cb:
+            continue
+        seen_cb.add(a.cb_id)
+        unique_affiliations.append(a)
     return AuditorDetailResponse(
         profile=_profile_detail(db, auditor),
-        memberships=_membership_items(memberships, cbs),
+        affiliations=unique_affiliations,
+        memberships=membership_items,
         educations=[EducationItem.model_validate(e) for e in educations],
         careers=[CareerItem.model_validate(c) for c in careers],
         external_certs=[ExternalCertItem.model_validate(x) for x in external_certs],

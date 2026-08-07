@@ -112,6 +112,16 @@ def normalize_cb_status(status: Optional[str], is_active: bool = True) -> str:
 
 
 def cb_to_spec_dict(cb: CertificationBodies) -> dict[str, Any]:
+    from app.core.validators import format_biz_no
+
+    # accreditation 레거시 컬럼에 "KAB | 번호 | 표준..." 합쳐진 값이 있으면 첫 토큰만 사용
+    ab_raw = (cb.accreditation_body or "").strip()
+    if not ab_raw:
+        legacy = (cb.accreditation or "").strip()
+        ab_raw = legacy.split("|")[0].strip() if legacy else ""
+    if len(ab_raw) > 40:
+        ab_raw = ab_raw[:40].strip()
+    biz = format_biz_no(cb.biz_no) or cb.biz_no
     return {
         "id": cb.id,
         "cb_code": cb.code,
@@ -119,8 +129,12 @@ def cb_to_spec_dict(cb: CertificationBodies) -> dict[str, Any]:
         "cb_name_en": cb.name_en,
         "cb_initial": cb.cb_initial,
         "reg_no": cb.reg_no or cb.accreditation_no,
-        "accreditation_body": cb.accreditation_body or cb.accreditation or "KAB",
-        "biz_reg_no": cb.biz_no,
+        "accreditation_body": ab_raw or "KAB",
+        "biz_reg_no": biz,
+        "biz_no": biz,  # DB 컬럼명 별칭
+        "code": cb.code,
+        "name": cb.name,
+        "name_en": cb.name_en,
         "ceo_name": cb.ceo_name,
         "address": cb.address,
         "tel": cb.tel or cb.phone,

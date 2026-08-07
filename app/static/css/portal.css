@@ -101,8 +101,10 @@ body.portal-page {
 
 /* ---- Buttons (design tokens) ----
    Exclude plain text action buttons (held-std / detail / close) so they
-   are NOT white-on-primary (transparent bg + white text = invisible). */
-button:not(.ghost):not([class*="bg-"]):not(.btn-ghost):not(.held-std-link):not(.held-std-text):not(.scope-badge):not(.btn-detail):not(.btn-close):not(.btn-secondary):not(.nav-link),
+   are NOT white-on-primary (transparent bg + white text = invisible).
+   Also exclude .aud-nav-btn (심사노트 left-nav clauses) — those use
+   transparent/dark vs green/white saved states, not primary chrome. */
+button:not(.ghost):not([class*="bg-"]):not(.btn-ghost):not(.held-std-link):not(.held-std-text):not(.scope-badge):not(.btn-detail):not(.btn-close):not(.btn-secondary):not(.nav-link):not(.aud-nav-btn),
 .btn-primary,
 a.btn-primary {
   padding: 9px 14px;
@@ -118,7 +120,7 @@ a.btn-primary {
   transition: background 0.15s ease;
 }
 
-button:not(.ghost):not(.held-std-link):not(.held-std-text):not(.scope-badge):not(.btn-detail):not(.btn-close):not(.btn-secondary):not(.nav-link):hover,
+button:not(.ghost):not(.held-std-link):not(.held-std-text):not(.scope-badge):not(.btn-detail):not(.btn-close):not(.btn-secondary):not(.nav-link):not(.aud-nav-btn):hover,
 .btn-primary:hover {
   filter: brightness(0.95);
 }
@@ -346,3 +348,364 @@ a.hover\:underline:hover,
 
 .block { display: block; }
 /* keep form onsubmit / ids untouched — visual only */
+
+/* ---- Shared form primitives (auditor / portal modals) ---- */
+.form-group {
+  margin-bottom: 14px;
+}
+.form-group > label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--portal-ink, #334155);
+  margin-bottom: 6px;
+}
+.form-group input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--portal-border, #d0d7e2);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--portal-ink, #1e2a24);
+  box-sizing: border-box;
+}
+.checkbox-group,
+.radio-group,
+.radios,
+.choice-group,
+.check-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+}
+.checkbox-group label,
+.radio-group label,
+.radios label,
+.choice-group label,
+.check-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin: 0;
+  white-space: nowrap;
+}
+.checkbox-group input[type="checkbox"],
+.radio-group input[type="radio"],
+.radios input[type="checkbox"],
+.radios input[type="radio"],
+.choice-group input[type="checkbox"],
+.choice-group input[type="radio"],
+.check-group input[type="checkbox"],
+.check-group input[type="radio"] {
+  width: auto;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* ---- Auditor 심사노트 (shared) ---- */
+body.auditor-portal-page {
+  font-family: "Pretendard", var(--font-family-main, system-ui), sans-serif;
+}
+.aud-note-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: auto;
+  flex: 1;
+  padding: 6px 6px 10px;
+}
+/* Clause nav: two visual states only
+   1) 미완료: transparent bg + dark text
+   2) 저장완료 (.is-saved): green bg + white text (cno + ctitle)
+   .aud-nav-btn is excluded from global primary button chrome above. */
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn,
+.aud-note-nav button.aud-nav-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  color: #1e293b;
+  margin: 0;
+  filter: none;
+  box-shadow: none;
+  font-weight: 450;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn .cno,
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn .ctitle,
+.aud-note-nav button.aud-nav-btn .cno,
+.aud-note-nav button.aud-nav-btn .ctitle {
+  color: #1e293b;
+}
+.aud-note-nav button.aud-nav-btn .cno { font-weight: 650; letter-spacing: -0.01em; }
+.aud-note-nav button.aud-nav-btn .v {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.7rem;
+  color: #64748b;
+  font-weight: 600;
+}
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn:hover,
+.aud-note-nav button.aud-nav-btn:hover {
+  background: #f1f5f4;
+  filter: none;
+  color: #1e293b;
+}
+/* Selected but unsaved: keep transparent + dark; accent bar only */
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.active:not(.is-saved),
+.aud-note-nav button.aud-nav-btn.active:not(.is-saved) {
+  background: transparent;
+  color: #1e293b;
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 #2f6f4e;
+}
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.active:not(.is-saved) .cno,
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.active:not(.is-saved) .ctitle,
+.aud-note-nav button.aud-nav-btn.active:not(.is-saved) .cno,
+.aud-note-nav button.aud-nav-btn.active:not(.is-saved) .ctitle {
+  color: #1e293b;
+}
+/* Dirty (= still 미완료 visually): transparent + dark */
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-dirty,
+.aud-note-nav button.aud-nav-btn.is-dirty {
+  background: transparent;
+  color: #1e293b;
+  box-shadow: none;
+}
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-dirty .cno,
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-dirty .ctitle,
+.aud-note-nav button.aud-nav-btn.is-dirty .cno,
+.aud-note-nav button.aud-nav-btn.is-dirty .ctitle {
+  color: #1e293b;
+}
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-dirty.active,
+.aud-note-nav button.aud-nav-btn.is-dirty.active {
+  box-shadow: inset 2px 0 0 #2f6f4e;
+}
+/* 저장완료: green fill + white text (wins over active/hover) */
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved,
+.aud-note-nav button.aud-nav-btn.is-saved {
+  background: #2f6f4e;
+  color: #fff;
+  box-shadow: none;
+}
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved .cno,
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved .ctitle,
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved .v,
+.aud-note-nav button.aud-nav-btn.is-saved .cno,
+.aud-note-nav button.aud-nav-btn.is-saved .ctitle,
+.aud-note-nav button.aud-nav-btn.is-saved .v {
+  color: #fff;
+  font-weight: 600;
+}
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved:hover,
+.aud-note-nav button.aud-nav-btn.is-saved:hover {
+  background: #286344;
+  color: #fff;
+  filter: none;
+}
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved.active,
+.aud-note-nav button.aud-nav-btn.is-saved.active {
+  background: #245a3f;
+  color: #fff;
+  box-shadow: inset 2px 0 0 #fff;
+}
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved.active .cno,
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved.active .ctitle,
+body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved.active .v,
+.aud-note-nav button.aud-nav-btn.is-saved.active .cno,
+.aud-note-nav button.aud-nav-btn.is-saved.active .ctitle,
+.aud-note-nav button.aud-nav-btn.is-saved.active .v {
+  color: #fff;
+}
+.aud-note-nav .aud-nav-mode-label {
+  margin: 2px 4px 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.aud-note-nav--clause .aud-nav-mode-label {
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+}
+.aud-note-nav--process .aud-nav-mode-label {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.aud-note-nav .grp {
+  margin: 10px 0 3px;
+  padding: 0 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #3f5a48;
+}
+.aud-note-nav .grp-chapter {
+  color: #3730a3;
+  border-bottom: 1px solid #e0e7ff;
+  padding-bottom: 3px;
+}
+.aud-note-nav .grp-process {
+  color: #065f46;
+  background: #f0fdf6;
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin-top: 12px;
+}
+.aud-note-nav .grp-hls {
+  margin: 4px 0 2px 8px;
+  padding: 0 4px;
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: #64748b;
+}
+.aud-note-nav--process button.nav-under-process {
+  padding-left: 18px;
+}
+.aud-kpi-dual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+@media (max-width: 1100px) {
+  .aud-kpi-dual { grid-template-columns: 1fr; }
+}
+.aud-kpi-panel {
+  border: 1px solid #d7e2da;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fafbfa;
+}
+.aud-kpi-panel .aud-sec-hd { margin-bottom: 8px; }
+.aud-kpi-empty {
+  font-size: 0.82rem;
+  margin: 0;
+}
+.aud-method-banner {
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.aud-method-banner.is-clause {
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+}
+.aud-method-banner.is-process {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.aud-iv-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.aud-iv-meta-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #5f7264;
+}
+.aud-iv-meta-grid label.span-2 { grid-column: 1 / -1; }
+.aud-iv-meta-grid .req { color: #b91c1c; }
+.aud-iv-inp {
+  padding: 8px 10px;
+  border: 1px solid #d0d7e2;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: #fff;
+}
+.aud-iv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--admin-border, #e3ebe4);
+}
+.aud-iv-chip {
+  border: 1px solid #d0d7e2;
+  background: #fff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-family: inherit;
+  cursor: pointer;
+  color: #5f7264;
+}
+.aud-iv-chip.active {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #fff;
+  font-weight: 700;
+}
+.aud-iv-chip.done:not(.active) {
+  border-color: #6ee7b7;
+  color: #047857;
+}
+.aud-iv-role-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f766e;
+  margin-bottom: 10px;
+}
+.aud-iv-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  background: #0f766e;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+.aud-iv-sec-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #334155;
+  margin: 0 0 6px;
+}
+.aud-iv-q-guide {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: #fafbfa;
+  border: 1px dashed #d5ddd7;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+.aud-iv-q-guide ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: #5f7264;
+}
+.aud-iv-q-box, .aud-iv-overall-box { margin-bottom: 12px; }
+.aud-iv-mini.active { background: #ecfdf5; font-weight: 700; color: #0f766e; }
+@media (max-width: 560px) {
+  .aud-iv-meta-grid { grid-template-columns: 1fr; }
+}

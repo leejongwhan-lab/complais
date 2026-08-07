@@ -18,15 +18,18 @@ from app.core.security import (
     require_cb_scope,
     verify_password,
 )
-from app.models.auditor import (
-    Auditor,
-    AuditorEducation,
-    AuditorWorkExperience,
-)
+from app.core.config import settings
+from app.models.auditor import Auditor, PreRegisteredAuditor
 from app.models.auth import Users  # Users 모델 (app.models.users 없음)
 from app.models.cb import CertificationBodies, CbOperationalRules
 from app.models.company import Companies
 from app.models.enums import UsersRole
+from app.services.auditor_grade import to_db_grade
+from app.services.auditor_profile_persist import (
+    add_educations,
+    add_qualifications,
+    add_work_experiences,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -126,7 +129,7 @@ class MembershipDecisionRequest(BaseModel):
 
 class EducationItem(BaseModel):
     school_name: str
-    degree: str  # bachelor, master, doctor, other
+    degree: str = "bachelor"  # bachelor, master, doctor, other
     major: Optional[str] = None
     entered_at: Optional[str] = None
     graduated_at: Optional[str] = None
@@ -134,12 +137,29 @@ class EducationItem(BaseModel):
 
 class WorkExperienceItem(BaseModel):
     company_name: str
+    company_id: Optional[int] = None
+    biz_no: Optional[str] = None
     department: Optional[str] = None
     position: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     is_current: bool = False
+    is_temporary: bool = False
+    duties: Optional[str] = None
+    ksic_code: Optional[str] = None
+    iaf_code: Optional[str] = None
     note: Optional[str] = None
+
+
+class QualificationItem(BaseModel):
+    """심사 자격 정보 (표준/발급기관/번호/등급/IAF)."""
+
+    standard_code: str = Field(..., description="QMS / EMS / OHSMS / ISMS …")
+    cert_body_name: Optional[str] = Field(None, description="KAR / IRCA / Exemplar Global …")
+    cert_no: Optional[str] = None
+    auditor_grade: str = Field(default="auditor", description="lead_auditor|auditor|reviewer|trainee")
+    iaf_codes: List[str] = Field(default_factory=list)
+    major_name: Optional[str] = None
 
 
 class AuditorRegisterRequest(BaseModel):
@@ -170,11 +190,65 @@ class AuditorRegisterRequest(BaseModel):
     # Step 3~6: 이력 상세 (선택)
     educations: Optional[List[EducationItem]] = Field(default_factory=list)
     work_experiences: Optional[List[WorkExperienceItem]] = Field(default_factory=list)
+    qualifications: Optional[List[QualificationItem]] = Field(default_factory=list)
+    major_name: Optional[str] = Field(None, description="대표 전공학과명 (학력/자격 공통)")
+    ci_key: Optional[str] = Field(None, description="본인인증 CI (PortOne)")
+    pre_registered_id: Optional[int] = Field(None, description="매칭된 사전등록 심사원 ID")
 
     # Step 7: 계좌 정보
     bank_name: Optional[str] = None
     account_no: Optional[str] = None
     account_holder: Optional[str] = None
+
+
+class IdentityConfigResponse(BaseModel):
+    configured: bool
+    mock_allowed: bool
+    sdk: str = Field(description="v1 | v2 | mock")
+    imp_code: Optional[str] = None
+    store_id: Optional[str] = None
+    channel_key_kakao: Optional[str] = None
+    channel_key_naver: Optional[str] = None
+    message: str
+
+
+class AuditorPrematchRequest(BaseModel):
+    ci_key: Optional[str] = None
+    name: Optional[str] = None
+    phone: Optional[str] = None
+
+
+class AuditorPrematchResponse(BaseModel):
+    matched: bool
+    message: str
+    pre_registered_id: Optional[int] = None
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    ci_key: Optional[str] = None
+    email: Optional[str] = None
+    apply_grade: Optional[str] = None
+    major_name: Optional[str] = None
+    cb_id: Optional[int] = None
+    educations: List[dict] = Field(default_factory=list)
+    careers: List[dict] = Field(default_factory=list)
+    qualifications: List[dict] = Field(default_factory=list)
+    iaf_codes: List[str] = Field(default_factory=list)
+
+
+def _digits_phone(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    return "".join(ch for ch in str(value) if ch.isdigit())
+
+
+def _as_list(value) -> list:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, dict):
+        return [value]
+    return []
 
 
 def _parse_date(value: Optional[str]) -> Optional[date]:
@@ -640,6 +714,124 @@ def register_cb_admin(
         )
 
 
+@router.get("/identity-config", response_model=IdentityConfigResponse)
+def get_identity_config():
+    """PortOne 본인인증 공개 설정 (시크릿 제외). 키 없으면 mock 모드 안내."""
+    configured = settings.portone_configured
+    mock_allowed = bool(settings.PORTONE_ALLOW_MOCK) or not configured
+    if configured and (settings.PORTONE_STORE_ID or "").strip():
+        sdk = "v2"
+    elif configured and (settings.PORTONE_IMP_CODE or "").strip():
+        sdk = "v1"
+    else:
+        sdk = "mock"
+    return IdentityConfigResponse(
+        configured=configured,
+        mock_allowed=mock_allowed,
+        sdk=sdk,
+        imp_code=(settings.PORTONE_IMP_CODE or "").strip() or None,
+        store_id=(settings.PORTONE_STORE_ID or "").strip() or None,
+        channel_key_kakao=(settings.PORTONE_CHANNEL_KEY_KAKAO or "").strip() or None,
+        channel_key_naver=(settings.PORTONE_CHANNEL_KEY_NAVER or "").strip() or None,
+        message=(
+            "PortOne 테스트 채널이 설정되어 있습니다."
+            if configured
+            else "PortOne 키가 없어 로컬 테스트 본인인증(mock)을 사용합니다."
+        ),
+    )
+
+
+def _run_auditor_prematch(
+    db: Session,
+    *,
+    ci_key: Optional[str],
+    name: Optional[str],
+    phone: Optional[str],
+) -> AuditorPrematchResponse:
+    """사전 등록 심사원 매칭 (CI 우선, 없으면 성명+연락처)."""
+    ci = (ci_key or "").strip() or None
+    nm = (name or "").strip() or None
+    ph = _digits_phone(phone)
+
+    if not ci and not (nm and ph):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="ci_key 또는 name+phone 이 필요합니다.",
+        )
+
+    row = None
+    if ci:
+        row = (
+            db.query(PreRegisteredAuditor)
+            .filter(
+                PreRegisteredAuditor.is_active.is_(True),
+                PreRegisteredAuditor.ci_key == ci,
+            )
+            .order_by(PreRegisteredAuditor.id.desc())
+            .first()
+        )
+    if row is None and nm and ph:
+        candidates = (
+            db.query(PreRegisteredAuditor)
+            .filter(
+                PreRegisteredAuditor.is_active.is_(True),
+                PreRegisteredAuditor.name == nm,
+            )
+            .order_by(PreRegisteredAuditor.id.desc())
+            .all()
+        )
+        for c in candidates:
+            if _digits_phone(c.phone) == ph:
+                row = c
+                break
+
+    if not row:
+        return AuditorPrematchResponse(
+            matched=False,
+            message="사전 등록된 심사원 정보가 없습니다. 신규로 이력을 입력해 주세요.",
+            ci_key=ci,
+            name=nm,
+            phone=ph or None,
+        )
+
+    return AuditorPrematchResponse(
+        matched=True,
+        message="등록된 심사원 정보가 확인되었습니다. 기존 자격 이력을 불러옵니다.",
+        pre_registered_id=row.id,
+        name=row.name,
+        phone=row.phone,
+        ci_key=row.ci_key or ci,
+        email=row.email,
+        apply_grade=row.apply_grade,
+        major_name=row.major_name,
+        cb_id=row.cb_id,
+        educations=_as_list(row.education_json),
+        careers=_as_list(row.career_json),
+        qualifications=_as_list(row.qualification_json),
+        iaf_codes=[str(x) for x in _as_list(row.iaf_codes_json) if x],
+    )
+
+
+@router.get("/auditor-prematch", response_model=AuditorPrematchResponse)
+def auditor_prematch_get(
+    ci_key: Optional[str] = None,
+    name: Optional[str] = None,
+    phone: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    return _run_auditor_prematch(db, ci_key=ci_key, name=name, phone=phone)
+
+
+@router.post("/auditor-prematch", response_model=AuditorPrematchResponse)
+def auditor_prematch_post(
+    payload: AuditorPrematchRequest,
+    db: Session = Depends(get_db),
+):
+    return _run_auditor_prematch(
+        db, ci_key=payload.ci_key, name=payload.name, phone=payload.phone
+    )
+
+
 @router.post("/register/auditor", status_code=status.HTTP_201_CREATED)
 def register_auditor(
     payload: AuditorRegisterRequest,
@@ -659,6 +851,7 @@ def register_auditor(
 
     now = datetime.utcnow()
     birth_date = _parse_date(payload.birth_date)
+    ci_key = (payload.ci_key or "").strip() or None
 
     try:
         new_user = Users(
@@ -666,6 +859,7 @@ def register_auditor(
             email=payload.email,
             password_hash=get_password_hash(payload.password),
             phone=payload.phone,
+            ci_key=ci_key,
             role=UsersRole.AUDITOR.value,
             cb_id=None,  # Identity — CB 비종속
             company_id=None,
@@ -682,68 +876,90 @@ def register_auditor(
         zip_c = (payload.zip_code or "").strip()
         if zip_c and addr_base != "미입력" and zip_c not in addr_base:
             addr_base = f"{zip_c} {addr_base}"
+        # Live DB: contract_type varchar NOT NULL (default per_day); SQLAlchemy may send NULL if omitted
+        contract_type = "per_day"
+        if (payload.fee_ratio or 0) > 0 and not (payload.daily_rate or 0):
+            contract_type = "ratio"
+        elif (payload.monthly_fee or 0) > 0 and not (payload.daily_rate or 0):
+            contract_type = "monthly"
+
+        ui_grade = payload.apply_grade or "auditor"
+        db_grade = to_db_grade(ui_grade)
+        major_name = (payload.major_name or "").strip() or None
+
         new_auditor = Auditor(
             user_id=new_user.id,
             name=payload.name,
             email=payload.email,
             phone=payload.phone,
+            ci_key=ci_key,
             birth_date=birth_date,
             gender=payload.gender,
             address=addr_base,
             detail_address=(payload.detail_address or "").strip() or "미입력",
             employment_type=payload.employment_type,
             is_freelance=payload.is_freelance,
-            grade=payload.apply_grade,
+            grade=ui_grade,  # auditors.grade 는 varchar — UI 코드 유지
+            major=major_name,
             primary_cb_id=None,
-            daily_rate=float(payload.daily_rate or 0) or None,
-            fee_ratio=float(payload.fee_ratio or 0) or None,
-            monthly_fee=float(payload.monthly_fee or 0) or None,
+            contract_type=contract_type,
+            daily_rate=float(payload.daily_rate or 0),
+            fee_ratio=float(payload.fee_ratio or 0),
+            monthly_fee=float(payload.monthly_fee or 0),
             bank_name=payload.bank_name,
             account_no=payload.account_no,
             account_holder=payload.account_holder,
             is_active=True,
             status="active",
-            profile_status="active",
+            profile_status="pending",  # enum: pending|approved|rejected
             created_at=now,
             updated_at=now,
         )
         db.add(new_auditor)
         db.flush()
 
-        for edu in payload.educations or []:
-            db.add(
-                AuditorEducation(
-                    auditor_id=new_auditor.id,
-                    school_name=edu.school_name,
-                    degree=edu.degree,
-                    major=edu.major or "-",
-                    entered_at=_parse_date(edu.entered_at),
-                    graduated_at=_parse_date(edu.graduated_at),
-                    is_verified=False,
-                    created_at=now,
-                )
-            )
+        add_educations(db, auditor_id=new_auditor.id, items=payload.educations or [], now=now)
 
         for work in payload.work_experiences or []:
-            start_date = _parse_date(work.start_date)
-            if start_date is None:
+            if work.start_date and _parse_date(work.start_date) is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"경력 '{work.company_name}'의 시작일(start_date)은 YYYY-MM-DD 형식이어야 합니다.",
+                )
+            if not work.start_date:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"경력 '{work.company_name}'의 시작일(start_date)은 필수입니다.",
                 )
-            note_parts = [p for p in (work.department, work.note) if p]
-            db.add(
-                AuditorWorkExperience(
-                    auditor_id=new_auditor.id,
-                    company_name=work.company_name,
-                    position=work.position,
-                    start_date=start_date,
-                    end_date=_parse_date(work.end_date),
-                    is_current=work.is_current,
-                    note=" / ".join(note_parts) if note_parts else None,
-                    created_at=now,
-                )
+        add_work_experiences(
+            db, auditor_id=new_auditor.id, items=payload.work_experiences or [], now=now
+        )
+
+        quals = list(payload.qualifications or [])
+        # 자격 미입력 시에도 희망등급만으로 빈 행을 만들지 않음 — 표준이 있을 때만 저장
+        for q in quals:
+            if not q.major_name and major_name:
+                q.major_name = major_name
+            if not q.auditor_grade:
+                q.auditor_grade = ui_grade
+        qual_count = add_qualifications(
+            db,
+            auditor_id=new_auditor.id,
+            items=quals,
+            now=now,
+            cb_id=None,
+            default_major=major_name,
+        )
+
+        if payload.pre_registered_id:
+            pre = (
+                db.query(PreRegisteredAuditor)
+                .filter(PreRegisteredAuditor.id == payload.pre_registered_id)
+                .first()
             )
+            if pre:
+                pre.matched_user_id = new_user.id
+                pre.updated_at = now
 
         db.commit()
         return {
@@ -753,6 +969,10 @@ def register_auditor(
             "cb_id": None,
             "membership_status": new_user.membership_status,
             "profile_status": new_auditor.profile_status,
+            "grade": ui_grade,
+            "db_grade": db_grade,
+            "qualification_count": qual_count,
+            "ci_key": ci_key,
         }
 
     except HTTPException:

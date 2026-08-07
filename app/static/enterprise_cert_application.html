@@ -4,19 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ComplAIs — 인증신청</title>
-<link rel="stylesheet" href="/static/css/main.css?v=20260807pf">
-<link rel="stylesheet" href="/static/css/portal.css?v=20260807pf">
-<link rel="stylesheet" href="/static/css/style.css?v=20260807pf">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="/static/css/main.css?v=20260807qf">
+<link rel="stylesheet" href="/static/css/portal.css?v=20260807qf">
+<link rel="stylesheet" href="/static/css/pages/enterprise.css?v=20260807qf">
+<link rel="stylesheet" href="/static/css/style.css?v=20260807qf">
 <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-<script src="/static/js/daum_postcode.js?v=20260807pf"></script>
+<script src="/static/js/daum_postcode.js?v=20260807qf"></script>
 <style>
-  body.ent-cert-page { display:block; min-height:100vh; margin:0; background:var(--admin-bg,#F4F6F4); color:var(--admin-ink,#1E2A24); font-family:var(--font-family-main,Pretendard,sans-serif); }
+  body.ent-cert-page { display:block; min-height:100vh; margin:0; background:var(--admin-bg,#F4F6F4); color:var(--admin-ink,#1E2A24); }
   .wrap { max-width:1040px; margin:0 auto; padding:24px 20px 64px; }
   .hdr { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
-  .hdr h1 { margin:0; font-size:22px; font-weight:800; }
-  .hdr .sub { color:var(--admin-muted,#5A675F); font-size:13px; margin-top:4px; }
+  .hdr h1 { margin:0; font-size:22px; font-weight:700; color:#0F172A; }
+  .hdr .sub { color:#64748B; font-size:13px; margin-top:4px; }
   .card { background:var(--admin-surface,#fff); border:1px solid var(--admin-border,#E8ECE9); border-radius:var(--admin-radius-lg,12px); margin-bottom:14px; overflow:hidden; }
-  .chd { padding:14px 18px; border-bottom:1px solid var(--admin-border); font-weight:800; font-size:15px; }
+  .chd { padding:14px 18px; border-bottom:1px solid var(--admin-border); font-weight:600; font-size:16px; color:#1E293B; }
   .cb { padding:18px; }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .readonly { background:var(--admin-success-soft,rgba(47,107,79,.12)); }
@@ -30,10 +32,10 @@
   .q-title { font-weight:800; font-size:13px; margin-bottom:8px; }
   .q-row { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px dashed var(--admin-border); font-size:13px; }
   .q-row .q-label { flex:1; line-height:1.5; }
-  .q-row .q-ctrl { min-width:180px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+  .q-row .q-ctrl { min-width:180px; display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center; justify-content:flex-end; }
   .aspect-sub { margin:16px 0 8px; font-size:13px; font-weight:800; color:var(--admin-primary); }
   .aspect-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .aspect-chips { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; margin-bottom:8px; }
+  .aspect-chips { display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center; margin-bottom:8px; }
   .aspect-chip { font-size:12px; display:inline-flex; gap:4px; align-items:center; }
   @media (max-width:720px) {
     .grid2, .aspect-grid { grid-template-columns:1fr; }
@@ -41,11 +43,11 @@
   }
 </style>
 </head>
-<body class="portal-page admin-page ent-cert-page cert-app-page">
-<div class="wrap">
+<body class="portal-page admin-page ent-cert-page cert-app-page enterprise-page">
+<div class="wrap ent-shell">
   <div class="hdr">
     <div>
-      <h1 style="font:var(--font-h1);margin:0;">인증신청</h1>
+      <h1>인증신청</h1>
       <div class="sub">표준·KSIC/IAF·특성정보·설문을 DB에 저장합니다.</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -155,7 +157,7 @@
     </div>
   </form>
 </div>
-<script src="/static/js/company_aspects_form.js?v=20260807pf"></script>
+<script src="/static/js/company_aspects_form.js?v=20260807qf"></script>
 <script>
 (function () {
   const API = (window.COMPLAIS_API_BASE || "/api/v1").replace(/\/$/, "");
@@ -282,7 +284,12 @@
     return s.name || s.iso_code || s.code;
   }
   function hasStd(code) {
-    return selectedStandards().some((c) => String(c).includes(code));
+    const selected = new Set(selectedStandards());
+    return standardsMeta.some((s) => {
+      if (!selected.has(s.code)) return false;
+      const blob = [s.code, s.iso_code, s.label, s.name, s.initial].join(" ");
+      return blob.includes(code);
+    }) || selectedStandards().some((c) => String(c).includes(code));
   }
 
   function updateAspectSections() {
@@ -326,15 +333,22 @@
     const key = q.key, label = esc(q.label), input = q.input || "yes_no";
     if (input === "select") {
       const opts = (q.options || []).map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
-      return `<div class="q-row"><div class="q-label">${label}</div><div class="q-ctrl">
+      return `<div class="form-group q-row"><div class="q-label">${label}</div><div class="q-ctrl">
         <select class="form-input" name="ans_${key}" data-std="${esc(std)}" data-key="${esc(key)}" data-text="${label}" required>
           <option value="">— 선택 —</option>${opts}</select></div></div>`;
     }
     if (input === "fill") {
-      return `<div class="q-row"><div class="q-label">${label}</div><div class="q-ctrl">
+      return `<div class="form-group q-row"><div class="q-label">${label}</div><div class="q-ctrl">
         <input class="form-input" type="text" name="ans_${key}" data-std="${esc(std)}" data-key="${esc(key)}" data-text="${label}" required placeholder="입력"></div></div>`;
     }
-    return `<div class="q-row"><div class="q-label">${label}</div><div class="q-ctrl radios">
+    if (input === "checkbox" || input === "multi") {
+      const opts = (q.options || []).map((o) =>
+        `<label><input type="checkbox" name="ans_${key}" value="${esc(o)}" data-std="${esc(std)}" data-key="${esc(key)}" data-text="${label}"> ${esc(o)}</label>`
+      ).join("");
+      return `<div class="form-group q-row"><div class="q-label">${label}</div>
+        <div class="q-ctrl checkbox-group">${opts}</div></div>`;
+    }
+    return `<div class="form-group q-row"><div class="q-label">${label}</div><div class="q-ctrl radios radio-group">
       <label><input type="radio" name="ans_${key}" value="yes" data-std="${esc(std)}" data-key="${esc(key)}" data-text="${label}" required> 예</label>
       <label><input type="radio" name="ans_${key}" value="no" data-std="${esc(std)}" data-key="${esc(key)}" data-text="${label}" required> 아니오</label>
     </div></div>`;
@@ -417,8 +431,8 @@
     const intro = integratedIntro || "통합심사를 신청하시려면 아래 항목에 답해 주세요.";
     box.innerHTML = `<div class="hint" style="margin-bottom:12px">${esc(intro)}</div>` +
       (integratedItems || []).map((it) => `
-      <div class="q-row"><div class="q-label">${esc(it.label)}</div>
-        <div class="q-ctrl radios">
+      <div class="form-group q-row"><div class="q-label">${esc(it.label)}</div>
+        <div class="q-ctrl radios radio-group">
           <label><input type="radio" name="intg_${esc(it.key)}" value="yes" required> 예</label>
           <label><input type="radio" name="intg_${esc(it.key)}" value="no" required> 아니오</label>
         </div></div>`).join("");
