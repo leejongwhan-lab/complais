@@ -1271,24 +1271,36 @@ def step_team_audit_and_v14(ctx: Ctx, client: Client) -> Any:
         "conform_save_status": st_cf,
         "team_review_gated": gated,
         "ncr_status": ncr_status,
+        "nc_body": _clip(nc_body),
         "conform_body": _clip(cf_body),
     }
-    if st_cf == 200 and gated and ncr_status == "waiting_team_review":
-        record(ctx, "8_team_audit_v14", "pass", "team fees ok; NCR finalize gated", snap)
-    elif st_cf == 200:
+    # Never pass on non-2xx clause API (was a false-pass bug).
+    if not (200 <= st_nc < 300):
         record(
             ctx,
             "8_team_audit_v14",
-            "pass",
-            f"team fees ok; v14 present; gate_obs gated={gated} status={ncr_status}",
+            "fail",
+            f"NCR clause save HTTP {st_nc} (expected 2xx)",
             snap,
         )
+        return snap
+    if not (200 <= st_cf < 300):
+        record(
+            ctx,
+            "8_team_audit_v14",
+            "fail",
+            f"clause gate exercise HTTP {st_cf} (expected 2xx; never pass on 4xx/5xx)",
+            snap,
+        )
+        return snap
+    if gated and ncr_status == "waiting_team_review":
+        record(ctx, "8_team_audit_v14", "pass", "team fees ok; NCR finalize gated", snap)
     else:
         record(
             ctx,
             "8_team_audit_v14",
-            "pass",
-            f"team fees ok; v14 present; clause gate exercise status={st_cf}",
+            "fail",
+            f"clause 2xx but gate incomplete: gated={gated} ncr_status={ncr_status}",
             snap,
         )
     return snap
@@ -1380,32 +1392,27 @@ def step_exception_paths(ctx: Ctx, client: Client) -> Any:
     if revision_ok:
         notes.append("revision=ok")
     elif revision_schema_gap:
+        # Documented ENUM gap — still fail (never lenient-pass on HTTP 500).
         notes.append(
             "revision=schema_gap(DB ENUM lacks company_revision_requested; API path exercised)"
         )
-        # Alternate enterprise-facing reject that fits live ENUM
-        sub_alt = _submit_cert_app(
+        snap_rev = {
+            "revision": {
+                "app_id": app_id,
+                "http": st_r,
+                "status": status_after,
+                "schema_gap": True,
+                "response": _clip(rev),
+            }
+        }
+        record(
             ctx,
-            client,
-            standards=["QMS_2015"],
-            application_type="initial",
-            note="exception-cb-reject",
+            "10_exception_paths",
+            "fail",
+            f"company-revision HTTP {st_r} schema_gap (ENUM missing company_revision_requested)",
+            snap_rev,
         )
-        alt_id = int(sub_alt.get("id") or 0)
-        client.request(
-            "POST",
-            f"/api/v1/cb-cert-applications/{alt_id}/action",
-            token=ctx.tokens["cb"],
-            json_body={"action": "under_review", "memo": "E2E"},
-        )
-        st_rej, rej, _ = client.request(
-            "POST",
-            f"/api/v1/cb-cert-applications/{alt_id}/action",
-            token=ctx.tokens["cb"],
-            json_body={"action": "rejected", "memo": "E2E CB reject alternate"},
-        )
-        notes.append(f"alternate_cb_reject_http={st_rej}")
-        rev = {"company_revision": rev, "alternate_reject": {"app_id": alt_id, "body": rej}}
+        return snap_rev
     else:
         raise AssertionError(f"company-revision unexpected: {st_r} {rev}")
 
