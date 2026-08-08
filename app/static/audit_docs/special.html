@@ -187,6 +187,24 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
 .time-sel{padding:3px 5px;border:1px solid var(--border);border-radius:4px;
   font-size:10px;background:#fff;cursor:pointer;width:70px}
 .time-sep{font-size:10px;color:var(--text3)}
+.std-grid{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px}
+.std-chip{padding:4px 10px;border-radius:20px;border:1px solid var(--border);
+  background:var(--bg2);font-size:10px;cursor:pointer;font-weight:600;
+  color:var(--text2);transition:.15s;user-select:none}
+.std-chip:hover{border-color:var(--orange);background:var(--orange2)}
+.std-chip.on,.std-chip.on-q{background:#e8f0fb;border-color:#c5d8f5;color:#1a5fa8}
+.std-chip.on-e{background:#e6f5ec;border-color:#86efac;color:#1e7a4a}
+.std-chip.on-s{background:#fff8e1;border-color:#fde68a;color:#8a5c00}
+.std-chip.on-m{background:#fce4ec;border-color:#f9a8d4;color:#880e4f}
+.std-chip.on-f{background:#e8f5e9;border-color:#a7f3d0;color:#1b5e20}
+.std-chip.on-i{background:#e3f2fd;border-color:#93c5fd;color:#0d47a1}
+.std-chip.on-en{background:#fff8e1;border-color:#fde68a;color:#f57f17}
+.std-chip.on-ac{background:#f3e5f5;border-color:#d8b4fe;color:#6a1b9a}
+.std-chip.on-co{background:#e0f2f1;border-color:#6ee7b7;color:#00695c}
+.std-chip.on-ai{background:#ede7f6;border-color:#c4b5fd;color:#4527a0}
+.std-chip.on-nu{background:#eceff1;border-color:#cbd5e1;color:#37474f}
+.std-chip.on-pr{background:#fce4ec;border-color:#fda4af;color:#880e4f}
+.std-chip.on-bc{background:#ede7f6;border-color:#a78bfa;color:#311b92}
 
 @media print{
   #hdr .hdr-r,#tab-bar,#save-notice,.no-print{display:none!important}
@@ -290,9 +308,16 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
       </tr>
       <tr>
         <td class="lbl">인증 표준</td>
-        <td><input class="inp" id="p1-std" placeholder="예) ISO 14001:2015, ISO 45001:2018"></td>
+        <td colspan="3">
+          <div class="field-lbl" style="margin-bottom:4px">클릭 선택</div>
+          <div class="std-grid" id="p1-std-grid"></div>
+          <input class="inp" id="p1-std" readonly placeholder="선택한 표준이 자동 입력"
+            style="margin-top:4px;border-bottom:1px solid var(--border)">
+        </td>
+      </tr>
+      <tr>
         <td class="lbl">인증서 번호</td>
-        <td><input class="inp" id="p1-cert-no"></td>
+        <td colspan="3"><input class="inp" id="p1-cert-no"></td>
       </tr>
       <tr>
         <td class="lbl">인증 범위</td>
@@ -1175,7 +1200,7 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
 </div><!-- #pg -->
 
 <script>
-const STANDARDS = [
+var STANDARDS = [
   {k:'q',  label:'ISO 9001:2015',      short:'품질',     cls:'chip-q',  on:'on-q',  desc:'품질경영시스템'},
   {k:'e',  label:'ISO 14001:2015',     short:'환경:15',  cls:'chip-e',  on:'on-e',  desc:'환경경영시스템 (현행)'},
   {k:'e26',label:'ISO 14001:2026',     short:'환경:26',  cls:'chip-e26',on:'on-e26',desc:'환경경영시스템 (2026 신판)'},
@@ -1194,6 +1219,48 @@ const STANDARDS = [
   {k:'bc', label:'ISO 22301:2019',     short:'사업연속', cls:'chip-bc', on:'on-bc', desc:'사업연속성경영시스템'},
   {k:'pr', label:'ISO/IEC 27701:2019', short:'개인정보', cls:'chip-pr', on:'on-pr', desc:'개인정보보호경영시스템'},
 ];
+window.STANDARDS = STANDARDS;
+var selectedStds = [];
+window.selectedStds = selectedStds;
+
+function masterStdKeys(ctx){
+  const c=ctx||(window.ComplaisAuditDocMaster&&window.ComplaisAuditDocMaster.context)||{};
+  const m=c.master||{};
+  const keys=c.selected_standard_keys||m.standard_keys||[];
+  return Array.isArray(keys)?keys.slice():[];
+}
+function syncStdLabelField(){
+  const ci=document.getElementById('p1-std');
+  if(!ci) return;
+  ci.value=selectedStds.map(k=>{
+    const st=STANDARDS.find(x=>x.k===k||x.standard_key===k);
+    return st?(st.label||st.l||k):k;
+  }).join(', ');
+}
+function buildStdGrid(gridId){
+  const g=document.getElementById(gridId||'p1-std-grid');
+  if(!g) return;
+  g.innerHTML='';
+  STANDARDS.forEach(st=>{
+    const b=document.createElement('button');
+    const on=selectedStds.includes(st.k)||selectedStds.includes(st.standard_key)||selectedStds.includes(st.legacy_k);
+    b.type='button';
+    b.className='std-chip'+(on?' '+(st.on||st.c||'on'):'');
+    b.textContent=st.short||st.s||st.k;
+    b.title=st.label||st.l||st.k;
+    b.onclick=()=>{
+      if(selectedStds.includes(st.k)) selectedStds=selectedStds.filter(x=>x!==st.k);
+      else selectedStds.push(st.k);
+      window.selectedStds=selectedStds;
+      b.className='std-chip'+(selectedStds.includes(st.k)?' '+(st.on||st.c||'on'):'');
+      syncStdLabelField();
+      saveAll();
+    };
+    g.appendChild(b);
+  });
+  syncStdLabelField();
+}
+window.buildStdGrid=buildStdGrid;
 
 // ════════════════════════════════════════
 // 30분 단위 시간 옵션
@@ -1357,6 +1424,7 @@ function restoreFields(d){
 
 function saveAll(){
   setSaved('fields',collectFields());
+  setSaved('stds',selectedStds);
   setSaved('trigger',selectedTrigger);
   setSaved('action',actionDecision);
   setSaved('checks',checkStates);
@@ -1382,13 +1450,30 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // 복원
   const f=getSaved('fields'); if(f) restoreFields(f);
+  const stds=getSaved('stds');
+  if(Array.isArray(stds)&&stds.length){ selectedStds=stds; window.selectedStds=selectedStds; }
+  else {
+    const keys=masterStdKeys();
+    if(keys.length){ selectedStds=keys.slice(); window.selectedStds=selectedStds; }
+  }
+  buildStdGrid('p1-std-grid');
   const t=getSaved('trigger'); if(t) selectTrigger(t);
   const a=getSaved('action'); if(a) setAction(a);
   const ch=getSaved('checks'); if(ch){checkStates=ch;renderImpartialityChecks();}
 
   buildTimeSelects(); // 복원 후 시간 재설정
 });
+
+document.addEventListener('complais-audit-doc-ready',(ev)=>{
+  if(selectedStds.length) return;
+  const keys=masterStdKeys(ev.detail);
+  if(!keys.length) return;
+  selectedStds=keys.slice();
+  window.selectedStds=selectedStds;
+  buildStdGrid('p1-std-grid');
+  saveAll();
+});
 </script>
-<script src="/static/js/audit_doc_master.js?v=20260807demo1"></script>
+<script src="/static/js/audit_doc_master.js?v=20260808std1"></script>
 </body>
 </html>

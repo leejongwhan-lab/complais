@@ -893,7 +893,7 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
 </div><!-- #pg -->
 
 <script>
-const STANDARDS=[
+var STANDARDS=[
   {k:'q',  l:'ISO 9001:2015',      s:'품질',    c:'on-q'},
   {k:'e',  l:'ISO 14001:2015',     s:'환경:15', c:'on-e'},
   {k:'e26',l:'ISO 14001:2026',     s:'환경:26', c:'on-e26'},
@@ -912,6 +912,7 @@ const STANDARDS=[
   {k:'bc', l:'ISO 22301:2019',     s:'사업연속',c:'on-bc'},
   {k:'pr', l:'ISO/IEC 27701:2019', s:'개인정보',c:'on-pr'},
 ];
+window.STANDARDS=STANDARDS;
 
 
 // ════════════════════════════════════════════════════════
@@ -950,9 +951,29 @@ const TIMES30 = (()=>{
 const S1_DAYS=['당일'];
 const S2_DAYS=['Day 1','Day 2','Day 3','Day 4','Day 5'];
 
-let s1Stds=[], s2Stds=[];
+var s1Stds=[], s2Stds=[];
 let s1Rows=[], s2Rows=[];
 let s1Team=[], s2Team=[];
+
+function masterStdKeys(ctx){
+  const c=ctx||(window.ComplaisAuditDocMaster&&window.ComplaisAuditDocMaster.context)||{};
+  const m=c.master||{};
+  const keys=c.selected_standard_keys||m.standard_keys||[];
+  return Array.isArray(keys)?keys.slice():[];
+}
+
+function prefillStdArrays(){
+  const keys=masterStdKeys();
+  if(!keys.length) return;
+  if(!s1Stds.length) s1Stds=keys.slice();
+  if(!s2Stds.length) s2Stds=keys.slice();
+}
+
+function syncStdCriteria(stdsVar, criteriaId){
+  const ci=document.getElementById(criteriaId);
+  if(!ci||!stdsVar.length) return;
+  if(!ci.value) ci.value=stdsVar.map(k=>STANDARDS.find(x=>x.k===k||x.standard_key===k)?.l||k).join(', ');
+}
 
 // ════════════════════════════════════════════════════════
 // 팀원 리스트 헬퍼
@@ -1243,30 +1264,34 @@ function showTab(n){
 // ── 표준 그리드 ──
 function buildStdGrid(gridId, stdsVar, criteriaId){
   const g=document.getElementById(gridId);
-  if(!g) return;
+  if(!g||!stdsVar) return;
   g.innerHTML='';
   STANDARDS.forEach(st=>{
     const b=document.createElement('button');
-    const isOn=stdsVar.includes(st.k);
-    b.className='std-chip'+(isOn?' '+st.c:'');
-    b.title=st.l;
-    b.textContent=st.s;
+    const isOn=stdsVar.includes(st.k)||stdsVar.includes(st.standard_key)||stdsVar.includes(st.legacy_k);
+    b.className='std-chip'+(isOn?' '+(st.c||st.on||''):'');
+    b.title=st.l||st.label||st.k;
+    b.textContent=st.s||st.short||st.k;
     b.onclick=()=>{
-      if(stdsVar.includes(st.k)){
-        const i=stdsVar.indexOf(st.k); stdsVar.splice(i,1);
+      const key=st.k;
+      const idx=stdsVar.indexOf(key);
+      if(idx>=0){
+        stdsVar.splice(idx,1);
         b.className='std-chip';
       } else {
-        stdsVar.push(st.k);
-        b.className='std-chip '+st.c;
+        stdsVar.push(key);
+        b.className='std-chip '+(st.c||st.on||'');
       }
       // 심사 기준 자동 업데이트
       const ci=document.getElementById(criteriaId);
-      if(ci) ci.value=stdsVar.map(k=>STANDARDS.find(x=>x.k===k)?.l||k).join(', ');
+      if(ci) ci.value=stdsVar.map(k=>STANDARDS.find(x=>x.k===k||x.standard_key===k)?.l||STANDARDS.find(x=>x.k===k)?.label||k).join(', ');
       saveAll();
     };
     g.appendChild(b);
   });
+  syncStdCriteria(stdsVar, criteriaId);
 }
+window.buildStdGrid=buildStdGrid;
 
 // ── 일정 테이블 행 ──
 function addRow(prefix){
@@ -1397,8 +1422,8 @@ function restoreAll(data){
     if(el.type==='checkbox') el.checked=val;
     else el.value=val||'';
   });
-  if(data._s1Stds){ s1Stds=data._s1Stds; buildStdGrid('s1-std-grid',s1Stds,'s1-criteria'); }
-  if(data._s2Stds){ s2Stds=data._s2Stds; buildStdGrid('s2-std-grid',s2Stds,'s2-criteria'); }
+  if(Array.isArray(data._s1Stds)&&data._s1Stds.length){ s1Stds=data._s1Stds; buildStdGrid('s1-std-grid',s1Stds,'s1-criteria'); }
+  if(Array.isArray(data._s2Stds)&&data._s2Stds.length){ s2Stds=data._s2Stds; buildStdGrid('s2-std-grid',s2Stds,'s2-criteria'); }
   if(data._s1Rows&&data._s1Rows.length){ s1Rows=data._s1Rows; renderRows('s1'); }
   if(data._s2Rows&&data._s2Rows.length){ s2Rows=data._s2Rows; renderRows('s2'); }
   if(data._s1Team&&data._s1Team.length){ s1Team=data._s1Team; renderTeam('s1'); }
@@ -1417,7 +1442,14 @@ document.addEventListener('change',()=>{ clearTimeout(_at); _at=setTimeout(saveA
 
 // ── 초기화 ──
 document.addEventListener('DOMContentLoaded',()=>{
-  // 표준 그리드 빌드
+  // 저장 데이터 복원 (비어 있지 않은 선택만 유지)
+  try{
+    const saved=localStorage.getItem('audit_plan_data');
+    if(saved) restoreAll(JSON.parse(saved));
+  }catch(e){}
+
+  // 마스터 선택이 이미 있으면 사용, 없으면 ctx 대기 / 폴백
+  prefillStdArrays();
   buildStdGrid('s1-std-grid',s1Stds,'s1-criteria');
   buildStdGrid('s2-std-grid',s2Stds,'s2-criteria');
 
@@ -1432,14 +1464,20 @@ document.addEventListener('DOMContentLoaded',()=>{
     const el=document.getElementById(id);
     if(el&&!el.value) el.value=today;
   });
+});
 
-  // 저장 데이터 복원
-  try{
-    const saved=localStorage.getItem('audit_plan_data');
-    if(saved) restoreAll(JSON.parse(saved));
-  }catch(e){}
+document.addEventListener('complais-audit-doc-ready',(ev)=>{
+  const keys=masterStdKeys(ev.detail);
+  let changed=false;
+  if(!s1Stds.length&&keys.length){ s1Stds=keys.slice(); changed=true; }
+  if(!s2Stds.length&&keys.length){ s2Stds=keys.slice(); changed=true; }
+  if(changed){
+    buildStdGrid('s1-std-grid',s1Stds,'s1-criteria');
+    buildStdGrid('s2-std-grid',s2Stds,'s2-criteria');
+    saveAll();
+  }
 });
 </script>
-<script src="/static/js/audit_doc_master.js?v=20260807demo1"></script>
+<script src="/static/js/audit_doc_master.js?v=20260808std1"></script>
 </body>
 </html>

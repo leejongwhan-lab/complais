@@ -58,6 +58,24 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
 .notice.blue{background:var(--blue2);color:var(--blue)}
 .notice.amber{background:var(--amber2);color:var(--amber)}
 .notice.green{background:var(--green2);color:var(--green)}
+.std-grid{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.std-chip{padding:4px 10px;border-radius:20px;border:1px solid var(--border);
+  background:var(--bg2);font-size:10px;cursor:pointer;font-weight:600;
+  color:var(--text2);transition:.15s;user-select:none}
+.std-chip:hover{border-color:var(--blue3);background:var(--blue2)}
+.std-chip.on,.std-chip.on-q{background:var(--blue2);border-color:var(--blue3);color:var(--blue)}
+.std-chip.on-e{background:var(--green2);border-color:var(--green3);color:var(--green)}
+.std-chip.on-s{background:var(--amber2);border-color:var(--amber3);color:var(--amber)}
+.std-chip.on-m{background:#fce4ec;border-color:#f9a8d4;color:#880e4f}
+.std-chip.on-f{background:#e8f5e9;border-color:#a7f3d0;color:#1b5e20}
+.std-chip.on-i{background:#e3f2fd;border-color:#93c5fd;color:#0d47a1}
+.std-chip.on-en{background:#fff8e1;border-color:#fde68a;color:#f57f17}
+.std-chip.on-ac{background:#f3e5f5;border-color:#d8b4fe;color:#6a1b9a}
+.std-chip.on-co{background:#e0f2f1;border-color:#6ee7b7;color:#00695c}
+.std-chip.on-ai{background:#ede7f6;border-color:#c4b5fd;color:#4527a0}
+.std-chip.on-nu{background:#eceff1;border-color:#cbd5e1;color:#37474f}
+.std-chip.on-pr{background:#fce4ec;border-color:#fda4af;color:#880e4f}
+.std-chip.on-bc{background:#ede7f6;border-color:#a78bfa;color:#311b92}
 /* 신청 검토 */
 .review-item{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border)}
 .review-item:last-child{border-bottom:none}
@@ -193,8 +211,10 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
   </div>
   <div class="sec">
     <div class="sec-h"><span class="sec-no">2</span> 신청 인증 표준 <span class="badge-ref">§9.1.1 a)d)</span></div>
-    <table class="form-tbl">
-      <tr><td class="lbl">신청 표준</td><td><textarea class="ta" id="a1-std" rows="2" placeholder="예) ISO 14001:2015, ISO 45001:2018"></textarea></td></tr>
+    <div class="field-lbl" style="margin-bottom:6px">신청 표준 (클릭 선택)</div>
+    <div class="std-grid" id="a1-std-grid"></div>
+    <table class="form-tbl" style="margin-top:8px">
+      <tr><td class="lbl">선택 표준</td><td><input class="inp" id="a1-std" readonly placeholder="선택한 표준이 자동 입력"></td></tr>
       <tr><td class="lbl">신청 인증 범위</td><td><textarea class="ta" id="a1-scope" rows="3" placeholder="제품·서비스 및 사이트를 포함한 신청 인증 범위"></textarea></td></tr>
       <tr><td class="lbl">적용 제외 조항</td><td><input class="inp" id="a1-excl" placeholder="없으면 '없음'"></td></tr>
     </table>
@@ -434,6 +454,68 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
 
 </div><!-- #pg -->
 <script>
+var STANDARDS=[
+  {k:'q',  label:'ISO 9001:2015',      short:'품질',     on:'on-q'},
+  {k:'e',  label:'ISO 14001:2015',     short:'환경',     on:'on-e'},
+  {k:'e26',label:'ISO 14001:2026',     short:'환경:26',  on:'on-e26'},
+  {k:'s',  label:'ISO 45001:2018',     short:'안전보건', on:'on-s'},
+  {k:'m',  label:'ISO 13485:2016',     short:'의료기기', on:'on-m'},
+  {k:'f',  label:'ISO 22000:2018',     short:'식품안전', on:'on-f'},
+  {k:'fs', label:'FSSC 22000 V6',      short:'FSSC',    on:'on-fs'},
+  {k:'i',  label:'ISO/IEC 27001:2022', short:'정보보안', on:'on-i'},
+  {k:'en', label:'ISO 50001:2018',     short:'에너지',   on:'on-en'},
+  {k:'sa', label:'SA 8000:2014',       short:'SA8000',  on:'on-sa'},
+  {k:'ac', label:'ISO 37001:2016',     short:'반부패',   on:'on-ac'},
+  {k:'co', label:'ISO 37301:2021',     short:'준법경영', on:'on-co'},
+  {k:'ai', label:'ISO/IEC 42001:2023', short:'AI경영',  on:'on-ai'},
+  {k:'nu', label:'ISO 19443:2018',     short:'원자력',   on:'on-nu'},
+  {k:'sd', label:'UN SDGs',            short:'SDGs',    on:'on-sd'},
+  {k:'bc', label:'ISO 22301:2019',     short:'사업연속', on:'on-bc'},
+  {k:'pr', label:'ISO/IEC 27701:2019', short:'개인정보', on:'on-pr'},
+];
+window.STANDARDS=STANDARDS;
+var selectedStds=[];
+window.selectedStds=selectedStds;
+
+function masterStdKeys(ctx){
+  const c=ctx||(window.ComplaisAuditDocMaster&&window.ComplaisAuditDocMaster.context)||{};
+  const m=c.master||{};
+  const keys=c.selected_standard_keys||m.standard_keys||[];
+  return Array.isArray(keys)?keys.slice():[];
+}
+function syncStdLabelField(){
+  const ci=document.getElementById('a1-std');
+  if(!ci) return;
+  ci.value=selectedStds.map(k=>{
+    const st=STANDARDS.find(x=>x.k===k||x.standard_key===k);
+    return st?(st.label||st.l||k):k;
+  }).join(', ');
+}
+function buildStdGrid(gridId){
+  const g=document.getElementById(gridId||'a1-std-grid');
+  if(!g) return;
+  g.innerHTML='';
+  STANDARDS.forEach(st=>{
+    const b=document.createElement('button');
+    const on=selectedStds.includes(st.k)||selectedStds.includes(st.standard_key)||selectedStds.includes(st.legacy_k);
+    b.type='button';
+    b.className='std-chip'+(on?' '+(st.on||st.c||'on'):'');
+    b.textContent=st.short||st.s||st.k;
+    b.title=st.label||st.l||st.k;
+    b.onclick=()=>{
+      if(selectedStds.includes(st.k)) selectedStds=selectedStds.filter(x=>x!==st.k);
+      else selectedStds.push(st.k);
+      window.selectedStds=selectedStds;
+      b.className='std-chip'+(selectedStds.includes(st.k)?' '+(st.on||st.c||'on'):'');
+      syncStdLabelField();
+      saveAll();
+    };
+    g.appendChild(b);
+  });
+  syncStdLabelField();
+}
+window.buildStdGrid=buildStdGrid;
+
 const REVIEW_ITEMS=[
   {r:'§9.1.2.1 a)',t:'신청 조직의 정보(규모·프로세스·사이트·인원·법적의무 등)가 충분히 파악되었는가?'},
   {r:'§9.1.2.1 b)',t:'인증기관과 신청 조직 간 알려진 차이점(예: 언어, 규제 요건)이 해소되었는가?'},
@@ -498,7 +580,7 @@ function getSaved(k){try{const v=localStorage.getItem('appcont_'+k);return v?JSO
 function setSaved(k,v){try{localStorage.setItem('appcont_'+k,JSON.stringify(v));}catch(e){}}
 function collectFields(){const d={};document.querySelectorAll('input[id],textarea[id],select[id]').forEach(el=>{if(!el.id)return;if(el.type==='checkbox')d[el.id]=el.checked;else d[el.id]=el.value;});return d;}
 function restoreFields(d){if(!d)return;Object.entries(d).forEach(([id,val])=>{const el=document.getElementById(id);if(!el)return;if(el.type==='checkbox')el.checked=val;else el.value=val||'';});}
-function saveAll(){setSaved('fields',collectFields());setSaved('rv',rvStates);setSaved('rvDec',rvDecision);const n=document.getElementById('save-notice');if(n){n.style.display='block';clearTimeout(n._t);n._t=setTimeout(()=>n.style.display='none',2000);}}
+function saveAll(){setSaved('fields',collectFields());setSaved('stds',selectedStds);setSaved('rv',rvStates);setSaved('rvDec',rvDecision);const n=document.getElementById('save-notice');if(n){n.style.display='block';clearTimeout(n._t);n._t=setTimeout(()=>n.style.display='none',2000);}}
 let _at=null;
 document.addEventListener('input',()=>{clearTimeout(_at);_at=setTimeout(saveAll,1500);updateCertPreview();});
 document.addEventListener('change',()=>{clearTimeout(_at);_at=setTimeout(saveAll,1500);});
@@ -507,10 +589,26 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('input[type="date"]').forEach(el=>{if(!el.value)el.value=today;});
   renderReviewChecklist();
   const f=getSaved('fields');if(f)restoreFields(f);
+  const stds=getSaved('stds');
+  if(Array.isArray(stds)&&stds.length){selectedStds=stds;window.selectedStds=selectedStds;}
+  else{
+    const keys=masterStdKeys();
+    if(keys.length){selectedStds=keys.slice();window.selectedStds=selectedStds;}
+  }
+  buildStdGrid('a1-std-grid');
   const rv=getSaved('rv');if(rv){rvStates=rv;renderReviewChecklist();}
   const rvd=getSaved('rvDec');if(rvd)setRvDecision(rvd);
   updateCertPreview();
 });
+document.addEventListener('complais-audit-doc-ready',(ev)=>{
+  if(selectedStds.length) return;
+  const keys=masterStdKeys(ev.detail);
+  if(!keys.length) return;
+  selectedStds=keys.slice();
+  window.selectedStds=selectedStds;
+  buildStdGrid('a1-std-grid');
+  saveAll();
+});
 </script>
-<script src="/static/js/audit_doc_master.js?v=20260807demo1"></script>
+<script src="/static/js/audit_doc_master.js?v=20260808std1"></script>
 </body></html>

@@ -983,7 +983,7 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
 
 </div><!-- #pg -->
 <script>
-const STANDARDS = [
+var STANDARDS = [
   {k:'q',  label:'ISO 9001:2015',      short:'품질',     cls:'chip-q',  on:'on-q',  desc:'품질경영시스템'},
   {k:'e',  label:'ISO 14001:2015',     short:'환경:15',  cls:'chip-e',  on:'on-e',  desc:'환경경영시스템 (현행)'},
   {k:'e26',label:'ISO 14001:2026',     short:'환경:26',  cls:'chip-e26',on:'on-e26',desc:'환경경영시스템 (2026 신판)'},
@@ -1002,13 +1002,28 @@ const STANDARDS = [
   {k:'bc', label:'ISO 22301:2019',     short:'사업연속', cls:'chip-bc', on:'on-bc', desc:'사업연속성경영시스템'},
   {k:'pr', label:'ISO/IEC 27701:2019', short:'개인정보', cls:'chip-pr', on:'on-pr', desc:'개인정보보호경영시스템'},
 ];
+window.STANDARDS = STANDARDS;
 
 // ════════════════════════════════════════
 // 상태
 // ════════════════════════════════════════
-let selectedStds = [];
+var selectedStds = [];
+window.selectedStds = selectedStds;
 let preReviewDecision = null, certDecision = null;
 let checkStates = {};  // {sec_idx: {item_idx: 'ok'|'ng'|'na', remark: ''}}
+
+function masterStdKeys(ctx){
+  const c=ctx||(window.ComplaisAuditDocMaster&&window.ComplaisAuditDocMaster.context)||{};
+  const m=c.master||{};
+  const keys=c.selected_standard_keys||m.standard_keys||[];
+  return Array.isArray(keys)?keys.slice():[];
+}
+
+function prefillSelectedStds(){
+  if(selectedStds.length) return;
+  const keys=masterStdKeys();
+  if(keys.length){ selectedStds=keys.slice(); window.selectedStds=selectedStds; }
+}
 
 // ════════════════════════════════════════
 // 탭
@@ -1028,20 +1043,26 @@ function buildStdGrid(gridId){
   g.innerHTML = '';
   STANDARDS.forEach(st=>{
     const b = document.createElement('button');
-    const on = selectedStds.includes(st.k);
+    const on = selectedStds.includes(st.k)||selectedStds.includes(st.standard_key)||selectedStds.includes(st.legacy_k);
     b.className = 'std-chip' + (on?' on':'');
-    b.textContent = st.short; b.title = st.label;
+    b.textContent = st.short||st.s||st.k; b.title = st.label||st.l||st.k;
     b.onclick = ()=>{
       if(selectedStds.includes(st.k)) selectedStds = selectedStds.filter(x=>x!==st.k);
       else selectedStds.push(st.k);
+      window.selectedStds = selectedStds;
       b.className = 'std-chip' + (selectedStds.includes(st.k)?' on':'');
       const ci = document.getElementById('c1-criteria');
-      if(ci) ci.value = selectedStds.map(k=>STANDARDS.find(x=>x.k===k)?.label||k).join(', ');
+      if(ci) ci.value = selectedStds.map(k=>STANDARDS.find(x=>x.k===k||x.standard_key===k)?.label||k).join(', ');
       saveAll();
     };
     g.appendChild(b);
   });
+  const ci = document.getElementById('c1-criteria');
+  if(ci && selectedStds.length && !ci.value){
+    ci.value = selectedStds.map(k=>STANDARDS.find(x=>x.k===k||x.standard_key===k)?.label||k).join(', ');
+  }
 }
+window.buildStdGrid = buildStdGrid;
 
 // ════════════════════════════════════════
 // 사전검토 체크리스트 정의 + 렌더
@@ -1223,7 +1244,8 @@ function loadAll(){
   const fields = getSaved('fields');
   restoreFields(fields);
   const stds = getSaved('stds');
-  if(stds){ selectedStds=stds; buildStdGrid('a1-std-grid'); }
+  // Prefer non-empty saved selection; empty array allows master autofill
+  if(Array.isArray(stds)&&stds.length){ selectedStds=stds; window.selectedStds=selectedStds; }
   const chk = getSaved('checks');
   if(chk){ checkStates=chk; renderChecklists(); }
   const pr = getSaved('preReview');
@@ -1241,6 +1263,8 @@ document.addEventListener('change',()=>{ clearTimeout(_at); _at=setTimeout(saveA
 // 초기화
 // ════════════════════════════════════════
 document.addEventListener('DOMContentLoaded',()=>{
+  loadAll();
+  prefillSelectedStds();
   buildStdGrid('a1-std-grid');
   renderChecklists();
   const today = new Date().toISOString().slice(0,10);
@@ -1250,9 +1274,18 @@ document.addEventListener('DOMContentLoaded',()=>{
     const el=document.getElementById(id);
     if(el&&!el.value) el.value=today;
   });
-  loadAll();
+});
+
+document.addEventListener('complais-audit-doc-ready',(ev)=>{
+  if(selectedStds.length) return;
+  const keys=masterStdKeys(ev.detail);
+  if(!keys.length) return;
+  selectedStds=keys.slice();
+  window.selectedStds=selectedStds;
+  buildStdGrid('a1-std-grid');
+  saveAll();
 });
 </script>
-<script src="/static/js/audit_doc_master.js?v=20260807demo1"></script>
+<script src="/static/js/audit_doc_master.js?v=20260808std1"></script>
 </body>
 </html>

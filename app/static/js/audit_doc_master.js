@@ -37,6 +37,69 @@
     }
   }
 
+  function hasKeys(arr) {
+    return Array.isArray(arr) && arr.length > 0;
+  }
+
+  function stdLabel(k) {
+    var list = window.STANDARDS || [];
+    for (var i = 0; i < list.length; i++) {
+      var x = list[i];
+      if (x.k === k || x.standard_key === k || x.legacy_k === k) {
+        return x.label || x.l || x.display_code || k;
+      }
+    }
+    return k;
+  }
+
+  function syncCriteria(ids, keys) {
+    if (!hasKeys(keys)) return;
+    var text = keys.map(stdLabel).join(", ");
+    (ids || []).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && (!el.value || params.get("force") === "1")) el.value = text;
+    });
+  }
+
+  /** Prefer non-empty current selection; otherwise take master keys. */
+  function mergeKeys(current, keys) {
+    if (hasKeys(current)) return current.slice();
+    if (hasKeys(keys)) return keys.slice();
+    return Array.isArray(current) ? current.slice() : [];
+  }
+
+  function rebuildStdGrids(selected, s1, s2) {
+    if (typeof window.buildStdGrid !== "function") return;
+
+    // plan.html: buildStdGrid(gridId, stdsVar, criteriaId)
+    try {
+      if (document.getElementById("s1-std-grid") && s1) {
+        window.buildStdGrid("s1-std-grid", s1, "s1-criteria");
+        syncCriteria(["s1-criteria"], s1);
+      }
+      if (document.getElementById("s2-std-grid") && s2) {
+        window.buildStdGrid("s2-std-grid", s2, "s2-criteria");
+        syncCriteria(["s2-criteria"], s2);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
+    // Single-grid docs: buildStdGrid(gridId) reading selectedStds
+    ["a1-std-grid", "d1-std-grid", "p1-std-grid"].forEach(function (gid) {
+      if (!document.getElementById(gid)) return;
+      try {
+        window.buildStdGrid(gid);
+      } catch (_) {
+        try {
+          window.buildStdGrid(gid, selected || [], null);
+        } catch (_2) {
+          /* ignore */
+        }
+      }
+    });
+  }
+
   function applyStandards(catalog, selectedKeys) {
     if (!Array.isArray(catalog) || !catalog.length) return;
     var mapped = catalog.map(function (s) {
@@ -57,7 +120,6 @@
     if (typeof window.STANDARDS !== "undefined") {
       window.STANDARDS = mapped;
     }
-    // also assign bare STANDARDS if in global script scope via var — overwrite on window
     try {
       STANDARDS = mapped; // eslint-disable-line no-undef
     } catch (_) {
@@ -65,24 +127,46 @@
     }
 
     var keys = Array.isArray(selectedKeys) ? selectedKeys.slice() : [];
-    if (typeof window.selectedStds !== "undefined") {
-      window.selectedStds = keys;
-    }
-    try {
-      selectedStds = keys; // eslint-disable-line no-undef
-    } catch (_) {
-      /* ignore */
-    }
+    var selected = [];
+    var s1 = [];
+    var s2 = [];
 
-    ["a1-std-grid", "s1-std-grid", "s2-std-grid"].forEach(function (gid) {
-      if (typeof window.buildStdGrid === "function") {
-        try {
-          window.buildStdGrid(gid);
-        } catch (_) {
-          /* ignore */
-        }
-      }
-    });
+    // selectedStds (recert / application / transfer / special)
+    try {
+      selected = mergeKeys(
+        typeof selectedStds !== "undefined" ? selectedStds : window.selectedStds,
+        keys
+      );
+      selectedStds = selected; // eslint-disable-line no-undef
+    } catch (_) {
+      selected = mergeKeys(window.selectedStds, keys);
+    }
+    window.selectedStds = selected;
+
+    // plan.html dual arrays
+    try {
+      s1 = mergeKeys(typeof s1Stds !== "undefined" ? s1Stds : window.s1Stds, keys);
+      s1Stds = s1; // eslint-disable-line no-undef
+    } catch (_) {
+      s1 = mergeKeys(window.s1Stds, keys);
+    }
+    window.s1Stds = s1;
+
+    try {
+      s2 = mergeKeys(typeof s2Stds !== "undefined" ? s2Stds : window.s2Stds, keys);
+      s2Stds = s2; // eslint-disable-line no-undef
+    } catch (_) {
+      s2 = mergeKeys(window.s2Stds, keys);
+    }
+    window.s2Stds = s2;
+
+    rebuildStdGrids(selected, s1, s2);
+
+    var active = hasKeys(selected) ? selected : hasKeys(s1) ? s1 : keys;
+    syncCriteria(
+      ["a1-std", "d1-stds", "p1-std", "c1-criteria", "c1-std", "cert-std"],
+      active
+    );
   }
 
   function banner(ctx) {
