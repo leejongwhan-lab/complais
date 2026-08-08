@@ -1,7 +1,8 @@
 """CB 어드민 프로필 + Scope 통합 조회/수정 API.
 
 프로필 소스는 certification_bodies (명세의 cb_profiles 역할).
-승인 Scope 조회는 레거시 cb_accredited_scopes(존재 시) LEFT JOIN 형태로 함께 반환한다.
+승인 Scope / 인정정보 조회는 v11 SoT(`cb_standard_accreditations`) +
+IAF 행렬(`cb_scope_matrix`)만 사용한다. 레거시 `cb_accredited_scopes`는 SoT 아님.
 표준별 인정/MD단가는 cb_standard_accreditations.
 CB는 운용 인정범위(SoT/matrix)를 직접 쓸 수 없고, md_rate만 PUT 가능.
 """
@@ -11,7 +12,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.api.v1.endpoints.admin_cb import (
@@ -23,9 +24,12 @@ from app.api.v1.endpoints.admin_cb import (
 from app.core.security import CurrentUser, require_cb_scope
 from app.models.auth import Notifications, Users
 from app.models.cb import CertificationBodies
-from app.models.certification_body import CbStandardAccreditation, cb_to_spec_dict
+from app.models.certification_body import (
+    CbAccreditationScope,
+    CbStandardAccreditation,
+    cb_to_spec_dict,
+)
 from app.models.enums import UsersRole
-from app.models.master_data import CbAccreditedScope
 from app.data.standards_catalog import to_family_initial
 
 router = APIRouter(prefix="/cb", tags=["CB Profile"])
@@ -36,11 +40,15 @@ _STATUS_LABEL = {
     "withdrawn": "철회",
 }
 
+_EMPTY_ACCREDITATION_MSG = (
+    "등록된 인정정보가 없습니다. 인정범위 신청 메뉴에서 제출해주세요"
+)
+
 
 class CbProfileScopeItem(BaseModel):
     scope_id: int
-    standard_id: int
-    iaf_code_id: int
+    standard_id: int = 0
+    iaf_code_id: int = 0
     standard_code: Optional[str] = None
     standard_name_ko: Optional[str] = None
     iaf_code: Optional[str] = None
@@ -50,6 +58,18 @@ class CbProfileScopeItem(BaseModel):
     expiry_date: Optional[str] = None
     status: str = "active"
     status_label: str = "정상"
+
+
+class CbProfileAccreditationItem(BaseModel):
+    """승인·활성 SoT 행 + 연결 matrix IAF."""
+
+    id: int
+    standard_code: str
+    ab_code: Optional[str] = None
+    registration_no: Optional[str] = None
+    expiry_date: Optional[str] = None
+    iaf_codes: List[str] = Field(default_factory=list)
+    is_active: bool = True
 
 
 class CbProfileOut(BaseModel):
@@ -85,6 +105,9 @@ class CbProfileOut(BaseModel):
     is_active: bool = True
     scopes: List[CbProfileScopeItem] = Field(default_factory=list)
     scope_count: int = 0
+    accreditations: List[CbProfileAccreditationItem] = Field(default_factory=list)
+    accreditation_count: int = 0
+    accreditation_message: Optional[str] = None
     has_profile: bool = True
     message: Optional[str] = None
 
@@ -133,80 +156,166 @@ def _resolve_cb_id(current_user: CurrentUser, cb_id: Optional[int]) -> int:
 
 
 def _sync_denormalized_scope_summary(db: Session, cb: CertificationBodies) -> None:
-    """레거시 컬럼(accredited_standards / iaf_scopes)을 최신 Scope 기준으로 동기화."""
+    """레거시 컬럼(accredited_standards / iaf_scopes)을 SoT + matrix 기준으로 동기화."""
     try:
-        rows = (
-            db.query(CbAccreditedScope)
-            .options(
-                joinedload(CbAccreditedScope.standard),
-                joinedload(CbAccreditedScope.iaf_code),
-            )
+        sot_rows = (
+            db.query(CbStandardAccreditation)
             .filter(
-                CbAccreditedScope.cb_id == cb.id,
-                CbAccreditedScope.status == "active",
+                CbStandardAccreditation.cb_id == cb.id,
+                CbStandardAccreditation.is_active.is_(True),
+            )
+            .all()
+        )
+        matrix_rows = (
+            db.query(CbAccreditationScope)
+            .filter(
+                CbAccreditationScope.cb_id == cb.id,
+                CbAccreditationScope.is_active.is_(True),
             )
             .all()
         )
     except Exception:
         db.rollback()
         return
-    standards = sorted(
-        {
-            r.standard.standard_code
-            for r in rows
-            if r.standard and r.standard.standard_code
-        }
-    )
-    iafs = sorted({r.iaf_code.code for r in rows if r.iaf_code and r.iaf_code.code})
+    standards = sorted({(r.standard_code or "").strip() for r in sot_rows if r.standard_code})
+    iafs = sorted({(r.iaf_code or "").strip() for r in matrix_rows if r.iaf_code})
     cb.accredited_standards = ", ".join(standards) if standards else None
     cb.iaf_scopes = ", ".join(iafs) if iafs else None
 
 
-def _load_scopes(db: Session, cb_id: int) -> List[CbProfileScopeItem]:
+def _match_sot(
+    sot_by_id: dict,
+    sot_by_code: dict,
+    sot_by_fam: dict,
+    matrix: CbAccreditationScope,
+) -> Optional[CbStandardAccreditation]:
+    if matrix.standard_accreditation_id and matrix.standard_accreditation_id in sot_by_id:
+        return sot_by_id[matrix.standard_accreditation_id]
+    code = (matrix.standard_code or "").strip()
+    if code and code in sot_by_code:
+        return sot_by_code[code]
+    fam = to_family_initial(code) if code else None
+    if fam and fam in sot_by_fam:
+        return sot_by_fam[fam]
+    return None
+
+
+def _load_sot_profile(
+    db: Session, cb_id: int
+) -> tuple[List[CbProfileAccreditationItem], List[CbProfileScopeItem]]:
+    """Active SoT rows + linked cb_scope_matrix IAF. No cb_accredited_scopes."""
     try:
-        rows = (
-            db.query(CbAccreditedScope)
-            .options(
-                joinedload(CbAccreditedScope.standard),
-                joinedload(CbAccreditedScope.iaf_code),
+        sot_rows = (
+            db.query(CbStandardAccreditation)
+            .filter(
+                CbStandardAccreditation.cb_id == cb_id,
+                CbStandardAccreditation.is_active.is_(True),
             )
-            .filter(CbAccreditedScope.cb_id == cb_id)
-            .order_by(CbAccreditedScope.id.desc())
+            .order_by(CbStandardAccreditation.standard_code.asc())
             .all()
         )
     except Exception:
         db.rollback()
-        return []
-    out: List[CbProfileScopeItem] = []
-    for r in rows:
-        out.append(
+        return [], []
+
+    if not sot_rows:
+        return [], []
+
+    sot_by_id = {int(r.id): r for r in sot_rows}
+    sot_by_code = {(r.standard_code or "").strip(): r for r in sot_rows if r.standard_code}
+    sot_by_fam: dict = {}
+    for r in sot_rows:
+        fam = to_family_initial(r.standard_code)
+        if fam and fam not in sot_by_fam:
+            sot_by_fam[fam] = r
+
+    try:
+        matrix_rows = (
+            db.query(CbAccreditationScope)
+            .filter(
+                CbAccreditationScope.cb_id == cb_id,
+                CbAccreditationScope.is_active.is_(True),
+            )
+            .order_by(
+                CbAccreditationScope.standard_code.asc(),
+                CbAccreditationScope.iaf_code.asc(),
+            )
+            .all()
+        )
+    except Exception:
+        db.rollback()
+        matrix_rows = []
+
+    iaf_by_sot_id: dict[int, List[str]] = {}
+    scopes: List[CbProfileScopeItem] = []
+    for m in matrix_rows:
+        sot = _match_sot(sot_by_id, sot_by_code, sot_by_fam, m)
+        if sot is None:
+            continue
+        code = (m.iaf_code or "").strip()
+        if code:
+            bucket = iaf_by_sot_id.setdefault(int(sot.id), [])
+            if code not in bucket:
+                bucket.append(code)
+        exp = sot.expiry_date or m.expiry_date
+        granted = m.granted_date
+        scopes.append(
             CbProfileScopeItem(
-                scope_id=r.id,
-                standard_id=r.standard_id,
-                iaf_code_id=r.iaf_code_id,
-                standard_code=r.standard.standard_code if r.standard else None,
-                standard_name_ko=r.standard.standard_name_ko if r.standard else None,
-                iaf_code=r.iaf_code.code if r.iaf_code else None,
-                industry_name_ko=r.iaf_code.name_ko if r.iaf_code else None,
-                accreditation_body=r.accreditation_body,
-                approval_date=r.approval_date.isoformat() if r.approval_date else None,
-                expiry_date=r.expiry_date.isoformat() if r.expiry_date else None,
-                status=r.status or "active",
-                status_label=_STATUS_LABEL.get(r.status or "active", r.status or "active"),
+                scope_id=int(m.id),
+                standard_id=0,
+                iaf_code_id=0,
+                standard_code=sot.standard_code,
+                standard_name_ko=sot.standard_code,
+                iaf_code=code or None,
+                industry_name_ko=None,
+                accreditation_body=sot.ab_code,
+                approval_date=granted.isoformat() if granted else None,
+                expiry_date=exp.isoformat() if exp else None,
+                status="active",
+                status_label=_STATUS_LABEL.get("active", "정상"),
             )
         )
-    return out
+
+    accreditations: List[CbProfileAccreditationItem] = []
+    for r in sot_rows:
+        iafs = iaf_by_sot_id.get(int(r.id), [])
+        accreditations.append(
+            CbProfileAccreditationItem(
+                id=int(r.id),
+                standard_code=r.standard_code,
+                ab_code=r.ab_code,
+                registration_no=r.registration_no,
+                expiry_date=r.expiry_date.isoformat() if r.expiry_date else None,
+                iaf_codes=sorted(iafs, key=lambda x: (len(x), x)),
+                is_active=bool(r.is_active),
+            )
+        )
+    return accreditations, scopes
 
 
-def _to_profile_out(cb: CertificationBodies, scopes: List[CbProfileScopeItem]) -> CbProfileOut:
-    """Admin CB detail 과 동일 ``cb_to_spec_dict`` 베이스 + 포털 Scope."""
+def _load_scopes(db: Session, cb_id: int) -> List[CbProfileScopeItem]:
+    """SoT-linked matrix rows (1행 = 표준×IAF). Legacy cb_accredited_scopes unused."""
+    _, scopes = _load_sot_profile(db, cb_id)
+    return scopes
+
+
+def _to_profile_out(
+    cb: CertificationBodies,
+    scopes: List[CbProfileScopeItem],
+    accreditations: Optional[List[CbProfileAccreditationItem]] = None,
+) -> CbProfileOut:
+    """Admin CB detail 과 동일 ``cb_to_spec_dict`` 베이스 + SoT 인정정보."""
     spec = cb_to_spec_dict(cb)
+    accs = accreditations if accreditations is not None else []
     has_basic = bool(
         (spec.get("cb_name") or spec.get("name") or "").strip()
         or (spec.get("ceo_name") or "").strip()
         or (spec.get("address") or "").strip()
     )
+    ab_codes = sorted({(a.ab_code or "").strip() for a in accs if a.ab_code})
+    ab_display = ", ".join(ab_codes) if ab_codes else (spec.get("accreditation_body") or None)
     expire = getattr(cb, "expire_date", None)
+    empty_acc = len(accs) == 0
     return CbProfileOut(
         cb_id=int(spec["id"]),
         code=spec.get("cb_code") or spec.get("code"),
@@ -226,7 +335,7 @@ def _to_profile_out(cb: CertificationBodies, scopes: List[CbProfileScopeItem]) -
         email=spec.get("email"),
         website=spec.get("website"),
         intro=getattr(cb, "intro", None),
-        accreditation_body=spec.get("accreditation_body"),
+        accreditation_body=ab_display,
         accreditation_no=spec.get("reg_no") or getattr(cb, "accreditation_no", None),
         reg_no=spec.get("reg_no"),
         accreditation_region=getattr(cb, "accreditation_region", None),
@@ -238,6 +347,9 @@ def _to_profile_out(cb: CertificationBodies, scopes: List[CbProfileScopeItem]) -
         is_active=bool(getattr(cb, "is_active", True)),
         scopes=scopes,
         scope_count=len(scopes),
+        accreditations=accs,
+        accreditation_count=len(accs),
+        accreditation_message=_EMPTY_ACCREDITATION_MSG if empty_acc else None,
         has_profile=has_basic,
         message=None
         if has_basic
@@ -412,7 +524,7 @@ def get_cb_profile(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_cb_scope),
 ):
-    """세션 cb_id 기준 기관 정보 + 승인 Scope(LEFT JOIN) 최신 조회."""
+    """세션 cb_id 기준 기관 정보 + 승인 SoT/matrix Scope 최신 조회."""
     _require_cb_manager(current_user)
     scope_cb_id = _resolve_cb_id(current_user, cb_id)
 
@@ -426,8 +538,8 @@ def get_cb_profile(
             detail="등록된 인증기관 정보가 없습니다. 정보를 입력하거나 CSV를 업로드해 주세요.",
         )
 
-    scopes = _load_scopes(db, scope_cb_id)
-    return _to_profile_out(cb, scopes)
+    accreditations, scopes = _load_sot_profile(db, scope_cb_id)
+    return _to_profile_out(cb, scopes, accreditations)
 
 
 @router.put("/profile", response_model=CbProfileOut)
@@ -437,7 +549,7 @@ def update_cb_profile(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_cb_scope),
 ):
-    """인증기관 기본 정보 수정 후 최신 프로필(+Scope) 반환."""
+    """인증기관 기본 정보 수정 후 최신 프로필(+SoT Scope) 반환."""
     _require_cb_manager(current_user)
     scope_cb_id = _resolve_cb_id(current_user, cb_id)
 
@@ -467,5 +579,5 @@ def update_cb_profile(
     db.expire_all()
 
     cb = db.query(CertificationBodies).filter(CertificationBodies.id == scope_cb_id).first()
-    scopes = _load_scopes(db, scope_cb_id)
-    return _to_profile_out(cb, scopes)
+    accreditations, scopes = _load_sot_profile(db, scope_cb_id)
+    return _to_profile_out(cb, scopes, accreditations)

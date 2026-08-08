@@ -30,7 +30,8 @@
     settlement: ["인증원 운영", "입회 관리 · MD17 · MD단가"],
     billing: ["인증원 운영", "입회 관리 · MD17 · MD단가"],
     finance: ["인증원 운영", "입회 관리 · MD17 · MD단가"],
-    cb_info: ["인증원 정보", "기관 프로필 · Scope"],
+    cb_info: ["인증원 정보", "기관 프로필 · 인정정보(SoT)"],
+    accreditation_req: ["인정범위 신청", "신청 제출 · 관리자 승인 대기"],
     approval_policy: ["승인 정책", "내부 승인 규칙"],
   };
 
@@ -179,6 +180,7 @@
     else if (name === "companies") loadCompanies();
     else if (name === "auditors") loadAuditors();
     else if (name === "cb_info") loadCbInfo();
+    else if (name === "accreditation_req") loadAccreditationReq();
     else if (name === "operations") {
       switchOpsSub(opts.sub || qs().get("sub") || normalizeOpsSub(null, raw), {
         skipQuery: !!opts.skipQuery,
@@ -1154,6 +1156,46 @@
     }
   }
 
+  function renderAccreditationSection(d) {
+    const accs = Array.isArray(d.accreditations) ? d.accreditations : [];
+    if (!accs.length) {
+      const msg =
+        d.accreditation_message ||
+        "등록된 인정정보가 없습니다. 인정범위 신청 메뉴에서 제출해주세요";
+      return (
+        `<div class="org-section" style="margin-top:20px">` +
+        `<h3 class="org-section-title">인정정보 (승인·활성)</h3>` +
+        `<p class="muted">${escapeHtml(msg)}</p>` +
+        `<p style="margin-top:8px"><a href="/cb-portal?tab=accreditation_req" data-tab="accreditation_req">인정범위 신청으로 이동 →</a></p>` +
+        `</div>`
+      );
+    }
+    const rows = accs
+      .map((a) => {
+        const iaf = (a.iaf_codes || []).join(", ") || "—";
+        return (
+          `<tr>` +
+          `<td>${escapeHtml(a.ab_code || "—")}</td>` +
+          `<td>${escapeHtml(a.standard_code || "—")}</td>` +
+          `<td>${escapeHtml(iaf)}</td>` +
+          `<td>${escapeHtml(a.registration_no || "—")}</td>` +
+          `<td>${escapeHtml(a.expiry_date ? String(a.expiry_date).slice(0, 10) : "—")}</td>` +
+          `</tr>`
+        );
+      })
+      .join("");
+    return (
+      `<div class="org-section" style="margin-top:20px">` +
+      `<h3 class="org-section-title">인정정보 (승인·활성)</h3>` +
+      `<p class="muted" style="margin:0 0 8px;">출처: cb_standard_accreditations + cb_scope_matrix</p>` +
+      `<div class="table-wrap"><table class="data-table admin-data-table">` +
+      `<thead><tr><th>인정기구(AB)</th><th>표준</th><th>IAF/수행범위</th><th>인정번호</th><th>만료일</th></tr></thead>` +
+      `<tbody>${rows}</tbody></table></div>` +
+      `<p class="hint" style="margin-top:8px">추가·변경은 <a href="/cb-portal?tab=accreditation_req" data-tab="accreditation_req">인정범위 신청</a>에서 제출하세요.</p>` +
+      `</div>`
+    );
+  }
+
   async function loadCbInfo() {
     const box = document.getElementById("cb-info-body");
     if (!box) return;
@@ -1178,6 +1220,7 @@
         `<dt>인정기구</dt><dd>${escapeHtml(d.accreditation_body || "—")}</dd>` +
         `<dt>상태</dt><dd>${escapeHtml(d.status || "—")}</dd>` +
         `</dl>` +
+        renderAccreditationSection(d) +
         `<div class="org-section" style="margin-top:16px">` +
         `<h3 class="org-section-title">기본 주소</h3>` +
         `<div class="org-field full"><label for="cbi-zip">우편번호 / 주소</label>` +
@@ -1191,12 +1234,17 @@
         `<div class="org-actions" style="margin-top:10px">` +
         `<button type="button" class="btn-primary" id="cbi-addr-save">주소 저장</button></div>` +
         `<div class="org-msg" id="cbi-addr-msg"></div>` +
-        `</div>` +
-        `<p class="hint"><a href="/static/cb_portal_legacy.html">상세 프로필/Scope 편집 (레거시)</a></p>`;
+        `</div>`;
       const addr = d.address || "";
       document.getElementById("cbi-address").value = addr;
       document.getElementById("cbi-detail").value = "";
       if (typeof wireDaumPostcodeButtons === "function") wireDaumPostcodeButtons(box);
+      box.querySelectorAll("a[data-tab]").forEach((a) => {
+        a.addEventListener("click", (evt) => {
+          evt.preventDefault();
+          switchTab(a.getAttribute("data-tab"));
+        });
+      });
       document.getElementById("cbi-addr-save")?.addEventListener("click", async () => {
         const msgEl = document.getElementById("cbi-addr-msg");
         const base = (document.getElementById("cbi-address").value || "").trim();
@@ -1224,6 +1272,116 @@
     } catch (e) {
       box.innerHTML = `<p class="muted">${escapeHtml(e.message)}</p>`;
     }
+  }
+
+  async function loadAccreditationReqList() {
+    const tbody = document.getElementById("acc-req-tbody");
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" class="muted">불러오는 중…</td></tr>';
+    try {
+      const res = await fetch(API + "/cb-portal/accreditation-requests", {
+        headers: authHeaders(),
+        cache: "no-store",
+      });
+      const data = await res.json().catch(() => []);
+      if (res.status === 403) {
+        forceCbLogin(typeof data.detail === "string" ? data.detail : "CB 계정 필요");
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(typeof data.detail === "string" ? data.detail : "신청 목록 실패");
+      }
+      const list = Array.isArray(data) ? data : [];
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted">제출한 신청이 없습니다.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list
+        .map((r) => {
+          const n = Array.isArray(r.scopes) ? r.scopes.length : 0;
+          return (
+            `<tr><td>${escapeHtml(String(r.id))}</td>` +
+            `<td>${escapeHtml(r.accreditation_body || "—")}</td>` +
+            `<td>${escapeHtml(r.certificate_number || "—")}</td>` +
+            `<td>${escapeHtml(r.status || "—")}</td>` +
+            `<td>${n}</td></tr>`
+          );
+        })
+        .join("");
+    } catch (e) {
+      tbody.innerHTML =
+        `<tr><td colspan="5" class="muted">${escapeHtml(e.message || String(e))}</td></tr>`;
+    }
+  }
+
+  async function loadAccreditationReq() {
+    loadAccreditationReqList();
+    const form = document.getElementById("acc-req-form");
+    if (!form || form.dataset.wired === "1") return;
+    form.dataset.wired = "1";
+    form.addEventListener("submit", async (evt) => {
+      evt.preventDefault();
+      const msgEl = document.getElementById("acc-req-msg");
+      if (msgEl) {
+        msgEl.textContent = "";
+        msgEl.className = "org-msg";
+      }
+      const ab = (document.getElementById("acc-req-ab")?.value || "").trim();
+      const certNo = (document.getElementById("acc-req-cert-no")?.value || "").trim();
+      const scopesRaw = (document.getElementById("acc-req-scopes")?.value || "").trim();
+      const fileInput = document.getElementById("acc-req-file");
+      const file = fileInput?.files?.[0];
+      if (!ab || !certNo || !scopesRaw || !file) {
+        if (msgEl) {
+          msgEl.textContent = "인정기구, 인정서 번호, Scope JSON, 파일이 필요합니다.";
+          msgEl.className = "org-msg err";
+        }
+        return;
+      }
+      try {
+        JSON.parse(scopesRaw);
+      } catch (_) {
+        if (msgEl) {
+          msgEl.textContent = "Scope JSON 형식이 올바르지 않습니다.";
+          msgEl.className = "org-msg err";
+        }
+        return;
+      }
+      const fd = new FormData();
+      fd.append("accreditation_body", ab);
+      fd.append("certificate_number", certNo);
+      fd.append("scopes", scopesRaw);
+      fd.append("certificate_file", file);
+      try {
+        const res = await fetch(API + "/cb-portal/accreditation-requests", {
+          method: "POST",
+          headers: authHeaders(),
+          body: fd,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            typeof data.detail === "string"
+              ? data.detail
+              : Array.isArray(data.detail)
+                ? data.detail.map((x) => x.msg || JSON.stringify(x)).join("; ")
+                : "신청 실패"
+          );
+        }
+        if (msgEl) {
+          msgEl.textContent =
+            "신청이 접수되었습니다. (ID " + (data.id || "") + ", 상태 " + (data.status || "PENDING") + ")";
+          msgEl.className = "org-msg ok";
+        }
+        form.reset();
+        loadAccreditationReqList();
+      } catch (err) {
+        if (msgEl) {
+          msgEl.textContent = err.message || "신청 실패";
+          msgEl.className = "org-msg err";
+        }
+      }
+    });
   }
 
   async function sessionGate() {

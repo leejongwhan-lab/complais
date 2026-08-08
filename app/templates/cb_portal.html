@@ -69,6 +69,7 @@
       <div class="sidebar-group-label">인증원 설정</div>
       <ul class="sidebar-menu">
         <li><a href="#" class="sidebar-menu-item" data-tab="cb_info">인증원 정보</a></li>
+        <li><a href="#" class="sidebar-menu-item" data-tab="accreditation_req">인정범위 신청</a></li>
         <li><a href="#" class="sidebar-menu-item" data-tab="approval_policy">승인 정책</a></li>
       </ul>
     </nav>
@@ -477,6 +478,59 @@
       <div id="cb-info-body"></div>
     </section>
 
+    <section id="tab-accreditation_req" class="tab-panel">
+      <div class="panel-header">
+        <h3 style="font: var(--font-h3); margin: 0;">인정범위 신청</h3>
+        <span class="panel-count">관리자 승인 후 운용 인정정보에 반영</span>
+      </div>
+      <p class="muted" style="margin:8px 0 14px;">
+        운용 인정범위(SoT/matrix)는 직접 등록할 수 없습니다. 아래 신청서를 제출하면 플랫폼 관리자가 검토·승인합니다.
+      </p>
+      <form id="acc-req-form" class="org-section" style="max-width:640px;">
+        <div class="org-grid">
+          <div class="org-field">
+            <label for="acc-req-ab">인정기구 (AB)</label>
+            <input id="acc-req-ab" name="accreditation_body" required placeholder="예: KAB" />
+          </div>
+          <div class="org-field">
+            <label for="acc-req-cert-no">인정서 번호</label>
+            <input id="acc-req-cert-no" name="certificate_number" required placeholder="인정서 번호" />
+          </div>
+          <div class="org-field full">
+            <label for="acc-req-scopes">Scope (JSON)</label>
+            <textarea id="acc-req-scopes" rows="4" required placeholder='[{"standard_code":"ISO 9001:2015","iaf_code":"14"}]'></textarea>
+          </div>
+          <div class="org-field full">
+            <label for="acc-req-file">인정서 파일</label>
+            <input id="acc-req-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" required />
+          </div>
+        </div>
+        <div class="org-actions" style="margin-top:12px;">
+          <button type="submit" class="btn-primary" id="acc-req-submit">신청 제출</button>
+        </div>
+        <div class="org-msg" id="acc-req-msg"></div>
+      </form>
+      <div class="panel-header" style="margin-top:24px;">
+        <h3 style="font: var(--font-h3); margin: 0;">내 신청 현황</h3>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table admin-data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>인정기구</th>
+              <th>인정서번호</th>
+              <th>상태</th>
+              <th>Scope 수</th>
+            </tr>
+          </thead>
+          <tbody id="acc-req-tbody">
+            <tr><td colspan="5" class="muted">불러오는 중…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="tab-approval_policy" class="tab-panel">
       <div class="panel-header"><h3 style="font: var(--font-h3); margin: 0;">승인 정책</h3></div>
       <p class="muted">내부 승인 규칙 설정 UI 준비 중.</p>
@@ -643,6 +697,6 @@
     </div>
 
   <script src="/static/js/company_aspects_form.js?v=20260807qf"></script>
-  <script src="/static/js/cb_portal.js?v=20260807rd"></script>
+  <script src="/static/js/cb_portal.js?v=20260808v13"></script>
 </body>
 </html>

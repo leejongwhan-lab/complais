@@ -136,7 +136,8 @@ def cb_to_spec_dict(cb: CertificationBodies) -> dict[str, Any]:
         "cb_name_en": cb.name_en,
         "cb_initial": cb.cb_initial,
         "reg_no": cb.reg_no or cb.accreditation_no,
-        "accreditation_body": ab_raw or "KAB",
+        # Empty → None (UI "—"); never invent "KAB". Per-standard AB lives on SoT.
+        "accreditation_body": ab_raw or None,
         "biz_reg_no": biz,
         "biz_no": biz,  # DB 컬럼명 별칭
         "code": cb.code,
