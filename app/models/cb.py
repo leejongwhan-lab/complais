@@ -278,3 +278,19 @@ class CbOperationalRules(Base):
     impartiality_cycle_months: Mapped[int] = mapped_column(Integer, nullable=False, default=12)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class CbAuditorRoleRates(Base):
+    """CB별 역할(팀장/팀원 등) 일당 요율 — 하드코딩 금지."""
+
+    __tablename__ = "cb_auditor_role_rates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    cb_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    role: Mapped[str] = mapped_column(
+        String(30), nullable=False, comment="lead / auditor / expert / observer / witness"
+    )
+    daily_rate: Mapped[int] = mapped_column(Integer, nullable=False, comment="일당 단가(원)")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

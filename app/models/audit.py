@@ -32,6 +32,22 @@ class AuditAssignments(Base):
     assigned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # 개인별 수수료 배분 (Contracts.fee_* 는 계약 전체 단위)
+    fee_type: Mapped[Optional[str]] = mapped_column(
+        String(30), nullable=True, comment="PERCENTAGE / DAILY_RATE"
+    )
+    fee_ratio: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(15, 4), nullable=True, comment="정률 시 적용비율"
+    )
+    daily_rate: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, comment="일당 단가(원)"
+    )
+    assigned_days: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(15, 4), nullable=True, comment="배정 일수(MD)"
+    )
+    calculated_fee: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(15, 2), nullable=True, comment="산출 수수료(원)"
+    )
 
 
 class AuditClauseMatrix(Base):

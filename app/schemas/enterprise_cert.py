@@ -134,6 +134,23 @@ class CompanyRevisionIn(BaseModel):
     comment: str = Field(..., min_length=1)
 
 
+class AuditorAssignIn(BaseModel):
+    """System1 심사원 배정 — Contracts + audit_assignments."""
+
+    lead_auditor_id: int
+    member_auditor_ids: List[int] = Field(default_factory=list)
+    audit_start: date
+    audit_end: date
+    total_md: Optional[float] = None
+    assigned_days: Optional[float] = Field(
+        None, description="공통 배정 일수(미지정 시 기간일수 또는 total_md)"
+    )
+    confirm: bool = Field(
+        False, description="True면 즉시 confirmed 처리 + AUDITOR_CONTRACT/NDA 생성"
+    )
+    note: Optional[str] = None
+
+
 class OkOut(BaseModel):
     ok: bool = True
     message: Optional[str] = None

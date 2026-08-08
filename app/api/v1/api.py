@@ -19,6 +19,7 @@ from app.api.v1.endpoints import (
     auth,
     audit_request,
     cb_admin,
+    cb_auditor_fees,
     cb_auditors,
     cb_entities,
     cb_operations,
@@ -54,6 +55,7 @@ api_router.include_router(admin_cb.router)
 api_router.include_router(certification_applications.router)
 api_router.include_router(enterprise_cert_applications.router)
 api_router.include_router(cb_cert_applications.router)
+api_router.include_router(cb_auditor_fees.router)
 api_router.include_router(client.router)
 api_router.include_router(audit_request.router)
 api_router.include_router(enterprise_portal.router)

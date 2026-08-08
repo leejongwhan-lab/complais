@@ -704,3 +704,21 @@ class Auditor(Base):
         cascade="all, delete-orphan",
     )
 
+
+
+class AuditorManagedCompanies(Base):
+    """심사원↔기업 관리(담당) 관계 — 배정 시 PERCENTAGE vs DAILY_RATE 판단 기준."""
+
+    __tablename__ = "auditor_managed_companies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    auditor_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    company_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    cb_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="ACTIVE", comment="ACTIVE / TRANSFERRED / INACTIVE"
+    )
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

@@ -28,6 +28,11 @@ class AuditAssignmentsBase(BaseModel):
     assigned_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    fee_type: Optional[str] = None
+    fee_ratio: Optional[Decimal] = None
+    daily_rate: Optional[int] = None
+    assigned_days: Optional[Decimal] = None
+    calculated_fee: Optional[Decimal] = None
 
 
 class AuditAssignmentsCreate(AuditAssignmentsBase):
@@ -54,6 +59,11 @@ class AuditAssignmentsUpdate(BaseModel):
     assigned_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    fee_type: Optional[str] = None
+    fee_ratio: Optional[Decimal] = None
+    daily_rate: Optional[int] = None
+    assigned_days: Optional[Decimal] = None
+    calculated_fee: Optional[Decimal] = None
 
 
 class AuditAssignmentsResponse(AuditAssignmentsBase):

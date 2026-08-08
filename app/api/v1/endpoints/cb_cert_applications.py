@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.security import CurrentUser, require_cb_portal_user
 from app.data.cert_questionnaire_catalog import INTEGRATED_CHECK_ITEMS
 from app.db.session import get_db
+from app.models.audit import AuditAssignments
 from app.models.certification import (
     CertificationApplicationAnswers,
     CertificationApplicationMdReviews,
@@ -32,6 +33,7 @@ from app.models.company import Companies
 from app.models.contract import Contracts
 from app.models.master import MasterKsicIaf
 from app.schemas.enterprise_cert import (
+    AuditorAssignIn,
     CompanyInfoEditIn,
     EnterpriseCertDetail,
     EnterpriseCertListItem,
@@ -40,6 +42,15 @@ from app.schemas.enterprise_cert import (
     ReviewActionIn,
 )
 from app.data.standards_catalog import standard_display_payload
+from app.services.auditor_assignment_fees import (
+    assert_auditors_exist,
+    assert_conduct_signs,
+    auditor_user_id_or_raise,
+    build_fee_snapshot,
+    default_assigned_days,
+    ensure_auditor_assignment_docs,
+    serialize_assignment,
+)
 from app.services.cert_app_md import (
     compute_base_md_for_app,
     md_review_to_dict,
@@ -782,4 +793,242 @@ def review_action(
         id=app.id,
         contract_id=new_contract_id,
         data={"status": action, "status_label": STATUS_KR.get(action, action)},
+    )
+
+
+@router.post("/{app_id}/assign-auditors", response_model=OkOut)
+def assign_auditors(
+    app_id: int,
+    payload: AuditorAssignIn,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_cb_portal_user),
+) -> OkOut:
+    """System1 심사원 배정 — Contracts + audit_assignments (+ 수수료 스냅샷).
+
+    cb_admin.assign_auditors(DEPRECATED) 를 참고하되 AuditApplication/audit_contracts 가 아닌
+    CertificationApplications / contracts / audit_assignments 조합으로 저장한다.
+    """
+    app = _get_app_for_cb(db, app_id, int(current_user.cb_id))  # type: ignore[arg-type]
+    if not app.contract_id:
+        raise HTTPException(
+            status_code=400,
+            detail="계약(Draft)이 없습니다. 승인(action=approved) 후 배정하세요.",
+        )
+    if payload.audit_end < payload.audit_start:
+        raise HTTPException(status_code=400, detail="audit_end 는 audit_start 이후여야 합니다.")
+
+    all_ids = [payload.lead_auditor_id, *payload.member_auditor_ids]
+    if len(set(all_ids)) != len(all_ids):
+        raise HTTPException(status_code=400, detail="동일 심사원을 중복 배정할 수 없습니다.")
+
+    assert_auditors_exist(db, all_ids)
+    assert_conduct_signs(db, all_ids)
+
+    contract = db.get(Contracts, int(app.contract_id))
+    if contract is None:
+        raise HTTPException(status_code=404, detail="연결된 계약을 찾을 수 없습니다.")
+    if int(contract.cb_id) != int(current_user.cb_id):  # type: ignore[arg-type]
+        raise HTTPException(status_code=403, detail="다른 CB의 계약입니다.")
+
+    cb_id = int(app.cb_id or current_user.cb_id)
+    company_id = int(app.company_id)
+    agreed = float(contract.agreed_amount or contract.fee_total or 0)
+    days = default_assigned_days(
+        audit_start=payload.audit_start,
+        audit_end=payload.audit_end,
+        total_md=payload.total_md if payload.total_md is not None else float(contract.total_md or 0),
+        assigned_days=payload.assigned_days,
+    )
+    now = datetime.now()
+    status_val = "confirmed" if payload.confirm else "assigned"
+    standards_raw = app.standards_json or contract.standards
+    iaf_raw = app.iaf_codes_json
+
+    # 기존 배정 교체
+    db.query(AuditAssignments).filter(AuditAssignments.contract_id == contract.id).delete()
+
+    created_rows: List[AuditAssignments] = []
+    role_plan = [("lead", "team_leader", payload.lead_auditor_id)] + [
+        ("auditor", "team_member", mid) for mid in payload.member_auditor_ids
+    ]
+    doc_ids: List[int] = []
+
+    try:
+        for role, assignment_role, auditor_id in role_plan:
+            user_id = auditor_user_id_or_raise(db, auditor_id)
+            fee = build_fee_snapshot(
+                db,
+                auditor_id=auditor_id,
+                company_id=company_id,
+                cb_id=cb_id,
+                role=role,
+                agreed_amount=agreed,
+                assigned_days=days,
+            )
+            row = AuditAssignments(
+                application_id=app.id,
+                contract_id=contract.id,
+                auditor_id=auditor_id,
+                role=role,
+                auditor_user_id=user_id,
+                assignment_role=assignment_role,
+                status=status_val,
+                iaf_match_status="review_needed",
+                conflict_check_status="pending",
+                client_confirmation_status="pending",
+                assignment_note=payload.note,
+                created_by=current_user.id,
+                created_at=now,
+                updated_at=now,
+                standards_json=standards_raw,
+                iaf_codes_json=iaf_raw,
+                assigned_at=now,
+                fee_type=fee["fee_type"],
+                fee_ratio=Decimal(str(fee["fee_ratio"])) if fee["fee_type"] == "PERCENTAGE" else None,
+                daily_rate=int(fee["daily_rate"]) if fee["fee_type"] == "DAILY_RATE" else None,
+                assigned_days=Decimal(str(fee["assigned_days"])),
+                calculated_fee=Decimal(str(fee["calculated_fee"])),
+            )
+            db.add(row)
+            db.flush()
+            created_rows.append(row)
+            if status_val == "confirmed":
+                doc_ids.extend(
+                    ensure_auditor_assignment_docs(
+                        db,
+                        contract_id=int(contract.id),
+                        assignment=row,
+                        created_by=current_user.id,
+                        now=now,
+                    )
+                )
+
+        contract.lead_auditor_id = payload.lead_auditor_id
+        contract.member_auditor_ids = ",".join(str(i) for i in payload.member_auditor_ids) or None
+        contract.audit_period_start = payload.audit_start
+        contract.audit_period_end = payload.audit_end
+        if payload.total_md is not None:
+            contract.total_md = Decimal(str(payload.total_md))
+            contract.audit_days = Decimal(str(payload.total_md))
+        if status_val == "confirmed" and str(contract.status or "").lower() in (
+            "draft",
+            "approved",
+            "",
+        ):
+            contract.status = "scheduled"
+        contract.updated_at = now
+
+        _add_log(
+            db,
+            app.id,
+            current_user,
+            "assign_auditors",
+            app.status,
+            app.status,
+            f"lead={payload.lead_auditor_id}; members={payload.member_auditor_ids}; status={status_val}",
+        )
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("assign_auditors failed")
+        raise HTTPException(status_code=500, detail=f"배정 실패: {e}") from e
+
+    return OkOut(
+        ok=True,
+        message=f"배정 완료 (팀장 1 + 팀원 {len(payload.member_auditor_ids)}, status={status_val})",
+        id=app.id,
+        contract_id=contract.id,
+        data={
+            "assignments": [serialize_assignment(r) for r in created_rows],
+            "document_ids": doc_ids,
+            "status": status_val,
+        },
+    )
+
+
+@router.post("/{app_id}/assignments/confirm", response_model=OkOut)
+def confirm_assignments(
+    app_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_cb_portal_user),
+) -> OkOut:
+    """배정 확정(confirmed) + AUDITOR_CONTRACT / NDA 문서 초안 생성."""
+    app = _get_app_for_cb(db, app_id, int(current_user.cb_id))  # type: ignore[arg-type]
+    if not app.contract_id:
+        raise HTTPException(status_code=400, detail="계약이 없습니다.")
+    contract = db.get(Contracts, int(app.contract_id))
+    if contract is None:
+        raise HTTPException(status_code=404, detail="연결된 계약을 찾을 수 없습니다.")
+
+    rows = (
+        db.query(AuditAssignments)
+        .filter(AuditAssignments.contract_id == contract.id)
+        .all()
+    )
+    if not rows:
+        raise HTTPException(status_code=400, detail="확정할 배정이 없습니다. 먼저 assign-auditors 를 호출하세요.")
+
+    now = datetime.now()
+    doc_ids: List[int] = []
+    try:
+        for row in rows:
+            row.status = "confirmed"
+            row.updated_at = now
+            doc_ids.extend(
+                ensure_auditor_assignment_docs(
+                    db,
+                    contract_id=int(contract.id),
+                    assignment=row,
+                    created_by=current_user.id,
+                    now=now,
+                )
+            )
+        if str(contract.status or "").lower() in ("draft", "approved", ""):
+            contract.status = "scheduled"
+        contract.updated_at = now
+        _add_log(db, app.id, current_user, "confirm_assignments", app.status, app.status, None)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("confirm_assignments failed")
+        raise HTTPException(status_code=500, detail=f"확정 실패: {e}") from e
+
+    return OkOut(
+        ok=True,
+        message=f"배정 {len(rows)}건 확정 및 문서 {len(doc_ids)}건 생성",
+        id=app.id,
+        contract_id=contract.id,
+        data={
+            "assignments": [serialize_assignment(r) for r in rows],
+            "document_ids": doc_ids,
+        },
+    )
+
+
+@router.get("/{app_id}/assignments", response_model=OkOut)
+def list_app_assignments(
+    app_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_cb_portal_user),
+) -> OkOut:
+    app = _get_app_for_cb(db, app_id, int(current_user.cb_id))  # type: ignore[arg-type]
+    if not app.contract_id:
+        return OkOut(ok=True, id=app.id, data={"assignments": []})
+    rows = (
+        db.query(AuditAssignments)
+        .filter(AuditAssignments.contract_id == int(app.contract_id))
+        .order_by(AuditAssignments.id.asc())
+        .all()
+    )
+    return OkOut(
+        ok=True,
+        id=app.id,
+        contract_id=int(app.contract_id),
+        data={"assignments": [serialize_assignment(r) for r in rows]},
     )
