@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import logging
 from calendar import monthrange
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -12,12 +12,14 @@ from sqlalchemy import inspect, or_, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.core.config import settings
 from app.core.security import CurrentUser, get_current_user
 from app.data.standards_catalog import format_standard_label, to_family_initial
 from app.models.audit import AuditAssignments, AuditNcrs, AuditNotes, AuditReports
 from app.models.auditor import (
     Auditor,
     AuditorCbMemberships,
+    AuditorConductSigns,
     AuditorEducation,
     AuditorExternalCert,
     AuditorQualification,
@@ -48,6 +50,9 @@ from app.schemas.auditor_portal import (
     AuditorQualItem,
     AuditorReportItem,
     AuditorScheduleItem,
+    ConductSignCreateIn,
+    ConductSignCreateResponse,
+    ConductSignStatusResponse,
 )
 from app.services.audit_process_progress import build_audit_docs_progress
 from app.services.auditor_grade import to_ui_grade
@@ -1530,5 +1535,120 @@ def _register_assignment_routes(r: APIRouter) -> None:
         return None
 
 
+def _latest_conduct_sign(db: Session, auditor_id: int) -> Optional[AuditorConductSigns]:
+    """assert_conduct_signs 와 동일: is_valid 중 signed_at 최신 1건."""
+    return (
+        db.query(AuditorConductSigns)
+        .filter(
+            AuditorConductSigns.auditor_id == auditor_id,
+            AuditorConductSigns.is_valid.is_(True),
+        )
+        .order_by(AuditorConductSigns.signed_at.desc())
+        .first()
+    )
+
+
+def _conduct_sign_status_impl(
+    *,
+    db: Session,
+    current_user: CurrentUser,
+) -> ConductSignStatusResponse:
+    _require_auditor(current_user)
+    auditor = _get_auditor_for_user(db, current_user.id)
+    days = int(settings.CONDUCT_SIGN_VALIDITY_DAYS or 365)
+    row = _latest_conduct_sign(db, int(auditor.id))
+    today = date.today()
+    if row is None:
+        return ConductSignStatusResponse(
+            is_valid=False,
+            needs_sign=True,
+            validity_days=days,
+        )
+    expired = row.expires_at is not None and row.expires_at < today
+    valid = not expired
+    return ConductSignStatusResponse(
+        is_valid=valid,
+        signed_at=row.signed_at,
+        expires_at=row.expires_at,
+        needs_sign=not valid,
+        validity_days=days,
+        sign_id=int(row.id),
+    )
+
+
+def _conduct_sign_create_impl(
+    *,
+    payload: ConductSignCreateIn,
+    request: Request,
+    db: Session,
+    current_user: CurrentUser,
+) -> ConductSignCreateResponse:
+    """
+    재서명 정책(insert_newest_wins):
+    - 언제든 재서명 허용 → 신규 row insert (is_valid=True)
+    - 이전 row 는 그대로 둠; assert_conduct_signs / status 는 signed_at desc 최신 valid 사용
+    """
+    _require_auditor(current_user)
+    if not payload.agreed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="서약 내용에 동의해야 서명할 수 있습니다.",
+        )
+    auditor = _get_auditor_for_user(db, current_user.id)
+    now = datetime.now()
+    days = int(settings.CONDUCT_SIGN_VALIDITY_DAYS or 365)
+    if days < 1:
+        days = 365
+    expires = now.date() + timedelta(days=days)
+    ip = _client_ip(request)
+    row = AuditorConductSigns(
+        auditor_id=int(auditor.id),
+        signed_at=now,
+        expires_at=expires,
+        ip_address=ip,
+        is_valid=True,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return ConductSignCreateResponse(
+        ok=True,
+        id=int(row.id),
+        auditor_id=int(row.auditor_id),
+        signed_at=row.signed_at,
+        expires_at=row.expires_at,
+        is_valid=bool(row.is_valid),
+        ip_address=row.ip_address,
+        policy="insert_newest_wins",
+    )
+
+
+def _register_conduct_sign_routes(r: APIRouter) -> None:
+    @r.get("/conduct-sign/status", response_model=ConductSignStatusResponse)
+    def conduct_sign_status(
+        db: Session = Depends(get_db),
+        current_user: CurrentUser = Depends(get_current_user),
+    ):
+        """본인 비밀유지·공평성 서약서 유효 여부 + 만료일 (마이페이지 배지)."""
+        return _conduct_sign_status_impl(db=db, current_user=current_user)
+
+    @r.post("/conduct-sign", response_model=ConductSignCreateResponse)
+    def conduct_sign_create(
+        payload: ConductSignCreateIn,
+        request: Request,
+        db: Session = Depends(get_db),
+        current_user: CurrentUser = Depends(get_current_user),
+    ):
+        """본인 비밀유지·공평성 서약서 서명. 재서명 시 신규 row (최신 valid 우선)."""
+        return _conduct_sign_create_impl(
+            payload=payload,
+            request=request,
+            db=db,
+            current_user=current_user,
+        )
+
+
 _register_assignment_routes(router)
 _register_assignment_routes(portal_router)
+_register_conduct_sign_routes(router)
+_register_conduct_sign_routes(portal_router)

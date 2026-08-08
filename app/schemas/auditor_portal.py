@@ -212,3 +212,32 @@ class AuditDocsProgressResponse(BaseModel):
     steps: List[AuditDocsFlowStep] = Field(default_factory=list)
     next_step: Optional[AuditDocsFlowStep] = None
     all_completed: bool = False
+
+
+class ConductSignStatusResponse(BaseModel):
+    """본인 비밀유지·공평성 서약서 유효 여부 (배정 게이트와 동일 판정)."""
+
+    is_valid: bool = False
+    signed_at: Optional[datetime] = None
+    expires_at: Optional[date] = None
+    needs_sign: bool = True
+    validity_days: int = 365
+    sign_id: Optional[int] = None
+
+
+class ConductSignCreateIn(BaseModel):
+    """UI 체크박스 동의. agreed=true 필수."""
+
+    agreed: bool = False
+
+
+class ConductSignCreateResponse(BaseModel):
+    ok: bool = True
+    id: int
+    auditor_id: int
+    signed_at: datetime
+    expires_at: Optional[date] = None
+    is_valid: bool = True
+    ip_address: Optional[str] = None
+    # re-sign: 신규 row insert; assert_conduct_signs 는 signed_at desc 최신 valid 사용
+    policy: str = "insert_newest_wins"

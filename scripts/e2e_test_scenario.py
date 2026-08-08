@@ -308,37 +308,24 @@ def run_step(
 # ---------------------------------------------------------------------------
 
 
-def db_seed_conduct_sign(auditor_id: int) -> Dict[str, Any]:
-    """No public API creates auditor_conduct_signs — seed for assign gate."""
-    from app.db.session import SessionLocal
-    from app.models.auditor import AuditorConductSigns
-
-    db = SessionLocal()
-    try:
-        now = datetime.utcnow()
-        row = (
-            db.query(AuditorConductSigns)
-            .filter(
-                AuditorConductSigns.auditor_id == auditor_id,
-                AuditorConductSigns.is_valid.is_(True),
-            )
-            .first()
-        )
-        if row is None:
-            row = AuditorConductSigns(
-                auditor_id=auditor_id,
-                signed_at=now,
-                expires_at=date.today() + timedelta(days=365),
-                ip_address="127.0.0.1",
-                is_valid=True,
-            )
-            db.add(row)
-            db.commit()
-            db.refresh(row)
-            return {"seeded": True, "id": row.id, "auditor_id": auditor_id}
-        return {"seeded": False, "id": row.id, "auditor_id": auditor_id}
-    finally:
-        db.close()
+def api_conduct_sign(client: "Client", token: str) -> Dict[str, Any]:
+    """POST /auditor-portal/conduct-sign — real API (replaces DB seed bypass)."""
+    st, body, _ = client.request(
+        "POST",
+        "/api/v1/auditor-portal/conduct-sign",
+        token=token,
+        json_body={"agreed": True},
+    )
+    if st not in (200, 201):
+        raise AssertionError(f"conduct-sign failed: {st} {body}")
+    st_s, status_body, _ = client.request(
+        "GET",
+        "/api/v1/auditor-portal/conduct-sign/status",
+        token=token,
+    )
+    if st_s != 200 or not isinstance(status_body, dict) or not status_body.get("is_valid"):
+        raise AssertionError(f"conduct-sign status not valid after sign: {st_s} {status_body}")
+    return {"sign": body, "status": status_body}
 
 
 def db_count_notifications(user_id: int, ntype: Optional[str] = None) -> int:
@@ -778,7 +765,7 @@ def step_cb_scope_put_blocked(ctx: Ctx, client: Client) -> Any:
 
 
 def step_auditor_membership_and_conduct(ctx: Ctx, client: Client) -> Any:
-    """CB affiliation + conduct-sign seed (needed before assign)."""
+    """CB affiliation + conduct-sign via real API (needed before assign)."""
     mem_payload = {
         "cb_id": ctx.cb_id,
         "apply_grade": GRADE_LEAD,
@@ -814,15 +801,15 @@ def step_auditor_membership_and_conduct(ctx: Ctx, client: Client) -> Any:
     )
     if st_a != 200:
         raise AssertionError(f"membership approve failed: {st_a} {appr}")
-    seed = db_seed_conduct_sign(int(ctx.auditor_id))
+    conduct = api_conduct_sign(client, ctx.tokens["auditor"])
     record(
         ctx,
         "5b_auditor_membership_conduct",
         "pass",
-        f"membership_id={ctx.membership_id}; conduct seeded",
-        {"membership": body, "approve": appr, "conduct": seed},
+        f"membership_id={ctx.membership_id}; conduct signed via API",
+        {"membership": body, "approve": appr, "conduct": conduct},
     )
-    return {"membership_id": ctx.membership_id, "conduct": seed}
+    return {"membership_id": ctx.membership_id, "conduct": conduct}
 
 
 def step_register_auditor2(ctx: Ctx, client: Client) -> Any:
@@ -905,12 +892,12 @@ def step_register_auditor2(ctx: Ctx, client: Client) -> Any:
     )
     if st_a != 200:
         raise AssertionError(f"auditor2 approve failed: {st_a} {appr}")
-    seed = db_seed_conduct_sign(int(ctx.auditor2_id))
+    conduct = api_conduct_sign(client, ctx.tokens["auditor2"])
     snap = {
         "email": email,
         "auditor_id": ctx.auditor2_id,
         "membership_id": ctx.membership2_id,
-        "conduct": seed,
+        "conduct": conduct,
     }
     record(ctx, "5c_auditor2_ready", "pass", f"auditor2_id={ctx.auditor2_id}", snap)
     return snap

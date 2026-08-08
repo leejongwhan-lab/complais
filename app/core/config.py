@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # true|1|yes → always allow mock identity button; also auto-enabled when keys missing
     PORTONE_ALLOW_MOCK: bool = True
 
+    # 심사원 비밀유지·공평성 서약서 유효기간 (일). POST conduct-sign 시 expires_at 산출에 사용.
+    CONDUCT_SIGN_VALIDITY_DAYS: int = 365
+
     @property
     def database_url(self) -> str:
         return _normalize_database_url(self.DATABASE_URL)

@@ -558,6 +558,34 @@
       margin: 2px 0 8px;
       color: var(--admin-ink, #1f2d24);
     }
+    body.auditor-portal-page .conduct-badge {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+      padding: 14px 16px; border-radius: 8px; border: 1px solid #d8e3da;
+      background: #f7faf8;
+    }
+    body.auditor-portal-page .conduct-badge.need {
+      border-color: #f0c9a0; background: #fff8f0;
+    }
+    body.auditor-portal-page .conduct-badge.ok {
+      border-color: #a7e3c4; background: #f0fdf6;
+    }
+    body.auditor-portal-page .conduct-badge .cb-title {
+      font-weight: 700; margin: 0 0 4px; font-size: 0.95rem;
+    }
+    body.auditor-portal-page .conduct-badge .cb-msg {
+      margin: 0; font-size: 0.88rem; color: #4a5c50; line-height: 1.45;
+    }
+    body.auditor-portal-page .conduct-clauses {
+      border: 1px solid #d8e3da; border-radius: 8px; padding: 16px 18px;
+      background: #fff; font-size: 0.9rem; line-height: 1.55; color: #1f2d24;
+    }
+    body.auditor-portal-page .conduct-clauses ol { margin: 0; padding-left: 1.25rem; }
+    body.auditor-portal-page .conduct-clauses li { margin: 0 0 10px; }
+    body.auditor-portal-page .conduct-agree {
+      display: flex; align-items: flex-start; gap: 10px; margin: 14px 0 0;
+      font-size: 0.92rem; font-weight: 600;
+    }
+    body.auditor-portal-page .conduct-agree input { margin-top: 3px; }
   
     /* 부적합 보고서 모달 — screenshot / audit_v15 */
     .nc-overlay {
@@ -676,6 +704,7 @@
         <li><a href="#" class="sidebar-menu-item" data-tab="docs">인증심사 문서</a></li>
         <li><a href="#" class="sidebar-menu-item" data-tab="ncrs">시정조치(NCR) 검토</a></li>
         <li><a href="#" class="sidebar-menu-item" data-tab="mypage">마이페이지</a></li>
+        <li><a href="#" class="sidebar-menu-item" data-tab="conduct">비밀유지·공평성 서약</a></li>
         <li><a href="#" class="sidebar-menu-item" data-tab="profile">자격 및 소속 관리</a></li>
       </ul>
     </nav>
@@ -796,6 +825,12 @@
     <!-- My Page -->
     <section id="tab-mypage" class="tab-panel">
       <div class="aud-block">
+        <h3>비밀유지·공평성 서약서</h3>
+        <div id="mypage-conduct-badge" class="conduct-badge">
+          <div class="aud-empty">불러오는 중…</div>
+        </div>
+      </div>
+      <div class="aud-block">
         <h3>기본 정보</h3>
         <dl class="mypage-grid" id="mypage-basic">
           <div class="aud-empty">불러오는 중…</div>
@@ -820,6 +855,52 @@
       <div class="aud-block">
         <h3>외부 자격</h3>
         <div id="mypage-external"><div class="aud-empty">불러오는 중…</div></div>
+      </div>
+    </section>
+
+    <!-- Conduct pledge (비밀유지·공평성 서약서) -->
+    <section id="tab-conduct" class="tab-panel">
+      <div class="aud-block">
+        <h3>비밀유지·공평성 서약서</h3>
+        <p class="muted" style="margin:0 0 12px;">
+          ISO/IEC 17021-1 §5.2 · §8.4 준수 · 배정 전 유효 서약 필수 ·
+          유효기간은 시스템 설정(<code>CONDUCT_SIGN_VALIDITY_DAYS</code>) 기준
+        </p>
+        <div id="conduct-status-badge" class="conduct-badge" style="margin-bottom:14px;">
+          <div class="aud-empty">불러오는 중…</div>
+        </div>
+        <div class="conduct-clauses">
+          <ol>
+            <li>
+              <strong>비밀유지</strong> — 심사·배정 과정에서 취득한 고객·인증기관의
+              경영시스템·기술·상업 정보, 심사노트·NCR·보고서 초안, 인력·수수료 정보를
+              심사 목적 외로 사용·복제·제3자 제공하지 않으며, 법령 또는 인정기구 요구에
+              따른 공개 시 인증기관에 사전 통지합니다. 비밀유지 의무는 배정 종료 후에도 유효합니다.
+            </li>
+            <li>
+              <strong>공평성·독립성</strong> — 심사원으로서 공평성·독립성을 유지하고,
+              이해충돌(컨설팅 이력, 특수 관계, 기타 지원 등)이 있는 경우 즉시 인증기관에
+              고지하며, 인증 결정 권한이 인증기관에 있음을 인정합니다.
+            </li>
+            <li>
+              <strong>성실 수행</strong> — 배정된 심사를 성실히 수행하고, 관련 규정·절차·
+              행동강령을 준수하며, 허위·과장 보고를 하지 않습니다.
+            </li>
+            <li>
+              <strong>전자 서명</strong> — 본 서약에 대한 동의·서명은 전자적으로 기록되며
+              (서명 시각·IP), 유효기간 내 배정 게이트 검증에 사용됩니다. 만료 전후 언제든
+              재서명이 가능합니다.
+            </li>
+          </ol>
+          <label class="conduct-agree">
+            <input type="checkbox" id="conduct-agree-check" />
+            <span>위 내용에 동의합니다</span>
+          </label>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button type="button" class="btn" id="conduct-sign-btn">서약 서명</button>
+          <span class="muted" id="conduct-sign-msg"></span>
+        </div>
       </div>
     </section>
 
@@ -1132,7 +1213,7 @@
     </div>
   </div>
 
-  <script src="/static/js/auditor_portal.js?v=20260808docs1"></script>
+  <script src="/static/js/auditor_portal.js?v=20260808conduct1"></script>
   <script src="/static/js/auditor_audit_notes.js?v=20260807theme1"></script>
 </body>
 </html>

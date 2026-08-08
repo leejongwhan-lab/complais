@@ -8,6 +8,7 @@
     docs: { title: "인증심사 문서", sub: "최초·사후·갱신·전환·특별 문서세트 · Master DB 데모" },
     ncrs: { title: "시정조치(NCR) 검토", sub: "기업 제출 시정조치 검토" },
     mypage: { title: "마이페이지", sub: "기본 정보 · 자격 · 소속 · 학력/경력" },
+    conduct: { title: "비밀유지·공평성 서약", sub: "배정 전 필수 · 유효기간 내 서명" },
     profile: { title: "자격 및 소속 관리", sub: "자격 이력 · 멀티 CB 소속 · 신규 신청" },
   };
 
@@ -129,6 +130,7 @@
     }
     if (tab === "ncrs") loadNcrsPanel();
     if (tab === "mypage") loadMypagePanel();
+    if (tab === "conduct") loadConductPanel();
     if (tab === "profile") loadProfilePanel();
   }
 
@@ -1067,6 +1069,110 @@
       .join("");
   }
 
+  function renderConductBadgeHtml(status, opts) {
+    const withLink = !opts || opts.link !== false;
+    const linkBtn = withLink
+      ? `<button type="button" class="btn ${status && status.is_valid ? "ghost" : ""}" data-goto="conduct">${
+          status && status.is_valid ? "서약 보기·재서명" : "서약하러 가기"
+        }</button>`
+      : "";
+    if (!status) {
+      return `<div><p class="cb-title">서약 상태</p><p class="cb-msg">조회 중…</p></div>${linkBtn}`;
+    }
+    if (status.is_valid) {
+      return `<div>
+          <p class="cb-title">완료${status.expires_at ? "(만료일 " + esc(fmtDate(status.expires_at)) + ")" : ""}</p>
+          <p class="cb-msg">유효한 비밀유지·공평성 서약이 있습니다.${
+            status.signed_at ? " 서명일 " + esc(fmtDate(status.signed_at)) + "." : ""
+          }</p>
+        </div>${linkBtn}`;
+    }
+    return `<div>
+        <p class="cb-title">서약 필요</p>
+        <p class="cb-msg">배정을 받으려면 먼저 서약해주세요.</p>
+      </div>${linkBtn}`;
+  }
+
+  async function fetchConductStatus() {
+    const res = await fetch(API + "/auditor-portal/conduct-sign/status", {
+      headers: authHeaders(),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || "서약 상태 조회 실패");
+    return data;
+  }
+
+  async function refreshConductBadges() {
+    const mypageBadge = document.getElementById("mypage-conduct-badge");
+    const panelBadge = document.getElementById("conduct-status-badge");
+    try {
+      const status = await fetchConductStatus();
+      if (mypageBadge) {
+        mypageBadge.className = "conduct-badge " + (status.is_valid ? "ok" : "need");
+        mypageBadge.innerHTML = renderConductBadgeHtml(status, { link: true });
+      }
+      if (panelBadge) {
+        panelBadge.className = "conduct-badge " + (status.is_valid ? "ok" : "need");
+        panelBadge.innerHTML = renderConductBadgeHtml(status, { link: false });
+      }
+      return status;
+    } catch (e) {
+      const msg = `<div><p class="cb-title">서약 상태</p><p class="cb-msg">${esc(e.message)}</p></div>`;
+      if (mypageBadge) {
+        mypageBadge.className = "conduct-badge need";
+        mypageBadge.innerHTML = msg;
+      }
+      if (panelBadge) {
+        panelBadge.className = "conduct-badge need";
+        panelBadge.innerHTML = msg;
+      }
+      return null;
+    }
+  }
+
+  async function loadConductPanel() {
+    await refreshConductBadges();
+    const msg = document.getElementById("conduct-sign-msg");
+    if (msg) msg.textContent = "";
+  }
+
+  async function submitConductSign() {
+    const check = document.getElementById("conduct-agree-check");
+    const btn = document.getElementById("conduct-sign-btn");
+    const msg = document.getElementById("conduct-sign-msg");
+    if (!check || !check.checked) {
+      alert("위 내용에 동의해 주세요.");
+      return;
+    }
+    if (btn) btn.disabled = true;
+    if (msg) msg.textContent = "서명 처리 중…";
+    try {
+      const res = await fetch(API + "/auditor-portal/conduct-sign", {
+        method: "POST",
+        headers: authHeaders(true),
+        body: JSON.stringify({ agreed: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "서약 서명 실패");
+      if (msg) {
+        msg.textContent =
+          "서명 완료" +
+          (data.expires_at ? " · 만료일 " + fmtDate(data.expires_at) : "");
+      }
+      if (check) check.checked = false;
+      await refreshConductBadges();
+      alert(
+        "비밀유지·공평성 서약이 완료되었습니다." +
+          (data.expires_at ? "\n만료일: " + fmtDate(data.expires_at) : "")
+      );
+    } catch (e) {
+      if (msg) msg.textContent = e.message || "서명 실패";
+      alert(e.message || "서약 서명 실패");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   async function loadMypagePanel() {
     const basic = document.getElementById("mypage-basic");
     const qualsBox = document.getElementById("mypage-quals");
@@ -1074,6 +1180,7 @@
     const eduBox = document.getElementById("mypage-educations");
     const careerBox = document.getElementById("mypage-careers");
     const extBox = document.getElementById("mypage-external");
+    refreshConductBadges();
     try {
       const res = await fetch(API + "/auditor/mypage", { headers: authHeaders() });
       const data = await res.json().catch(() => ({}));
@@ -2020,6 +2127,10 @@
     location.href = "/login";
   });
 
+  document.getElementById("conduct-sign-btn")?.addEventListener("click", () => {
+    submitConductSign();
+  });
+
   document.getElementById("reload-btn")?.addEventListener("click", () => {
     loadDashboard();
     const tab = new URL(location.href).searchParams.get("tab") || "dashboard";
@@ -2027,6 +2138,7 @@
     if (tab === "reports") loadReportsPanel();
     if (tab === "ncrs") loadNcrsPanel();
     if (tab === "mypage") loadMypagePanel();
+    if (tab === "conduct") loadConductPanel();
     if (tab === "profile") loadProfilePanel();
   });
 
