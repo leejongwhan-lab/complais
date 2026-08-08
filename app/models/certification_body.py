@@ -61,6 +61,13 @@ class CbAccreditationScope(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     granted_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     expiry_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # Subordinate to SoT row when set (nullable for legacy matrix rows).
+    standard_accreditation_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("cb_standard_accreditations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 

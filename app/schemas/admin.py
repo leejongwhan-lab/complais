@@ -109,6 +109,10 @@ class CBAccreditedScopeResponse(BaseModel):
     iso_standard_id: int
     iaf_code: str
     is_approved: bool
+    status: Optional[str] = None
+    reject_reason: Optional[str] = None
+    standard_code: Optional[str] = None
+    standard_name: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 

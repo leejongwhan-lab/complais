@@ -18,6 +18,7 @@ from app.api.v1.endpoints import (
     auditors,
     auth,
     audit_request,
+    cb_accreditation_requests,
     cb_admin,
     cb_auditor_fees,
     cb_auditors,
@@ -74,6 +75,7 @@ api_router.include_router(pricing.router)
 api_router.include_router(proposals.router)
 api_router.include_router(cb_admin.router)
 api_router.include_router(cb_portal.router)
+api_router.include_router(cb_accreditation_requests.router)
 api_router.include_router(cb_operations.router)
 api_router.include_router(contracts.router)
 api_router.include_router(assignments.router)

@@ -10,12 +10,16 @@ import json
 import logging
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import CurrentUser, get_current_admin_user
 from app.models.admin import (
@@ -34,6 +38,12 @@ from app.models.certification_body import CbAccreditationScope, CbStandardAccred
 from app.models.contract import Contracts
 from app.models.standard import StandardMaster
 from app.data.standards_catalog import held_standards_as_initials
+from app.services.accreditation_projection import (
+    project_all_pending_scopes,
+    project_scope_approval,
+    refresh_accreditation_status,
+    reject_scope,
+)
 from app.services.name_masking import mask_auditor_name, mask_company_name
 from app.schemas.admin import (
     AccreditationActionResponse,
@@ -96,6 +106,62 @@ def _get_accreditation_or_404(db: Session, acc_id: int) -> CBAccreditation:
     if accreditation is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"인정서(id={acc_id})를 찾을 수 없습니다.")
     return accreditation
+
+
+def _upload_root() -> Path:
+    root = Path(getattr(settings, "UPLOAD_DIR", "") or "").expanduser()
+    if not root or str(root) in {".", ""}:
+        root = Path(__file__).resolve().parents[4] / "uploads"
+    return root
+
+
+def _scope_to_response(db: Session, scope: CBAccreditedScope) -> CBAccreditedScopeResponse:
+    std = scope.standard or db.get(StandardMaster, scope.iso_standard_id)
+    return CBAccreditedScopeResponse(
+        id=scope.id,
+        cb_accreditation_id=scope.cb_accreditation_id,
+        iso_standard_id=scope.iso_standard_id,
+        iaf_code=scope.iaf_code,
+        is_approved=bool(scope.is_approved),
+        status=getattr(scope, "status", None),
+        reject_reason=getattr(scope, "reject_reason", None),
+        standard_code=std.standard_code if std else None,
+        standard_name=std.standard_name if std else None,
+    )
+
+
+def _accreditation_to_response(db: Session, accreditation: CBAccreditation) -> CBAccreditationResponse:
+    return CBAccreditationResponse(
+        id=accreditation.id,
+        cb_id=accreditation.cb_id,
+        accreditation_body=accreditation.accreditation_body,
+        certificate_number=accreditation.certificate_number,
+        certificate_file_url=accreditation.certificate_file_url,
+        status=accreditation.status,
+        reject_reason=accreditation.reject_reason,
+        approved_at=accreditation.approved_at,
+        scopes=[_scope_to_response(db, s) for s in accreditation.scopes],
+    )
+
+
+class ScopeActionResponse(BaseModel):
+    message: str
+    accreditation: CBAccreditationResponse
+    projected: Optional[dict] = None
+
+
+class AccreditationRequestDetailResponse(BaseModel):
+    id: int
+    cb_id: int
+    cb_name: Optional[str] = None
+    accreditation_body: str
+    certificate_number: str
+    certificate_file_url: Optional[str] = None
+    certificate_file_link: Optional[str] = None
+    status: str
+    reject_reason: Optional[str] = None
+    approved_at: Optional[datetime] = None
+    scopes: List[CBAccreditedScopeResponse] = Field(default_factory=list)
 
 
 def _get_rule_or_404(db: Session, rule_code: str) -> PlatformCalculationRule:
@@ -623,42 +689,201 @@ def get_admin_monitoring(
 
 
 # 1. CB 인정서 및 인정 범위 승인/반려 API
+@router.get(
+    "/accreditation-requests/{acc_id}",
+    response_model=AccreditationRequestDetailResponse,
+)
+@router.get(
+    "/accreditations/{acc_id}",
+    response_model=AccreditationRequestDetailResponse,
+)
+def get_accreditation_request(
+    acc_id: int,
+    db: Session = Depends(get_db),
+    admin: CurrentUser = Depends(get_current_admin_user),
+) -> AccreditationRequestDetailResponse:
+    """인정 신청 상세 + 파일 링크 + per-scope 상태."""
+    accreditation = _get_accreditation_or_404(db, acc_id)
+    cb = db.get(CertificationBodies, accreditation.cb_id)
+    file_link = None
+    if accreditation.certificate_file_url:
+        file_link = f"/api/v1/admin/accreditation-requests/{acc_id}/certificate"
+    return AccreditationRequestDetailResponse(
+        id=accreditation.id,
+        cb_id=accreditation.cb_id,
+        cb_name=cb.name if cb else None,
+        accreditation_body=accreditation.accreditation_body,
+        certificate_number=accreditation.certificate_number,
+        certificate_file_url=accreditation.certificate_file_url,
+        certificate_file_link=file_link,
+        status=accreditation.status,
+        reject_reason=accreditation.reject_reason,
+        approved_at=accreditation.approved_at,
+        scopes=[_scope_to_response(db, s) for s in accreditation.scopes],
+    )
+
+
+@router.get("/accreditation-requests/{acc_id}/certificate")
+def download_accreditation_certificate(
+    acc_id: int,
+    db: Session = Depends(get_db),
+    admin: CurrentUser = Depends(get_current_admin_user),
+):
+    accreditation = _get_accreditation_or_404(db, acc_id)
+    rel = (accreditation.certificate_file_url or "").strip()
+    if not rel:
+        raise HTTPException(status_code=404, detail="인정서 파일이 없습니다.")
+    # Allow absolute URL passthrough for legacy rows
+    if rel.startswith("http://") or rel.startswith("https://"):
+        raise HTTPException(
+            status_code=400,
+            detail="외부 URL 파일은 브라우저에서 직접 열어 주세요.",
+        )
+    path = (_upload_root() / rel).resolve()
+    root = _upload_root().resolve()
+    if not str(path).startswith(str(root)) or not path.is_file():
+        raise HTTPException(status_code=404, detail="인정서 파일을 찾을 수 없습니다.")
+    return FileResponse(path, filename=path.name)
+
+
+@router.patch(
+    "/accreditation-requests/{acc_id}/scopes/{scope_id}/approve",
+    response_model=ScopeActionResponse,
+)
+def approve_accreditation_scope(
+    acc_id: int,
+    scope_id: int,
+    db: Session = Depends(get_db),
+    admin: CurrentUser = Depends(get_current_admin_user),
+) -> ScopeActionResponse:
+    """Per-scope 승인 — SoT(cb_standard_accreditations) + matrix(cb_scope_matrix) 반영."""
+    accreditation = _get_accreditation_or_404(db, acc_id)
+    scope = (
+        db.query(CBAccreditedScope)
+        .filter(
+            CBAccreditedScope.id == scope_id,
+            CBAccreditedScope.cb_accreditation_id == acc_id,
+        )
+        .first()
+    )
+    if scope is None:
+        raise HTTPException(status_code=404, detail=f"Scope(id={scope_id})를 찾을 수 없습니다.")
+    try:
+        projected = project_scope_approval(db, accreditation, scope)
+        refresh_accreditation_status(db, accreditation)
+        db.commit()
+        db.refresh(accreditation)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        db.rollback()
+        logger.exception("scope approve projection failed")
+        raise HTTPException(status_code=500, detail=f"승인 반영 실패: {e}") from e
+    return ScopeActionResponse(
+        message="Scope가 승인되어 운용 인정범위에 반영되었습니다.",
+        accreditation=_accreditation_to_response(db, accreditation),
+        projected=projected,
+    )
+
+
+@router.patch(
+    "/accreditation-requests/{acc_id}/scopes/{scope_id}/reject",
+    response_model=ScopeActionResponse,
+)
+def reject_accreditation_scope(
+    acc_id: int,
+    scope_id: int,
+    payload: AccreditationRejectRequest,
+    db: Session = Depends(get_db),
+    admin: CurrentUser = Depends(get_current_admin_user),
+) -> ScopeActionResponse:
+    """Per-scope 반려 — SoT/matrix에는 쓰지 않음."""
+    accreditation = _get_accreditation_or_404(db, acc_id)
+    scope = (
+        db.query(CBAccreditedScope)
+        .filter(
+            CBAccreditedScope.id == scope_id,
+            CBAccreditedScope.cb_accreditation_id == acc_id,
+        )
+        .first()
+    )
+    if scope is None:
+        raise HTTPException(status_code=404, detail=f"Scope(id={scope_id})를 찾을 수 없습니다.")
+    reject_scope(scope, reject_reason=payload.reject_reason)
+    refresh_accreditation_status(db, accreditation)
+    if accreditation.status == CBAccreditationStatus.REJECTED.value:
+        accreditation.reject_reason = payload.reject_reason
+    db.commit()
+    db.refresh(accreditation)
+    return ScopeActionResponse(
+        message="Scope가 반려되었습니다.",
+        accreditation=_accreditation_to_response(db, accreditation),
+    )
+
+
 @router.patch("/accreditations/{acc_id}/approve", response_model=AccreditationActionResponse)
+@router.patch(
+    "/accreditation-requests/{acc_id}/approve",
+    response_model=AccreditationActionResponse,
+)
 def approve_cb_accreditation(
     acc_id: int,
     db: Session = Depends(get_db),
     admin: CurrentUser = Depends(get_current_admin_user),
 ) -> AccreditationActionResponse:
-    """CB 인정서를 승인하고, 하위 인정 범위(scopes)를 모두 승인 처리합니다."""
+    """Batch 승인 convenience — 각 scope에 동일 projection 로직 적용."""
     accreditation = _get_accreditation_or_404(db, acc_id)
+    try:
+        project_all_pending_scopes(db, accreditation)
+        accreditation.reject_reason = None
+        if accreditation.status != CBAccreditationStatus.APPROVED.value:
+            # If no scopes, still mark approved for envelope-only records
+            if not accreditation.scopes:
+                accreditation.status = CBAccreditationStatus.APPROVED.value
+                accreditation.approved_at = datetime.utcnow()
+        db.commit()
+        db.refresh(accreditation)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        db.rollback()
+        logger.exception("batch accreditation approve failed")
+        raise HTTPException(status_code=500, detail=f"승인 반영 실패: {e}") from e
 
-    accreditation.status = CBAccreditationStatus.APPROVED.value
-    accreditation.reject_reason = None
-    accreditation.approved_at = datetime.utcnow()
-    db.query(CBAccreditedScope).filter(CBAccreditedScope.cb_accreditation_id == acc_id).update({"is_approved": True})
-    db.commit()
-    db.refresh(accreditation)
-
-    return AccreditationActionResponse(message="CB 인정서 및 인정 범위가 승인되었습니다.", accreditation=accreditation)
+    return AccreditationActionResponse(
+        message="CB 인정서 및 인정 범위가 승인되었습니다.",
+        accreditation=_accreditation_to_response(db, accreditation),
+    )
 
 
 @router.patch("/accreditations/{acc_id}/reject", response_model=AccreditationActionResponse)
+@router.patch(
+    "/accreditation-requests/{acc_id}/reject",
+    response_model=AccreditationActionResponse,
+)
 def reject_cb_accreditation(
     acc_id: int,
     payload: AccreditationRejectRequest,
     db: Session = Depends(get_db),
     admin: CurrentUser = Depends(get_current_admin_user),
 ) -> AccreditationActionResponse:
-    """CB 인정서를 반려하고, 하위 인정 범위(scopes)를 모두 미승인 처리합니다."""
+    """Batch 반려 — 하위 scope 전부 REJECTED. SoT/matrix 미변경."""
     accreditation = _get_accreditation_or_404(db, acc_id)
 
     accreditation.status = CBAccreditationStatus.REJECTED.value
     accreditation.reject_reason = payload.reject_reason
-    db.query(CBAccreditedScope).filter(CBAccreditedScope.cb_accreditation_id == acc_id).update({"is_approved": False})
+    accreditation.approved_at = None
+    for scope in list(accreditation.scopes or []):
+        reject_scope(scope, reject_reason=payload.reject_reason)
     db.commit()
     db.refresh(accreditation)
 
-    return AccreditationActionResponse(message="CB 인정서가 반려되었습니다.", accreditation=accreditation)
+    return AccreditationActionResponse(
+        message="CB 인정서가 반려되었습니다.",
+        accreditation=_accreditation_to_response(db, accreditation),
+    )
 
 
 # 2. CB 연간 계약 및 과금 정책 목록/등록 API
@@ -793,10 +1018,33 @@ def list_cb_accreditations(
             status=accreditation.status,
             reject_reason=accreditation.reject_reason,
             approved_at=accreditation.approved_at,
-            scopes=[CBAccreditedScopeResponse.model_validate(scope) for scope in accreditation.scopes],
+            scopes=[_scope_to_response(db, scope) for scope in accreditation.scopes],
         )
         for accreditation, cb_name in rows
     ]
+
+
+@router.get(
+    "/accreditation-requests",
+    response_model=List[CBAccreditationRecordListResponse],
+)
+def list_accreditation_requests_alias(
+    skip: int = 0,
+    limit: int = 100,
+    cb_id: Optional[int] = None,
+    status_filter: Optional[str] = Query(default=None, alias="status"),
+    db: Session = Depends(get_db),
+    admin: CurrentUser = Depends(get_current_admin_user),
+) -> List[CBAccreditationRecordListResponse]:
+    """Alias of GET /admin/accreditations for briefing path naming."""
+    return list_cb_accreditations(
+        skip=skip,
+        limit=limit,
+        cb_id=cb_id,
+        status_filter=status_filter,
+        db=db,
+        admin=admin,
+    )
 
 
 @router.post("/accreditations", response_model=CBAccreditationResponse, status_code=status.HTTP_201_CREATED)
@@ -826,6 +1074,8 @@ def create_cb_accreditation(
                 cb_accreditation_id=accreditation.id,
                 iso_standard_id=scope.standard_master_id,
                 iaf_code=scope.iaf_code,
+                is_approved=False,
+                status=CBAccreditationStatus.PENDING.value,
             )
         )
 

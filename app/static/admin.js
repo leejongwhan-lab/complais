@@ -1778,18 +1778,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     tbody.innerHTML = records
       .map((r) => {
-        const codes = (r.scopes || []).map((s) => s.iaf_code).filter(Boolean);
-        const plain = formatIafPlain(codes);
-        const scopesText =
-          plain === "—"
-            ? "-"
-            : plain
-                .split(/\s+/)
-                .filter(Boolean)
-                .map((c) => `IAF ${escapeHtml(c)}`)
-                .join(" ");
+        const scopeBits = (r.scopes || []).map((s) => {
+          const std = s.standard_code || `std#${s.iso_standard_id}`;
+          return `${std}/${s.iaf_code || "-"}`;
+        });
+        const scopesText = scopeBits.length ? escapeHtml(scopeBits.join(", ")) : "-";
         const fileCell = r.certificate_file_url
-          ? `<a href="${escapeHtml(r.certificate_file_url)}" style="color: var(--sec-blue);" target="_blank" rel="noopener">파일 보기</a>`
+          ? `<button type="button" class="btn-secondary" data-cert-file="${r.id}">파일 보기</button>`
           : "-";
         return `
           <tr>
@@ -1799,13 +1794,24 @@ document.addEventListener("DOMContentLoaded", () => {
             <td>${fileCell}</td>
             <td>${escapeHtml(r.status)}</td>
             <td>
-              <button type="button" class="btn-detail" data-approve="${r.id}">승인</button>
-              <button type="button" class="btn-secondary" data-reject="${r.id}">반려</button>
+              <button type="button" class="btn-detail" data-acc-detail="${r.id}">상세</button>
+              <button type="button" class="btn-detail" data-approve="${r.id}">일괄승인</button>
+              <button type="button" class="btn-secondary" data-reject="${r.id}">일괄반려</button>
             </td>
           </tr>`;
       })
       .join("");
 
+    tbody.querySelectorAll("[data-acc-detail]").forEach((btn) => {
+      btn.addEventListener("click", () =>
+        openAccreditationDetail(Number(btn.getAttribute("data-acc-detail")))
+      );
+    });
+    tbody.querySelectorAll("[data-cert-file]").forEach((btn) => {
+      btn.addEventListener("click", () =>
+        downloadAccreditationCertificate(Number(btn.getAttribute("data-cert-file")))
+      );
+    });
     tbody.querySelectorAll("[data-approve]").forEach((btn) => {
       btn.addEventListener("click", () => approveAccreditation(Number(btn.getAttribute("data-approve"))));
     });
@@ -1814,10 +1820,108 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  async function downloadAccreditationCertificate(recordId) {
+    try {
+      const res = await authFetch(
+        `${API_BASE}/admin/accreditation-requests/${recordId}/certificate`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` } }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `다운로드 실패 (HTTP ${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      alert(`파일 열기 실패\n${err.message}`);
+    }
+  }
+
+  async function openAccreditationDetail(recordId) {
+    try {
+      const res = await authFetch(`${API_BASE}/admin/accreditation-requests/${recordId}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `요청 실패 (HTTP ${res.status})`);
+      }
+      const d = await res.json();
+      const panel = document.getElementById("accreditation-detail");
+      if (!panel) {
+        alert(
+          [
+            `CB: ${d.cb_name || d.cb_id}`,
+            `인정기구: ${d.accreditation_body}`,
+            `번호: ${d.certificate_number}`,
+            `상태: ${d.status}`,
+            `Scopes: ${(d.scopes || [])
+              .map((s) => `${s.standard_code || s.iso_standard_id}/${s.iaf_code} (${s.status || "-"})`)
+              .join("; ")}`,
+          ].join("\n")
+        );
+        return;
+      }
+      const fileLink = d.certificate_file_url
+        ? `<button type="button" class="btn-secondary" data-cert-file="${d.id}">인정서 파일</button>`
+        : "-";
+      const rows = (d.scopes || [])
+        .map((s) => {
+          const pending = (s.status || "PENDING") === "PENDING";
+          const actions = pending
+            ? `<button type="button" class="btn-detail" data-scope-approve="${d.id}:${s.id}">승인</button>
+               <button type="button" class="btn-secondary" data-scope-reject="${d.id}:${s.id}">반려</button>`
+            : escapeHtml(s.status || "-");
+          return `<tr>
+            <td>${escapeHtml(s.standard_code || String(s.iso_standard_id))}</td>
+            <td>${escapeHtml(s.iaf_code || "-")}</td>
+            <td>${escapeHtml(s.status || "-")}</td>
+            <td>${actions}</td>
+          </tr>`;
+        })
+        .join("");
+      panel.innerHTML = `
+        <div style="margin:12px 0;padding:12px;border:1px solid var(--border-color,#ddd);border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <strong>${escapeHtml(d.cb_name || "")}</strong>
+              · ${escapeHtml(d.accreditation_body || "")}
+              · ${escapeHtml(d.certificate_number || "")}
+              · ${escapeHtml(d.status || "")}
+            </div>
+            <div>${fileLink}</div>
+          </div>
+          <table class="data-table admin-data-table" style="margin-top:10px;">
+            <thead><tr><th>표준</th><th>IAF</th><th>상태</th><th>처리</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="4">Scope 없음</td></tr>'}</tbody>
+          </table>
+        </div>`;
+      panel.querySelectorAll("[data-cert-file]").forEach((btn) => {
+        btn.addEventListener("click", () =>
+          downloadAccreditationCertificate(Number(btn.getAttribute("data-cert-file")))
+        );
+      });
+      panel.querySelectorAll("[data-scope-approve]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const [accId, scopeId] = btn.getAttribute("data-scope-approve").split(":").map(Number);
+          approveAccreditationScope(accId, scopeId);
+        });
+      });
+      panel.querySelectorAll("[data-scope-reject]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const [accId, scopeId] = btn.getAttribute("data-scope-reject").split(":").map(Number);
+          rejectAccreditationScope(accId, scopeId);
+        });
+      });
+    } catch (err) {
+      alert(`상세 조회 실패\n${err.message}`);
+    }
+  }
+
   async function fetchAccreditationRequests() {
     const tbody = document.getElementById("accreditation-tbody");
     try {
-      const res = await authFetch(`${API_BASE}/admin/accreditations?status=PENDING`);
+      const res = await authFetch(`${API_BASE}/admin/accreditation-requests?status=PENDING`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || `요청 실패 (HTTP ${res.status})`);
@@ -1833,9 +1937,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function approveAccreditation(recordId) {
-    if (!confirm("해당 인증기관의 인정서 및 요청 ISO 범위를 승인하시겠습니까?")) return;
+    if (!confirm("해당 인증기관의 인정서 및 요청 ISO 범위를 일괄 승인하시겠습니까?\n(SoT/matrix에 반영됩니다)")) return;
     try {
-      const res = await authFetch(`${API_BASE}/admin/accreditations/${recordId}/approve`, {
+      const res = await authFetch(`${API_BASE}/admin/accreditation-requests/${recordId}/approve`, {
         method: "PATCH",
       });
       if (!res.ok) {
@@ -1850,12 +1954,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function rejectAccreditation(recordId) {
-    if (!confirm("해당 인증기관의 인정서를 반려하시겠습니까?")) return;
+    if (!confirm("해당 인증기관의 인정서를 일괄 반려하시겠습니까?")) return;
     const reason = window.prompt("반려 사유를 입력하세요 (선택):", "");
     if (reason === null) return;
 
     try {
-      const res = await authFetch(`${API_BASE}/admin/accreditations/${recordId}/reject`, {
+      const res = await authFetch(`${API_BASE}/admin/accreditation-requests/${recordId}/reject`, {
         method: "PATCH",
         body: JSON.stringify({ reject_reason: reason || null }),
       });
@@ -1867,6 +1971,48 @@ document.addEventListener("DOMContentLoaded", () => {
       fetchAccreditationRequests();
     } catch (err) {
       alert(`반려 처리 중 오류가 발생했습니다.\n${err.message}`);
+    }
+  }
+
+  async function approveAccreditationScope(accId, scopeId) {
+    if (!confirm("이 Scope를 승인하여 운용 인정범위(SoT/matrix)에 반영할까요?")) return;
+    try {
+      const res = await authFetch(
+        `${API_BASE}/admin/accreditation-requests/${accId}/scopes/${scopeId}/approve`,
+        { method: "PATCH" }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `요청 실패 (HTTP ${res.status})`);
+      }
+      alert("Scope 승인 반영 완료");
+      await fetchAccreditationRequests();
+      openAccreditationDetail(accId);
+    } catch (err) {
+      alert(`Scope 승인 실패\n${err.message}`);
+    }
+  }
+
+  async function rejectAccreditationScope(accId, scopeId) {
+    const reason = window.prompt("반려 사유를 입력하세요:", "");
+    if (reason === null) return;
+    try {
+      const res = await authFetch(
+        `${API_BASE}/admin/accreditation-requests/${accId}/scopes/${scopeId}/reject`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ reject_reason: reason || null }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `요청 실패 (HTTP ${res.status})`);
+      }
+      alert("Scope 반려 완료");
+      await fetchAccreditationRequests();
+      openAccreditationDetail(accId);
+    } catch (err) {
+      alert(`Scope 반려 실패\n${err.message}`);
     }
   }
 

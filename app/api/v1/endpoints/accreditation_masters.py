@@ -190,6 +190,23 @@ def _require_cb_manager(current_user: CurrentUser) -> CurrentUser:
     return current_user
 
 
+def _block_cb_operational_scope_write(current_user: CurrentUser) -> None:
+    """CB must not self-activate operational accreditation scope.
+
+    Platform admin may still use these endpoints for break-glass maintenance;
+    normal path is request → admin approve → SoT/matrix projection.
+    """
+    if current_user.role == UsersRole.PLATFORM_ADMIN.value:
+        return
+    raise HTTPException(
+        status_code=403,
+        detail=(
+            "CB는 운용 인정범위(Scope)를 직접 등록/수정/삭제할 수 없습니다. "
+            "POST /api/v1/cb-portal/accreditation-requests 로 신청 후 관리자 승인을 받으세요."
+        ),
+    )
+
+
 def _resolve_cb_id(current_user: CurrentUser, cb_id: Optional[int]) -> int:
     if current_user.role == UsersRole.PLATFORM_ADMIN.value:
         if not cb_id:
@@ -681,6 +698,7 @@ def create_cb_scope(
 ):
     """단일 Scope (1개 표준 + 1개 IAF) 추가."""
     _require_cb_manager(current_user)
+    _block_cb_operational_scope_write(current_user)
     scope_cb_id = _resolve_cb_id(current_user, payload.cb_id)
     row, _ = _create_scope_row(
         db,
@@ -716,6 +734,7 @@ def delete_cb_scope(
 ):
     """특정 Scope 삭제/해제."""
     _require_cb_manager(current_user)
+    _block_cb_operational_scope_write(current_user)
     query = db.query(CbAccreditedScope).filter(CbAccreditedScope.id == scope_id)
     if current_user.role != UsersRole.PLATFORM_ADMIN.value:
         query = query.filter(CbAccreditedScope.cb_id == current_user.cb_id)
@@ -735,6 +754,7 @@ def update_cb_scope(
     current_user: CurrentUser = Depends(require_cb_scope),
 ):
     _require_cb_manager(current_user)
+    _block_cb_operational_scope_write(current_user)
     query = db.query(CbAccreditedScope).filter(CbAccreditedScope.id == scope_id)
     if current_user.role != UsersRole.PLATFORM_ADMIN.value:
         query = query.filter(CbAccreditedScope.cb_id == current_user.cb_id)
@@ -776,6 +796,7 @@ async def bulk_import_cb_scopes(
     IAF 셀에 콤마가 있으면 각각 별도 행으로 분리한다.
     """
     _require_cb_manager(current_user)
+    _block_cb_operational_scope_write(current_user)
     scope_cb_id = _resolve_cb_id(current_user, None)
     _ensure_seed_masters(db)
 

@@ -90,6 +90,9 @@ class CBAccreditedScope(Base):
     iso_standard_id = Column(Integer, ForeignKey("standard_masters.id"), nullable=False, index=True)
     iaf_code = Column(String(50), nullable=False)  # EAC/IAF 코드 (e.g. Code 14)
     is_approved = Column(Boolean, default=False)
+    # Per-scope workflow (default PENDING). APPROVED/REJECTED after admin action.
+    status = Column(String(20), default=CBAccreditationStatus.PENDING.value)
+    reject_reason = Column(Text, nullable=True)
 
     accreditation = relationship("CBAccreditation", back_populates="scopes")
     standard = relationship("StandardMaster")
