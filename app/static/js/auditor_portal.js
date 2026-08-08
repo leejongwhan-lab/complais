@@ -310,6 +310,16 @@
           </div>
         </article>`;
         }
+        const st = String(r.status || "").toLowerCase();
+        const canAccept =
+          r.assignment_id &&
+          (st === "assigned" || st === "revision_requested");
+        const engageHref = r.assignment_id
+          ? "/audit-docs/auditor_engagement?assignment_id=" +
+            encodeURIComponent(r.assignment_id) +
+            "&contract_id=" +
+            encodeURIComponent(r.contract_id || "")
+          : "";
         return `<article class="aud-detail-card">
           <h4>${esc(r.company_name || (r.company_id ? "#" + r.company_id : "기업"))}</h4>
           <dl class="aud-dl">
@@ -324,7 +334,17 @@
             <dt>담당자연락처</dt><dd>${esc(dash(r.contact_phone))}</dd>
             <dt>진행 상태</dt><dd>${esc(dash(r.status_label || r.status))}</dd>
           </dl>
-          <div style="margin-top:10px;">
+          <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">
+            ${
+              engageHref
+                ? `<a class="btn ghost" href="${esc(engageHref)}" target="_blank" rel="noopener">위촉계약·NDA</a>`
+                : ""
+            }
+            ${
+              canAccept
+                ? `<button type="button" class="btn" data-accept-assignment="${esc(r.assignment_id)}">배정 동의</button>`
+                : ""
+            }
             <button type="button" class="btn ghost" data-goto="reports" data-contract="${esc(r.contract_id || "")}">심사노트/보고서 작성</button>
           </div>
         </article>`;
@@ -424,13 +444,27 @@
     }
     return list.map((r) => {
       const cid = r.contract_id || "";
+      const st = String(r.status || "").toLowerCase();
+      const canAccept =
+        r.assignment_id &&
+        (st === "assigned" || st === "revision_requested");
+      const engage =
+        r.assignment_id
+          ? `<a class="btn ghost" href="/audit-docs/auditor_engagement?assignment_id=${encodeURIComponent(r.assignment_id)}&contract_id=${encodeURIComponent(cid)}" target="_blank" rel="noopener">계약·NDA</a>`
+          : "";
+      const accept = canAccept
+        ? `<button type="button" class="btn" data-accept-assignment="${esc(r.assignment_id)}">동의</button>`
+        : "";
       return `<tr>
         <td>${esc(r.company_name || (r.company_id ? "#" + r.company_id : "—"))}</td>
         <td>${esc(r.standards_label || "—")}</td>
         <td>${esc(r.audit_type_label || r.audit_type || "—")}</td>
         <td>${esc(fmtDate(r.audit_date))}${r.audit_period_end && r.audit_period_end !== r.audit_date ? " ~ " + esc(fmtDate(r.audit_period_end)) : ""}</td>
         <td>${esc(r.status_label || r.status || "—")}</td>
-        <td><button type="button" class="btn ghost" data-goto="reports" data-contract="${esc(cid)}">심사노트/보고서 작성</button></td>
+        <td style="display:flex;flex-wrap:wrap;gap:4px;">
+          ${engage}${accept}
+          <button type="button" class="btn ghost" data-goto="reports" data-contract="${esc(cid)}">심사노트/보고서 작성</button>
+        </td>
       </tr>`;
     }).join("");
   }
@@ -1870,6 +1904,39 @@
     if (delUnavail) {
       evt.preventDefault();
       deleteUnavailability(delUnavail.getAttribute("data-del-unavail"));
+      return;
+    }
+    const acceptBtn = evt.target.closest("[data-accept-assignment]");
+    if (acceptBtn) {
+      evt.preventDefault();
+      const aid = acceptBtn.getAttribute("data-accept-assignment");
+      if (!aid) return;
+      const docUrl =
+        "/audit-docs/auditor_engagement?assignment_id=" + encodeURIComponent(aid);
+      if (
+        !confirm(
+          "위촉계약서·NDA를 열람·동의한 것으로 배정을 수락합니다.\n(상세 문서는 별도 창에서 확인할 수 있습니다.)"
+        )
+      ) {
+        window.open(docUrl, "_blank", "noopener");
+        return;
+      }
+      (async () => {
+        try {
+          const res = await fetch(
+            API + "/auditor/assignments/" + encodeURIComponent(aid) + "/accept",
+            { method: "POST", headers: authHeaders(true) }
+          );
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.detail || "배정 동의 실패");
+          alert("배정에 동의했습니다. 위촉계약·NDA가 서명 처리되었습니다.");
+          loadSchedulesPanel();
+          loadDashboard();
+        } catch (e) {
+          alert(e.message || "배정 동의 실패");
+          window.open(docUrl, "_blank", "noopener");
+        }
+      })();
       return;
     }
     const openReport = evt.target.closest("[data-open-report]");

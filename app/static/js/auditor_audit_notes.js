@@ -419,6 +419,7 @@
     const ivBtn = $("aud-iv-toggle-btn");
     const mxBtn = $("aud-matrix-toggle-btn");
     const tmBtn = $("aud-team-meeting-btn");
+    const trBtn = $("aud-team-review-confirm-btn");
     if (ivBtn) {
       ivBtn.textContent = state.view === "interview" ? "심사로 돌아가기" : "면담 작성";
     }
@@ -430,6 +431,17 @@
       tmBtn.style.display = show ? "" : "none";
       tmBtn.classList.toggle("active", !!state.teamMeeting);
       tmBtn.textContent = state.teamMeeting ? "내 배정으로 돌아가기" : "심사팀회의 (전체)";
+    }
+    if (trBtn) {
+      const sess = state.session || {};
+      const needs =
+        !state.preview &&
+        state.isLead &&
+        state.teamMeeting &&
+        !!sess.requires_team_review &&
+        !sess.team_review_confirmed;
+      trBtn.style.display = needs ? "" : "none";
+      trBtn.textContent = "팀 검토 확인";
     }
   }
 
@@ -2043,6 +2055,28 @@
   });
   $("aud-team-meeting-btn")?.addEventListener("click", () => {
     setTeamMeeting(!state.teamMeeting);
+  });
+  $("aud-team-review-confirm-btn")?.addEventListener("click", async () => {
+    if (!state.contractId || state.preview || !state.isLead) return;
+    if (!state.teamMeeting) {
+      toast("심사팀회의(전체) 모드에서 팀 검토를 확인해 주세요.");
+      return;
+    }
+    if (!confirm("팀 전체 배정을 검토했습니다. 팀 검토를 확인하시겠습니까?")) return;
+    try {
+      const res = await fetch(API + "/auditor/audit-notes/team-review-confirm", {
+        method: "PUT",
+        headers: authHeaders(true),
+        body: JSON.stringify({ contract_id: Number(state.contractId) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "팀 검토 확인 실패");
+      toast(data.message || "팀 검토가 확인되었습니다.");
+      await loadSession(state.contractId, state.standardKey, false);
+      syncViewButtons();
+    } catch (e) {
+      toast(e.message || "팀 검토 확인 실패");
+    }
   });
   $("aud-iv-nav-hd")?.addEventListener("click", () => {
     const body = $("aud-iv-nav-body");

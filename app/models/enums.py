@@ -144,6 +144,7 @@ class AuditNoteNcrStatus(str, enum.Enum):
     OPEN = "open"
     CLIENT_RESPONSE = "client_response"
     CB_REVIEW = "cb_review"
+    WAITING_TEAM_REVIEW = "waiting_team_review"  # ≥2인 팀 — 팀장 팀검토 전 NCR 종결 보류
     CLOSED = "closed"
     OVERDUE = "overdue"
 

@@ -12,3 +12,6 @@ app/main-JW*.py
 
 # Reference seed spreadsheets (local only, do not commit)
 data/*.xlsx
+
+# One-time secret handoff (never commit)
+SECRET_KEY_FOR_RENDER.txt

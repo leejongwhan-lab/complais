@@ -206,6 +206,7 @@ _AUDIT_DOC_SLUGS = {
     "personnel": "personnel.html",
     "cert_decision": "cert_decision.html",
     "application": "application.html",
+    "auditor_engagement": "auditor_engagement.html",
     "stage1_readiness": "stage1_readiness.html",
     "stage1_report": "stage1_report.html",
     "stage2_report": "stage2_report.html",

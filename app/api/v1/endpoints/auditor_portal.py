@@ -302,6 +302,7 @@ def _assignment_status_label(raw: Optional[str]) -> Optional[str]:
     key = str(raw).strip().lower()
     mapping = {
         "assigned": "배정",
+        "revision_requested": "조율요청",
         "confirmed": "확정",
         "accepted": "수락",
         "in_progress": "진행중",
@@ -323,6 +324,8 @@ def _ncr_status_label(raw: Optional[str]) -> Optional[str]:
         "ca_submitted": "시정조치 제출",
         "ca_approved": "시정조치 승인",
         "ca_rejected": "시정조치 반려",
+        "open": "미종결",
+        "waiting_team_review": "팀검토대기",
         "closed": "종결",
         "under_review": "검토중",
     }
@@ -1206,6 +1209,7 @@ from pydantic import BaseModel, Field
 
 from app.models.auth import Notifications, Users
 from app.services.auditor_assignment_fees import (
+    get_assignment_engagement_docs,
     mark_assignment_docs_signed,
     serialize_assignment,
     sync_contract_scheduled_if_all_confirmed,
@@ -1346,6 +1350,8 @@ def _accept_assignment_impl(
         "document_ids": doc_ids,
         "contract_status": contract.status,
         "all_confirmed_scheduled": scheduled,
+        "agreed_documents": ["AUDITOR_CONTRACT", "NDA"],
+        "accept_means_agreement": True,
     }
 
 
@@ -1395,6 +1401,20 @@ def _revision_assignment_impl(
 
 
 def _register_assignment_routes(r: APIRouter) -> None:
+    @r.get("/assignments/{assignment_id}/engagement-docs")
+    def get_engagement_docs(
+        assignment_id: int,
+        db: Session = Depends(get_db),
+        current_user: CurrentUser = Depends(get_current_user),
+    ):
+        """위촉계약·NDA readable payload (accept = 문서 동의)."""
+        _require_auditor(current_user)
+        auditor = _get_auditor_for_user(db, current_user.id)
+        row = _get_own_assignment(db, assignment_id, auditor)
+        data = get_assignment_engagement_docs(db, assignment=row)
+        db.commit()
+        return data
+
     @r.post("/assignments/{assignment_id}/accept")
     def accept_assignment(
         assignment_id: int,
@@ -1402,7 +1422,7 @@ def _register_assignment_routes(r: APIRouter) -> None:
         db: Session = Depends(get_db),
         current_user: CurrentUser = Depends(get_current_user),
     ):
-        """배정 동의: assigned → confirmed + 문서 signed/completed."""
+        """배정 동의: assigned → confirmed + 위촉계약/NDA signed/completed (= 열람·합의)."""
         return _accept_assignment_impl(
             assignment_id=assignment_id,
             request=request,

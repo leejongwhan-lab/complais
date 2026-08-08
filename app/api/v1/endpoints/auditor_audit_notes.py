@@ -52,12 +52,22 @@ from app.schemas.auditor_audit_notes import (
     ProcessGroupHlsItem,
     ProcessGroupItem,
     ProcessGroupNavOut,
+    TeamReviewConfirmIn,
+    TeamReviewConfirmOut,
 )
 from app.services.audit_plan_scope import (
     filter_clauses_by_plan,
+    is_lead_auditor,
     load_engagement_plan_scope,
     resolve_plan_autofill,
 )
+from app.services.audit_team import (
+    confirm_team_review,
+    get_team_review_state,
+    is_team_review_confirmed,
+    team_size_requires_review,
+)
+from app.models.enums import AuditNoteNcrStatus
 from app.services.company_held_certs import list_company_held_standards
 from app.services.iso_clauses_master import (
     list_operating_standards,
@@ -1436,6 +1446,7 @@ def get_note_session(
     audit_type_s = str(audit_type) if audit_type else None
     audit_date = _ymd(getattr(contract, "audit_period_start", None))
     audit_period_end = _ymd(getattr(contract, "audit_period_end", None))
+    team_state = get_team_review_state(db, contract_id)
 
     return AuditNoteSessionOut(
         note_id=note_id,
@@ -1470,6 +1481,10 @@ def get_note_session(
         plan_item_count=int((scope_info.get("scope") or {}).get("item_count") or 0),
         scope_mode=scope_info.get("scope_mode"),
         scope_message=_scope_message(scope_info),
+        team_size=int(team_state.get("team_size") or 0),
+        requires_team_review=bool(team_state.get("requires_team_review")),
+        team_review_confirmed=bool(team_state.get("team_review_confirmed")),
+        team_review_confirmed_at=team_state.get("team_review_confirmed_at"),
         interview_content=iv_content,
         interview_templates=iv_templates,
         interview_entries=iv_entries,
@@ -1754,6 +1769,8 @@ def save_note_clause(
 
     ensure_ncr_extra_columns(db)
     ncr_id = None
+    team_review_gated = False
+    ncr_status_out: Optional[str] = None
     if verdict != _VERDICT_CONFORM and grade in {"major", "minor", "observation"}:
         fact = (payload.ncr_fact or note_text or "").strip() or f"{clause_no} 부적합/관찰"
         title = f"{short} {clause_no} {clause_topic}".strip()[:300]
@@ -1848,15 +1865,54 @@ def save_note_clause(
             except Exception:
                 pass
     elif verdict == _VERDICT_CONFORM and _table_exists(db, "audit_note_ncr"):
-        # mark open NCRs for this clause as closed when judged conform
-        db.execute(
-            text(
-                "UPDATE audit_note_ncr SET status='closed', closed_at=CURRENT_TIMESTAMP, "
-                "updated_at=CURRENT_TIMESTAMP "
-                "WHERE note_id=:nid AND standard=:std AND clause=:cno AND status!='closed'"
-            ),
-            {"nid": note_id, "std": short, "cno": clause_no},
-        )
+        # NC→적합: 1인 팀은 즉시 종결, ≥2인은 팀장 팀검토 확인 전 waiting_team_review
+        waiting = AuditNoteNcrStatus.WAITING_TEAM_REVIEW.value
+        needs_gate = team_size_requires_review(
+            db, payload.contract_id
+        ) and not is_team_review_confirmed(db, payload.contract_id)
+        if needs_gate:
+            db.execute(
+                text(
+                    "UPDATE audit_note_ncr SET status=:wstatus, "
+                    "updated_at=CURRENT_TIMESTAMP "
+                    "WHERE note_id=:nid AND standard=:std AND clause=:cno "
+                    "AND status != 'closed' AND status != :wstatus2"
+                ),
+                {
+                    "nid": note_id,
+                    "std": short,
+                    "cno": clause_no,
+                    "wstatus": waiting,
+                    "wstatus2": waiting,
+                },
+            )
+            team_review_gated = True
+            ncr_status_out = waiting
+            open_row = db.execute(
+                text(
+                    "SELECT id FROM audit_note_ncr "
+                    "WHERE note_id=:nid AND standard=:std AND clause=:cno "
+                    "AND status=:wstatus ORDER BY id DESC LIMIT 1"
+                ),
+                {
+                    "nid": note_id,
+                    "std": short,
+                    "cno": clause_no,
+                    "wstatus": waiting,
+                },
+            ).first()
+            if open_row:
+                ncr_id = int(open_row[0])
+        else:
+            db.execute(
+                text(
+                    "UPDATE audit_note_ncr SET status='closed', closed_at=CURRENT_TIMESTAMP, "
+                    "updated_at=CURRENT_TIMESTAMP "
+                    "WHERE note_id=:nid AND standard=:std AND clause=:cno AND status!='closed'"
+                ),
+                {"nid": note_id, "std": short, "cno": clause_no},
+            )
+            ncr_status_out = AuditNoteNcrStatus.CLOSED.value
 
     # audit_notes.standard_code ← master standard_code (ISO9001…), not platform key
     params_hdr = {
@@ -1875,12 +1931,84 @@ def save_note_clause(
     db.execute(text(sql_hdr), params_hdr)
     db.commit()
 
+    msg = "저장되었습니다." + (" (KPI 미입력 허용)" if not any(kpi_map.values()) else "")
+    if team_review_gated:
+        msg = (
+            "저장되었습니다. 팀 검토 대기 — 심사팀장 팀검토 확인 후 NCR이 종결됩니다."
+        )
+
     return AuditNoteClauseSaveOut(
         ok=True,
         note_id=note_id,
         clause_row_id=clause_row_id,
         ncr_id=ncr_id,
-        message="저장되었습니다." + (" (KPI 미입력 허용)" if not any(kpi_map.values()) else ""),
+        ncr_status=ncr_status_out,
+        team_review_gated=team_review_gated,
+        message=msg,
+    )
+
+
+@router.put("/team-review-confirm", response_model=TeamReviewConfirmOut)
+def confirm_team_review_endpoint(
+    payload: TeamReviewConfirmIn,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """심사팀장 — 심사팀회의(team_meeting) 후 팀 검토 확인.
+
+    ≥2인 배정 시 NC→적합 자동종결 게이트를 해제하고,
+    대기(waiting_team_review) NCR을 종결한다.
+    """
+    _require_auditor(current_user)
+    auditor = _get_auditor(db, current_user.id)
+    contract = db.query(Contracts).filter(Contracts.id == payload.contract_id).first()
+    if not contract:
+        raise HTTPException(status_code=404, detail="계약을 찾을 수 없습니다.")
+    if not is_lead_auditor(db, contract_id=payload.contract_id, auditor_id=auditor.id):
+        raise HTTPException(status_code=403, detail="심사팀장만 팀 검토를 확인할 수 있습니다.")
+
+    now = datetime.now()
+    try:
+        confirm_team_review(
+            db,
+            contract_id=payload.contract_id,
+            confirmed_by_user_id=current_user.id,
+            now=now,
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="계약을 찾을 수 없습니다.")
+
+    closed_count = 0
+    waiting = AuditNoteNcrStatus.WAITING_TEAM_REVIEW.value
+    if _table_exists(db, "audit_note_ncr") and _table_exists(db, "audit_notes"):
+        result = db.execute(
+            text(
+                "UPDATE audit_note_ncr SET status='closed', closed_at=:now, "
+                "closed_by=:uid, updated_at=:now "
+                "WHERE status=:wstatus AND note_id IN ("
+                "  SELECT id FROM audit_notes WHERE contract_id=:cid"
+                ")"
+            ),
+            {
+                "cid": payload.contract_id,
+                "wstatus": waiting,
+                "now": now,
+                "uid": current_user.id,
+            },
+        )
+        closed_count = int(result.rowcount or 0)
+
+    db.commit()
+    state = get_team_review_state(db, payload.contract_id)
+    return TeamReviewConfirmOut(
+        ok=True,
+        contract_id=payload.contract_id,
+        team_size=int(state.get("team_size") or 0),
+        team_review_confirmed=True,
+        team_review_confirmed_at=state.get("team_review_confirmed_at"),
+        closed_waiting_ncr_count=closed_count,
+        message="팀 검토가 확인되었습니다."
+        + (f" (대기 NCR {closed_count}건 종결)" if closed_count else ""),
     )
 
 

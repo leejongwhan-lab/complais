@@ -92,6 +92,15 @@ DOC_PAGES = [
         "group_label": "공통 · 계획/인력/신청",
     },
     {
+        "slug": "auditor_engagement",
+        "title": "심사원 위촉계약·NDA",
+        "doc_type": "auditor_engagement",
+        "path": "/audit-docs/auditor_engagement",
+        "file": "auditor_engagement.html",
+        "group": "common",
+        "group_label": "공통 · 계획/인력/신청",
+    },
+    {
         "slug": "personnel",
         "title": "심사원역량·공정성·이의·불만",
         "doc_type": "auditor_personnel",

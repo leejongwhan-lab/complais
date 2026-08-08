@@ -184,9 +184,27 @@ class AuditNoteSessionOut(BaseModel):
     plan_item_count: int = 0
     scope_mode: Optional[str] = None  # preview | assigned | team_meeting | no_plan
     scope_message: Optional[str] = None
+    team_size: int = 0
+    requires_team_review: bool = False
+    team_review_confirmed: bool = False
+    team_review_confirmed_at: Optional[str] = None
     interview_content: Optional[str] = None  # legacy flatten (compat)
     interview_templates: List[AuditInterviewTemplateItem] = Field(default_factory=list)
     interview_entries: List[AuditInterviewEntry] = Field(default_factory=list)
+
+
+class TeamReviewConfirmIn(BaseModel):
+    contract_id: int
+
+
+class TeamReviewConfirmOut(BaseModel):
+    ok: bool = True
+    contract_id: int
+    team_size: int = 0
+    team_review_confirmed: bool = True
+    team_review_confirmed_at: Optional[str] = None
+    closed_waiting_ncr_count: int = 0
+    message: str = "팀 검토가 확인되었습니다."
 
 
 class AuditNoteMethodIn(BaseModel):
@@ -328,6 +346,8 @@ class AuditNoteClauseSaveOut(BaseModel):
     note_id: int
     clause_row_id: Optional[int] = None
     ncr_id: Optional[int] = None
+    ncr_status: Optional[str] = None
+    team_review_gated: bool = False
     message: str = "저장되었습니다."
 
 

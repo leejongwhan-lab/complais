@@ -76,6 +76,12 @@ class Contracts(Base):
     cb_signed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     cb_signed_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     audit_mode: Mapped[str] = mapped_column(String(50), nullable=False)
+    team_review_confirmed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, comment="심사팀장 팀검토(회의) 확인 시각"
+    )
+    team_review_confirmed_by: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, comment="팀검토 확인 user_id"
+    )
 
 
 class Contract(Base):
