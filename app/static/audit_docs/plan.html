@@ -414,13 +414,28 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
           <th>성명</th>
           <th style="width:90px">자격 / 소속</th>
           <th>담당 표준 / 전문분야</th>
-          <th style="min-width:160px">역할 설명</th>
+          <th style="min-width:140px">역할 설명</th>
+          <th style="min-width:120px">담당 프로세스·활동 <span style="font-weight:400;color:var(--text3)">(§6.3.2.2)</span></th>
           <th class="no-print" style="width:40px"></th>
         </tr>
       </thead>
       <tbody id="s1-team-tbody"></tbody>
     </table>
     <button class="team-add-btn no-print" onclick="addTeamMember('s1')">+ 팀원 추가</button>
+    <div style="margin-top:12px">
+      <div class="field-lbl">리스크 기반 자원배분 근거 <span style="font-weight:400;color:var(--text3)">(ISO 19011 §6.3.2.2)</span></div>
+      <textarea class="field-ta" id="s1-risk-resource" rows="2"
+        placeholder="리스크·복잡도·우선순위에 따른 인원·시간 배분 근거 (선택)"></textarea>
+    </div>
+    <div style="margin-top:10px">
+      <div class="field-lbl">피심사조직 시설/프로세스 사전 익숙화 방법 <span style="font-weight:400;color:var(--text3)">(§6.3.2.2)</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:6px;font-size:11px">
+        <label><input type="checkbox" id="s1-fam-remote" class="fam-chk"> 원격 문서·영상 사전검토</label>
+        <label><input type="checkbox" id="s1-fam-onsite" class="fam-chk"> 현장 사전 방문</label>
+        <label><input type="checkbox" id="s1-fam-brief" class="fam-chk"> 신청서·계약서 브리핑</label>
+        <label><input type="checkbox" id="s1-fam-prior" class="fam-chk"> 이전 심사 기록 검토</label>
+      </div>
+    </div>
   </div>
 
   <!-- §4 심사 일정 -->
@@ -705,13 +720,28 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
           <th>성명</th>
           <th style="width:90px">자격 / 소속</th>
           <th>담당 표준 / 전문분야</th>
-          <th style="min-width:160px">역할 설명</th>
+          <th style="min-width:140px">역할 설명</th>
+          <th style="min-width:120px">담당 프로세스·활동 <span style="font-weight:400;color:var(--text3)">(§6.3.2.2)</span></th>
           <th class="no-print" style="width:40px"></th>
         </tr>
       </thead>
       <tbody id="s2-team-tbody"></tbody>
     </table>
     <button class="team-add-btn no-print" onclick="addTeamMember('s2')">+ 팀원 추가</button>
+    <div style="margin-top:12px">
+      <div class="field-lbl">리스크 기반 자원배분 근거 <span style="font-weight:400;color:var(--text3)">(ISO 19011 §6.3.2.2)</span></div>
+      <textarea class="field-ta" id="s2-risk-resource" rows="2"
+        placeholder="리스크·복잡도·우선순위에 따른 인원·시간 배분 근거 (선택)"></textarea>
+    </div>
+    <div style="margin-top:10px">
+      <div class="field-lbl">피심사조직 시설/프로세스 사전 익숙화 방법 <span style="font-weight:400;color:var(--text3)">(§6.3.2.2)</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:6px;font-size:11px">
+        <label><input type="checkbox" id="s2-fam-remote" class="fam-chk"> 원격 문서·영상 사전검토</label>
+        <label><input type="checkbox" id="s2-fam-onsite" class="fam-chk"> 현장 사전 방문</label>
+        <label><input type="checkbox" id="s2-fam-brief" class="fam-chk"> 신청서·계약서 브리핑</label>
+        <label><input type="checkbox" id="s2-fam-prior" class="fam-chk"> 이전 심사 기록 검토</label>
+      </div>
+    </div>
   </div>
 
   <!-- §4 IAF MD5 심사일수 산정 -->
@@ -999,7 +1029,7 @@ function addTeamMember(prefix){
   // 팀장이 없으면 팀장으로, 있으면 심사원으로 기본
   const hasLeader=team.some(m=>m.role==='leader');
   team.push({id:Date.now(), role:hasLeader?'auditor':'leader',
-             name:'', qual:'', std:'', desc:''});
+             name:'', qual:'', std:'', desc:'', processes:''});
   renderTeam(prefix);
   saveAll();
 }
@@ -1059,6 +1089,10 @@ function renderTeam(prefix){
         value="${m.desc||ROLE_DESC[m.role]||''}"
         oninput="updateTeam('${prefix}',${m.id},'desc',this.value)"
         style="border-bottom:1px solid var(--border);width:100%;font-size:10px"></td>
+      <td><input class="inp" value="${m.processes||''}"
+        placeholder="예) 리더십/기획, 운영"
+        oninput="updateTeam('${prefix}',${m.id},'processes',this.value)"
+        style="border-bottom:1px solid var(--border);width:100%;font-size:10px"></td>
       <td class="no-print">
         <button class="team-del-btn" onclick="delTeamMember('${prefix}',${m.id})">삭제</button>
       </td>
@@ -1066,7 +1100,7 @@ function renderTeam(prefix){
   }).join('');
 
   if(team.length===0){
-    tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:12px;
+    tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:12px;
       color:var(--text3);font-size:11px">팀원을 추가하세요</td></tr>`;
   }
 }
@@ -1074,19 +1108,43 @@ function renderTeam(prefix){
 function initDefaultTeam(){
   if(s1Team.length===0){
     s1Team=[
-      {id:1,role:'leader', name:'',qual:'',std:'전체 표준',     desc:ROLE_DESC.leader},
-      {id:2,role:'auditor',name:'',qual:'',std:'',              desc:ROLE_DESC.auditor},
-      {id:3,role:'guide',  name:'',qual:'피심사 조직',std:'',   desc:ROLE_DESC.guide},
+      {id:1,role:'leader', name:'',qual:'',std:'전체 표준',     desc:ROLE_DESC.leader, processes:''},
+      {id:2,role:'auditor',name:'',qual:'',std:'',              desc:ROLE_DESC.auditor, processes:''},
+      {id:3,role:'guide',  name:'',qual:'피심사 조직',std:'',   desc:ROLE_DESC.guide, processes:''},
     ];
   }
   if(s2Team.length===0){
     s2Team=[
-      {id:10,role:'leader', name:'',qual:'',std:'전체 표준',    desc:ROLE_DESC.leader},
-      {id:11,role:'auditor',name:'',qual:'',std:'',             desc:ROLE_DESC.auditor},
-      {id:12,role:'auditor',name:'',qual:'',std:'',             desc:ROLE_DESC.auditor},
-      {id:13,role:'guide',  name:'',qual:'피심사 조직',std:'',  desc:ROLE_DESC.guide},
+      {id:10,role:'leader', name:'',qual:'',std:'전체 표준',    desc:ROLE_DESC.leader, processes:''},
+      {id:11,role:'auditor',name:'',qual:'',std:'',             desc:ROLE_DESC.auditor, processes:''},
+      {id:12,role:'auditor',name:'',qual:'',std:'',             desc:ROLE_DESC.auditor, processes:''},
+      {id:13,role:'guide',  name:'',qual:'피심사 조직',std:'',  desc:ROLE_DESC.guide, processes:''},
     ];
   }
+  renderTeam('s1');
+  renderTeam('s2');
+}
+
+function applyMasterTeam(ctx){
+  const team=(ctx&&ctx.team)||[];
+  if(!team.length) return;
+  const mapped=team.map((t,i)=>({
+    id:1000+i,
+    role:t.role||'auditor',
+    name:t.name||'',
+    qual:t.registration_no||t.grade||'',
+    std:t.standards_json||'',
+    desc:ROLE_DESC[t.role]||'',
+    processes:Array.isArray(t.processes)?t.processes.join(', '):(t.processes||''),
+  }));
+  const fill=(arr, prefix)=>{
+    const blank=arr.every(m=>!(m.name||'').trim());
+    if(!blank) return;
+    if(prefix==='s1') s1Team=mapped.map((m,i)=>({...m,id:1+i}));
+    else s2Team=mapped.map((m,i)=>({...m,id:10+i}));
+  };
+  fill(s1Team,'s1');
+  fill(s2Team,'s2');
   renderTeam('s1');
   renderTeam('s2');
 }
@@ -1471,13 +1529,15 @@ document.addEventListener('complais-audit-doc-ready',(ev)=>{
   let changed=false;
   if(!s1Stds.length&&keys.length){ s1Stds=keys.slice(); changed=true; }
   if(!s2Stds.length&&keys.length){ s2Stds=keys.slice(); changed=true; }
+  applyMasterTeam(ev.detail);
   if(changed){
     buildStdGrid('s1-std-grid',s1Stds,'s1-criteria');
     buildStdGrid('s2-std-grid',s2Stds,'s2-criteria');
-    saveAll();
   }
+  saveAll();
 });
 </script>
-<script src="/static/js/audit_doc_master.js?v=20260808std1"></script>
+<script src="/static/js/audit_doc_iso19011.js?v=20260808iso1"></script>
+<script src="/static/js/audit_doc_master.js?v=20260808iso1"></script>
 </body>
 </html>

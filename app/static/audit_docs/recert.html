@@ -570,7 +570,7 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
   <!-- §3 심사팀 구성 -->
   <div class="sec">
     <div class="sec-h"><span class="sec-no">3</span> 심사팀 구성
-      <span class="badge-ref">§9.2.2</span></div>
+      <span class="badge-ref">§9.2.2 / ISO 19011 §6.3.2.2</span></div>
     <div class="notice blue">
       ℹ️ 갱신심사는 전체 표준 요구사항을 심사하므로 최초심사와 동등한 심사팀 역량이 필요합니다.
     </div>
@@ -579,17 +579,39 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
         <td><input class="inp" id="c1-lead" placeholder="성명 / 심사원 자격번호"></td>
         <td class="lbl" style="width:80px">담당 표준</td>
         <td><input class="inp" id="c1-lead-std" placeholder="전체 표준"></td></tr>
+      <tr><td class="lbl">팀장 담당 프로세스·활동</td>
+        <td colspan="3"><input class="inp" id="c1-lead-proc" placeholder="배정 프로세스/활동 (AuditAssignment·계획 일정)"></td></tr>
       <tr><td class="lbl">심사원 1</td>
         <td><input class="inp" id="c1-aud1" placeholder="없으면 '-'"></td>
         <td class="lbl">담당 표준</td>
         <td><input class="inp" id="c1-aud1-std"></td></tr>
+      <tr><td class="lbl">심사원1 프로세스·활동</td>
+        <td colspan="3"><input class="inp" id="c1-aud1-proc" placeholder="배정 프로세스/활동"></td></tr>
       <tr><td class="lbl">심사원 2</td>
         <td><input class="inp" id="c1-aud2" placeholder="없으면 '-'"></td>
         <td class="lbl">담당 표준</td>
         <td><input class="inp" id="c1-aud2-std"></td></tr>
+      <tr><td class="lbl">심사원2 프로세스·활동</td>
+        <td colspan="3"><input class="inp" id="c1-aud2-proc" placeholder="배정 프로세스/활동"></td></tr>
       <tr><td class="lbl">기술전문가</td>
         <td colspan="3"><input class="inp" id="c1-te" placeholder="없으면 '-' / 전문분야"></td></tr>
+      <tr><td class="lbl">참관인(Observer)</td>
+        <td colspan="3"><input class="inp" id="c1-observer" placeholder="없으면 '-'"></td></tr>
     </table>
+    <div style="margin-top:12px">
+      <div class="field-lbl">리스크 기반 자원배분 근거 <span style="font-weight:400;color:var(--text3)">(ISO 19011 §6.3.2.2)</span></div>
+      <textarea class="field-ta" id="c1-risk-resource" rows="2"
+        placeholder="리스크·복잡도·우선순위에 따른 인원·시간 배분 근거 (선택)"></textarea>
+    </div>
+    <div style="margin-top:10px">
+      <div class="field-lbl">피심사조직 시설/프로세스 사전 익숙화 방법 <span style="font-weight:400;color:var(--text3)">(§6.3.2.2)</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:6px;font-size:11px">
+        <label><input type="checkbox" id="c1-fam-remote"> 원격 문서·영상 사전검토</label>
+        <label><input type="checkbox" id="c1-fam-onsite"> 현장 사전 방문</label>
+        <label><input type="checkbox" id="c1-fam-brief"> 신청서·계약서 브리핑</label>
+        <label><input type="checkbox" id="c1-fam-prior"> 이전 심사 기록 검토</label>
+      </div>
+    </div>
   </div>
 
   <!-- §4 심사 일정 -->
@@ -1277,15 +1299,44 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 document.addEventListener('complais-audit-doc-ready',(ev)=>{
-  if(selectedStds.length) return;
-  const keys=masterStdKeys(ev.detail);
-  if(!keys.length) return;
-  selectedStds=keys.slice();
-  window.selectedStds=selectedStds;
-  buildStdGrid('a1-std-grid');
+  const ctx=ev.detail||{};
+  if(!selectedStds.length){
+    const keys=masterStdKeys(ctx);
+    if(keys.length){
+      selectedStds=keys.slice();
+      window.selectedStds=selectedStds;
+      buildStdGrid('a1-std-grid');
+    }
+  }
+  const team=ctx.team||[];
+  const roleOf=m=>(m.role||m.assignment_role||'').toLowerCase();
+  const procs=m=>Array.isArray(m.processes)?m.processes.join(', '):(m.processes||'');
+  const leaders=team.filter(m=>['leader','lead','team_leader'].includes(roleOf(m)));
+  const auditors=team.filter(m=>!['leader','lead','team_leader','te','expert','observer','guide'].includes(roleOf(m)));
+  const tes=team.filter(m=>['te','expert'].includes(roleOf(m)));
+  const observers=team.filter(m=>roleOf(m)==='observer');
+  const setIfEmpty=(id,val)=>{
+    const el=document.getElementById(id);
+    if(el&&!el.value&&val) el.value=val;
+  };
+  if(leaders[0]){
+    setIfEmpty('c1-lead', leaders[0].name||'');
+    setIfEmpty('c1-lead-proc', procs(leaders[0]));
+  }
+  if(auditors[0]){
+    setIfEmpty('c1-aud1', auditors[0].name||'');
+    setIfEmpty('c1-aud1-proc', procs(auditors[0]));
+  }
+  if(auditors[1]){
+    setIfEmpty('c1-aud2', auditors[1].name||'');
+    setIfEmpty('c1-aud2-proc', procs(auditors[1]));
+  }
+  if(tes[0]) setIfEmpty('c1-te', tes[0].name||'');
+  if(observers[0]) setIfEmpty('c1-observer', observers[0].name||'');
   saveAll();
 });
 </script>
-<script src="/static/js/audit_doc_master.js?v=20260808std1"></script>
+<script src="/static/js/audit_doc_iso19011.js?v=20260808iso1"></script>
+<script src="/static/js/audit_doc_master.js?v=20260808iso1"></script>
 </body>
 </html>

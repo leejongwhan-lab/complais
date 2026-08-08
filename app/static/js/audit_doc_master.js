@@ -214,12 +214,21 @@
         setVal(id, fields[id]);
       });
       // Force-fill Stage1/2 sync panel from master (always overwrite empty)
-      ["f-org", "f-addr", "f-scope", "f-std", "f-lead", "f-aud", "f-cb", "f-rep"].forEach(
+      ["f-org", "f-addr", "f-scope", "f-std", "f-lead", "f-aud", "f-cb", "f-rep", "f-objective"].forEach(
         function (id) {
           var el = document.getElementById(id);
           if (el && fields[id] && !el.value) el.value = String(fields[id]);
         }
       );
+      if (
+        window.ComplaisIso19011 &&
+        document.getElementById("f-objective") &&
+        !document.getElementById("f-objective").value
+      ) {
+        var stageHint = location.pathname.indexOf("stage1") >= 0 ? "stage1" : "stage2";
+        document.getElementById("f-objective").value =
+          window.ComplaisIso19011.auditObjectiveFromContext(ctx, stageHint);
+      }
       // mirror companyName for PHP-style init
       if (ctx.company && ctx.company.name) {
         window.__SERVER_INIT__ = window.__SERVER_INIT__ || {};

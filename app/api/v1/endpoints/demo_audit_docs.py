@@ -450,8 +450,114 @@ def _ensure_demo_plan(db: Session, contract_id: int) -> Optional[int]:
     return plan_id
 
 
-def _load_team(db: Session, contract: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _map_assignment_role(raw: Optional[str]) -> str:
+    """Map AuditAssignmentsRole / legacy labels → plan.html role keys."""
+    v = (raw or "").strip().lower()
+    if v in ("lead", "leader", "team_leader", "팀장", "심사팀장"):
+        return "leader"
+    if v in ("expert", "te", "tech", "technical_expert", "기술전문가"):
+        return "te"
+    if v in ("observer", "참관", "참관인"):
+        return "observer"
+    if v in ("witness", "입회"):
+        return "observer"
+    if v in ("guide", "안내", "안내인"):
+        return "guide"
+    return "auditor"
+
+
+def _load_assignment_rows(db: Session, contract_id: int) -> List[Dict[str, Any]]:
+    if not _table_exists(db, "audit_assignments"):
+        return []
+    rows = db.execute(
+        text(
+            "SELECT id, auditor_id, role, assignment_role, status, standards_json, "
+            "assignment_note "
+            "FROM audit_assignments WHERE contract_id=:c ORDER BY id ASC"
+        ),
+        {"c": contract_id},
+    ).mappings().all()
+    return [dict(r) for r in rows]
+
+
+def _load_plan_processes(
+    db: Session, plan_id: Optional[int]
+) -> Dict[str, List[str]]:
+    """auditor_name / auditor_id → process names from audit_plan_items."""
+    out: Dict[str, List[str]] = {}
+    if not plan_id or not _table_exists(db, "audit_plan_items"):
+        return out
+    rows = db.execute(
+        text(
+            "SELECT auditor_name, auditor_id, process_name "
+            "FROM audit_plan_items WHERE audit_plan_id=:p ORDER BY sort_order, id"
+        ),
+        {"p": plan_id},
+    ).mappings().all()
+    for r in rows:
+        proc = (r.get("process_name") or "").strip()
+        if not proc:
+            continue
+        keys: List[str] = []
+        if r.get("auditor_id") is not None:
+            keys.append(f"id:{int(r['auditor_id'])}")
+        name = (r.get("auditor_name") or "").strip()
+        if name:
+            keys.append(f"name:{name}")
+        for k in keys:
+            out.setdefault(k, [])
+            if proc not in out[k]:
+                out[k].append(proc)
+    return out
+
+
+def _load_team(
+    db: Session,
+    contract: Dict[str, Any],
+    *,
+    plan_id: Optional[int] = None,
+) -> List[Dict[str, Any]]:
     team: List[Dict[str, Any]] = []
+    processes = _load_plan_processes(db, plan_id)
+    assignments = _load_assignment_rows(db, int(contract.get("id") or 0))
+
+    if assignments and _table_exists(db, "auditors"):
+        for aa in assignments:
+            aid = aa.get("auditor_id")
+            if not aid:
+                continue
+            r = db.execute(
+                text(
+                    "SELECT id, name, grade, registration_no FROM auditors "
+                    "WHERE id=:id LIMIT 1"
+                ),
+                {"id": int(aid)},
+            ).mappings().first()
+            if not r:
+                continue
+            role = _map_assignment_role(
+                aa.get("assignment_role") or aa.get("role")
+            )
+            procs = processes.get(f"id:{int(r['id'])}") or processes.get(
+                f"name:{(r.get('name') or '').strip()}"
+            ) or []
+            team.append(
+                {
+                    "auditor_id": int(r["id"]),
+                    "name": r["name"],
+                    "role": role,
+                    "assignment_role": aa.get("assignment_role") or aa.get("role"),
+                    "grade": r["grade"],
+                    "registration_no": r.get("registration_no"),
+                    "standards_json": aa.get("standards_json"),
+                    "assignment_note": aa.get("assignment_note"),
+                    "processes": procs,
+                    "is_demo": False,
+                }
+            )
+        if team:
+            return team
+
     lead_id = contract.get("lead_auditor_id")
     member_ids = _parse_json_list(contract.get("member_auditor_ids"))
     ids: List[int] = []
@@ -476,14 +582,18 @@ def _load_team(db: Session, contract: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "auditor_id": 1,
                 "name": "이종환",
                 "role": "leader",
+                "assignment_role": "lead",
                 "grade": "senior",
+                "processes": processes.get("name:이종환") or [],
                 "is_demo": True,
             },
             {
                 "auditor_id": 5,
                 "name": "최광윤",
                 "role": "auditor",
+                "assignment_role": "auditor",
                 "grade": "auditor",
+                "processes": processes.get("name:최광윤") or [],
                 "is_demo": True,
             },
         ]
@@ -496,13 +606,18 @@ def _load_team(db: Session, contract: Dict[str, Any]) -> List[Dict[str, Any]]:
         ).mappings().first()
         if not r:
             continue
+        procs = processes.get(f"id:{int(r['id'])}") or processes.get(
+            f"name:{(r.get('name') or '').strip()}"
+        ) or []
         team.append(
             {
                 "auditor_id": int(r["id"]),
                 "name": r["name"],
                 "role": "leader" if i == 0 else "auditor",
+                "assignment_role": "lead" if i == 0 else "auditor",
                 "grade": r["grade"],
                 "registration_no": r.get("registration_no"),
+                "processes": procs,
                 "is_demo": aid in (1, 5) and not lead_id,
             }
         )
@@ -640,6 +755,86 @@ def demo_standards(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/clauses")
+def demo_clauses(
+    standard_key: Optional[List[str]] = Query(
+        None, description="Filter by standard_key (repeatable). Empty = all seeded masters."
+    ),
+    db: Session = Depends(get_db),
+):
+    """Clause catalog from standard_clause_masters (same source as audit-notes /clauses).
+
+    Public demo endpoint for document HTML fallback/cache — no inventing clauses.
+    """
+    _ensure_schema(db)
+    list_official_clauses = None
+    try:
+        from app.services.standard_clause_titles import (
+            ensure_standard_clause_titles,
+            list_official_clauses as _list_official_clauses,
+        )
+
+        ensure_standard_clause_titles(db)
+        list_official_clauses = _list_official_clauses
+    except Exception:
+        logger.exception("ensure_standard_clause_titles failed")
+
+    catalog = _standards_catalog(db)
+    keys: List[str] = []
+    if standard_key:
+        for raw in standard_key:
+            sk = resolve_standard_key(raw) or raw
+            if sk and sk not in keys:
+                keys.append(sk)
+    if not keys:
+        keys = [
+            s["standard_key"]
+            for s in catalog
+            if s.get("standard_key") and s["standard_key"] not in ("COMMON", "IMS")
+        ]
+
+    clauses: List[Dict[str, Any]] = []
+    counts: Dict[str, int] = {}
+    for sk in keys:
+        rows: List[Dict[str, Any]] = []
+        try:
+            if list_official_clauses:
+                rows = list_official_clauses(db, sk)
+        except Exception:
+            logger.exception("list_official_clauses failed for %s", sk)
+        counts[sk] = len(rows)
+        for r in rows:
+            cno = str(r.get("clause_no") or "").strip()
+            if not cno:
+                continue
+            title = (r.get("clause_title") or r.get("clause_topic") or "").strip()
+            major = cno.split(".")[0]
+            clauses.append(
+                {
+                    "id": cno,
+                    "clause_no": cno,
+                    "standard_key": r.get("standard_key") or sk,
+                    "family_code": r.get("family_code"),
+                    "clause_title": title,
+                    "clause_topic": title,
+                    "label": (cno + (" " + title if title else "")).strip(),
+                    "g": f"{major}항",
+                    "group_name": f"{major}항",
+                    "source": "standard_clause_masters",
+                    "sort_order": r.get("sort_order") or 0,
+                }
+            )
+
+    return {
+        "source": "standard_clause_masters",
+        "sync_date": date.today().isoformat(),
+        "standard_keys": keys,
+        "counts": counts,
+        "total": len(clauses),
+        "clauses": clauses,
+    }
+
+
 @router.get("/context")
 def demo_context(
     contract_id: int = Query(1, description="contracts.id"),
@@ -704,7 +899,20 @@ def demo_context(
         ).first()
         plan_id = int(row[0]) if row else None
 
-    team = _load_team(db, contract)
+    audit_plan: Dict[str, Any] = {}
+    if plan_id and _table_exists(db, "audit_plans"):
+        prow = db.execute(
+            text(
+                "SELECT id, audit_objective, audit_criteria, scope_summary, "
+                "communication_note, plan_date, status "
+                "FROM audit_plans WHERE id=:id LIMIT 1"
+            ),
+            {"id": int(plan_id)},
+        ).mappings().first()
+        if prow:
+            audit_plan = dict(prow)
+
+    team = _load_team(db, contract, plan_id=plan_id)
     fields = _field_map(company, contract, cb, std_labels)
     if team:
         fields["as1-name"] = team[0].get("name") or ""
@@ -716,6 +924,12 @@ def demo_context(
         if len(team) > 2:
             fields["as3-name"] = team[2].get("name") or ""
             fields["f-te"] = team[2].get("name") or ""
+    objective = (audit_plan.get("audit_objective") or "").strip()
+    if objective:
+        fields["f-objective"] = objective
+        fields["s1-objective"] = objective
+        fields["s2-objective"] = objective
+        fields["c1-objective"] = objective
 
     # master field dictionary (explicit names for docs/JS)
     master = {
@@ -749,6 +963,8 @@ def demo_context(
         "audit_period_end": _ymd(contract.get("audit_period_end")),
         "total_md": str(contract.get("total_md") or ""),
         "lead_auditor_id": contract.get("lead_auditor_id"),
+        "audit_objective": objective,
+        "audit_plan_id": plan_id,
     }
 
     pages = []
@@ -788,6 +1004,15 @@ def demo_context(
         "cb": cb,
         "team": team,
         "audit_plan_id": plan_id,
+        "audit_plan": {
+            "id": audit_plan.get("id") or plan_id,
+            "audit_objective": objective,
+            "audit_criteria": audit_plan.get("audit_criteria"),
+            "scope_summary": audit_plan.get("scope_summary"),
+            "communication_note": audit_plan.get("communication_note"),
+            "plan_date": _ymd(audit_plan.get("plan_date")),
+            "status": audit_plan.get("status"),
+        },
         "standards_catalog": catalog,
         "selected_standard_keys": std_keys,
         "fields": fields,
