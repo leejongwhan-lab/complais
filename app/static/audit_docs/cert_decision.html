@@ -40,6 +40,7 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
 #conn-badge{font-size:10px;padding:3px 9px;border-radius:12px;white-space:nowrap}
 .cb-wait{background:rgba(245,158,11,.3);color:#fde68a}
 .cb-ok{background:rgba(34,197,94,.3);color:#bbf7d0}
+.cb-err{background:rgba(239,68,68,.3);color:#fca5a5}
 
 /* ── 탭 ── */
 #tab-bar{background:var(--card);border-bottom:2px solid var(--border);
@@ -261,8 +262,8 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
 <div id="hdr">
   <div class="logo">ComplAIs <small>인증 검증 및 심의서 — ISO/IEC 17021-1 §9.5</small></div>
   <div class="hdr-r">
-    <span id="conn-badge" class="cb-wait">⚡ 연계 대기</span>
-    <button class="hbtn" onclick="syncData()">📡 심사보고서 연계</button>
+    <span id="conn-badge" class="cb-wait">⚡ 심사노트 대기</span>
+    <button class="hbtn" onclick="requestData()">📡 심사노트 불러오기</button>
     <button class="hbtn" onclick="saveAll()">💾 저장</button>
     <button class="hbtn pri no-print" onclick="window.print()">🖨️ 인쇄 / PDF</button>
   </div>
@@ -1208,64 +1209,231 @@ function updateSummary(){
 }
 
 // ════════════════════════════════════════
-// BroadcastChannel 연계
+// 심사노트 API 연계 (BroadcastChannel 제거)
 // ════════════════════════════════════════
-const bc = new BroadcastChannel('complais_audit');
-bc.onmessage = function(e){
-  if(e.data.type!=='AUDIT_DATA') return;
-  const d=e.data.data;
-  // 기본 정보 자동 채우기
-  if(d.coName){
-    ['r1-org','c1-org','d1-org','m1-org'].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el&&!el.value) el.value=d.coName;
-    });
+const EMPTY_NOTE='심사노트에 기록 없음';
+const NOTES_API='/api/v1/auditor/audit-notes';
+let _notesLoading=false;
+let connected=false;
+
+function notesAuthHeaders(){
+  const t=localStorage.getItem('access_token')||'';
+  return {Authorization:'Bearer '+t};
+}
+
+function mapApiVerdict(verdict, ncrGrade){
+  const g=String(ncrGrade||'').toLowerCase();
+  const v=String(verdict||'').trim();
+  if(g==='major'||v==='major'||v.indexOf('중대')>=0) return 'major';
+  if(g==='minor'||v==='minor'||v.indexOf('경미')>=0) return 'minor';
+  if(g==='observation'||g==='obs'||v==='obs'||v==='observation'||v.indexOf('관찰')>=0) return 'obs';
+  if(v==='적합'||v==='ok'||v==='conform'||v.toLowerCase()==='ok') return 'ok';
+  return '';
+}
+
+function resolveContractId(ctx){
+  const params=new URLSearchParams(location.search);
+  const fromUrl=params.get('contract_id')||params.get('contract')||'';
+  const m=(ctx&&ctx.master)||{};
+  const fromCtx=m.contract_id||(ctx&&ctx.contract&&ctx.contract.id)||'';
+  const fromMaster=window.ComplaisAuditDocMaster&&window.ComplaisAuditDocMaster.context;
+  const m2=(fromMaster&&fromMaster.master)||{};
+  return String(fromUrl||fromCtx||m2.contract_id||(fromMaster&&fromMaster.contract&&fromMaster.contract.id)||'').trim();
+}
+
+function resolveStandardKeys(ctx){
+  const fromCtx=(ctx&&ctx.selected_standard_keys)||[];
+  const fromMaster=window.ComplaisAuditDocMaster&&window.ComplaisAuditDocMaster.context;
+  const keys=fromCtx.length?fromCtx:(fromMaster&&fromMaster.selected_standard_keys)||[];
+  return (Array.isArray(keys)&&keys.length)?keys.slice():[];
+}
+
+async function fetchNotesJson(url){
+  const res=await fetch(url,{credentials:'same-origin',headers:notesAuthHeaders()});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){
+    const detail=data.detail||('HTTP '+res.status);
+    const err=new Error(typeof detail==='string'?detail:JSON.stringify(detail));
+    err.status=res.status;
+    throw err;
   }
-  if(d.auditDate){
-    ['r1-audit-date','c1-audit-date'].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el&&!el.value) el.value=d.auditDate;
-    });
-  }
-  if(d.selectedStds?.length){
-    const stdNames=d.selectedStds.map(k=>{const s=STANDARDS.find(x=>x.k===k);return s?s.label:k;}).join(', ');
-    ['r1-std','c1-std','d1-std','m1-std'].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el&&!el.value) el.value=stdNames;
-    });
-  }
-  // 부적합 카운트
-  const saved=d.saved||{};
-  let major=0,minor=0,obs=0;
-  Object.values(saved).forEach(v=>{
-    if(v.verdict==='major') major++;
-    else if(v.verdict==='minor') minor++;
-    else if(v.verdict==='obs') obs++;
+  return data;
+}
+
+function fillIfEmpty(ids, value){
+  if(!value) return;
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el&&!el.value) el.value=value;
   });
+}
+
+function applyAuditNotesToDecision(sessions, matrix){
+  const findings=[];
+  const selectedStds=[];
+  let major=0, minor=0, obs=0;
+
+  (sessions||[]).forEach(sess=>{
+    const sk=sess.standard_key;
+    if(sk && selectedStds.indexOf(sk)<0) selectedStds.push(sk);
+    (sess.standards||[]).forEach(s=>{
+      const k=s.standard_key;
+      if(k && selectedStds.indexOf(k)<0) selectedStds.push(k);
+    });
+    (sess.clauses||[]).forEach(c=>{
+      const stdKey=c.standard_key||sk||'';
+      const clauseNo=String(c.clause_no||'').trim();
+      const verdict=mapApiVerdict(c.verdict, c.ncr_grade);
+      if(verdict==='major') major++;
+      else if(verdict==='minor') minor++;
+      else if(verdict==='obs') obs++;
+      if(verdict==='major'||verdict==='minor'||verdict==='obs'){
+        const labelTopic=(c.clause_topic||c.clause_title||'').trim();
+        findings.push({
+          verdict,
+          clause:clauseNo+(labelTopic?(' '+labelTopic):''),
+          summary:(c.ncr_fact||c.note_text||'').trim()||EMPTY_NOTE,
+          std:stdKey
+        });
+      }
+    });
+  });
+
+  // Matrix may include verdict-only cells not present in session clauses
+  if(!major && !minor && !obs && matrix&&matrix.cells){
+    (matrix.cells||[]).forEach(cell=>{
+      const verdict=mapApiVerdict(cell.verdict, null);
+      if(verdict==='major') major++;
+      else if(verdict==='minor') minor++;
+      else if(verdict==='obs') obs++;
+      const sk=cell.standard_key||(matrix&&matrix.standard_key)||'';
+      if(sk && selectedStds.indexOf(sk)<0) selectedStds.push(sk);
+    });
+  }
+
+  const primary=sessions&&sessions[0];
+  fillIfEmpty(['r1-org','c1-org','d1-org','m1-org'], primary&&primary.company_name);
+  fillIfEmpty(['r1-audit-date','c1-audit-date'], primary&&primary.audit_date);
+  const stdNames=selectedStds.length
+    ? selectedStds.map(k=>{
+        const s=STANDARDS.find(x=>x.k===k||x.standard_key===k);
+        return s?(s.label||s.display_code||k):k;
+      }).join(', ')
+    : (primary&&primary.standards_label)||'';
+  fillIfEmpty(['r1-std','c1-std','d1-std','m1-std'], stdNames);
+  if(primary&&primary.auditor_name){
+    fillIfEmpty(['r1-lead','c1-lead'], primary.auditor_name);
+  }
+
   const mEl=document.getElementById('c1-major');
   const nEl=document.getElementById('c1-minor');
   const oEl=document.getElementById('c1-obs');
   if(mEl) mEl.value=major;
   if(nEl) nEl.value=minor;
   if(oEl) oEl.value=obs;
-  updateSummary();
 
+  // Fill NC summary rows (nc1…ncN) when empty
+  const gradeLabel={major:'중부적합',minor:'경부적합',obs:'관찰사항'};
+  findings.slice(0,3).forEach((f,i)=>{
+    const n=i+1;
+    const noEl=document.getElementById('nc'+n+'-no');
+    const gEl=document.getElementById('nc'+n+'-grade');
+    const cEl=document.getElementById('nc'+n+'-clause');
+    const sEl=document.getElementById('nc'+n+'-summary');
+    if(!noEl || noEl.value) return;
+    noEl.value=(f.verdict==='obs'?'OBS':'NC')+'-'+String(n).padStart(2,'0');
+    if(gEl) gEl.value=gradeLabel[f.verdict]||'경부적합';
+    if(cEl) cEl.value=f.clause||'';
+    if(sEl) sEl.value=f.summary||EMPTY_NOTE;
+  });
+
+  updateSummary();
+  connected=true;
   const badge=document.getElementById('conn-badge');
   badge.className='cb-ok';
-  badge.textContent=`✅ 연계됨 — NC ${major+minor}건, OBS ${obs}건`;
-};
-
-function syncData(){
-  bc.postMessage({type:'REQUEST_DATA'});
-  document.getElementById('conn-badge').className='cb-wait';
-  document.getElementById('conn-badge').textContent='⏳ 요청 중...';
-  setTimeout(()=>{
-    if(document.getElementById('conn-badge').className==='cb-wait'){
-      document.getElementById('conn-badge').className='cb-wait';
-      document.getElementById('conn-badge').textContent='⚠️ 응답 없음';
-    }
-  },3000);
+  if(major+minor+obs===0){
+    badge.textContent='✅ 심사노트 연동 — '+EMPTY_NOTE;
+  } else {
+    badge.textContent=`✅ 심사노트 연동 — NC ${major+minor}건, OBS ${obs}건`;
+  }
 }
+
+async function loadAuditNotesFromApi(ctx, opts){
+  opts=opts||{};
+  if(_notesLoading) return;
+  const contractId=resolveContractId(ctx);
+  const badge=document.getElementById('conn-badge');
+  if(!contractId){
+    badge.className='cb-err';
+    badge.textContent='⚠️ contract_id 없음';
+    if(opts.manual){
+      alert('contract_id가 없습니다.\nURL에 ?demo=1&contract_id=… 를 붙여 다시 열어주세요.');
+    }
+    return;
+  }
+  if(!(localStorage.getItem('access_token')||'').trim()){
+    badge.className='cb-err';
+    badge.textContent='⚠️ 로그인 필요';
+    if(opts.manual){
+      alert('심사노트 API는 심사원 로그인이 필요합니다.\n심사원 포털에 로그인한 뒤 이 페이지를 새로고침하세요.');
+    }
+    return;
+  }
+  _notesLoading=true;
+  badge.className='cb-wait';
+  badge.textContent='⏳ 심사노트 불러오는 중…';
+  try{
+    const params=new URLSearchParams(location.search);
+    const teamMeeting=params.get('team_meeting')==='1'||params.get('team_meeting')==='true';
+    const stdKeys=resolveStandardKeys(ctx);
+    const teamQ=teamMeeting?'&team_meeting=1':'';
+    const sessionPromises=stdKeys.length
+      ? stdKeys.map(sk=>fetchNotesJson(
+          NOTES_API+'/session?contract_id='+encodeURIComponent(contractId)+
+          '&standard_key='+encodeURIComponent(sk)+teamQ
+        ))
+      : [fetchNotesJson(
+          NOTES_API+'/session?contract_id='+encodeURIComponent(contractId)+teamQ
+        )];
+    const matrixPromise=fetchNotesJson(
+      NOTES_API+'/matrix?contract_id='+encodeURIComponent(contractId)+
+      '&all_standards=true'+teamQ
+    ).catch(err=>{
+      console.warn('[cert_decision] matrix fetch failed', err);
+      return null;
+    });
+    const [sessions, matrix]=await Promise.all([
+      Promise.all(sessionPromises),
+      matrixPromise
+    ]);
+    applyAuditNotesToDecision(sessions, matrix);
+  }catch(err){
+    console.warn('[cert_decision] audit-notes load failed', err);
+    badge.className='cb-err';
+    badge.textContent=err.status===401||err.status===403
+      ? '⚠️ 인증 실패'
+      : '⚠️ 심사노트 로드 실패';
+    if(opts.manual){
+      alert('심사노트 데이터를 불러오지 못했습니다.\n\n'+
+        (err.message||String(err))+
+        '\n\n심사원 포털 로그인 상태와 contract_id를 확인하세요.');
+    }
+  }finally{
+    _notesLoading=false;
+  }
+}
+
+function requestData(){
+  const ctx=(window.ComplaisAuditDocMaster&&window.ComplaisAuditDocMaster.context)||null;
+  loadAuditNotesFromApi(ctx,{manual:true});
+}
+
+/** @deprecated alias for leftover onclick */
+function syncData(){ requestData(); }
+
+document.addEventListener('complais-audit-doc-ready', function(ev){
+  loadAuditNotesFromApi(ev.detail||null,{manual:false});
+});
 
 // ════════════════════════════════════════
 // 저장 / 복원
@@ -1333,10 +1501,19 @@ document.addEventListener('DOMContentLoaded',()=>{
   const ch=getSaved('changeDecision'); if(ch) setChange(ch);
   updateSummary();
 
-  // 자동 연계
-  setTimeout(()=>syncData(),500);
+  // Master context 이벤트 대기; 이미 로드됐으면 즉시 API 호출
+  setTimeout(function(){
+    if(connected || _notesLoading) return;
+    const master=window.ComplaisAuditDocMaster;
+    if(master && master.enabled && master.context){
+      loadAuditNotesFromApi(master.context,{manual:false});
+      return;
+    }
+    const cid=resolveContractId(null);
+    if(cid) loadAuditNotesFromApi(null,{manual:false});
+  }, 800);
 });
 </script>
-<script src="/static/js/audit_doc_master.js?v=20260807demo1"></script>
+<script src="/static/js/audit_doc_master.js?v=20260808notes1"></script>
 </body>
 </html>
