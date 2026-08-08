@@ -21,6 +21,7 @@ from app.models.auditor import (
     AuditorEducation,
     AuditorExternalCert,
     AuditorQualification,
+    AuditorUnavailability,
     AuditorWorkExperience,
 )
 from app.models.backoffice import CompanyStaff
@@ -453,6 +454,7 @@ def _schedule_item_from_contract(
     contact_name, contact_phone = _company_contact(db, company)
     mode = getattr(contract, "audit_mode", None)
     return AuditorScheduleItem(
+        item_type="assignment",
         assignment_id=assignment_id,
         contract_id=contract.id,
         company_id=contract.company_id,
@@ -486,9 +488,6 @@ def _build_schedules(
     month: Optional[int] = None,
     limit: int = 50,
 ) -> List[AuditorScheduleItem]:
-    if not _table_exists(db, "contracts"):
-        return []
-
     if year and month:
         month_start = date(year, month, 1)
         month_end = date(year, month, monthrange(year, month)[1])
@@ -506,92 +505,122 @@ def _build_schedules(
 
     raw_rows: List[Tuple[Optional[AuditAssignments], Contracts, Optional[Companies]]] = []
 
-    if _table_exists(db, "audit_assignments"):
-        q = (
-            db.query(AuditAssignments, Contracts, Companies)
-            .outerjoin(Contracts, Contracts.id == AuditAssignments.contract_id)
-            .outerjoin(Companies, Companies.id == Contracts.company_id)
-            .filter(
-                or_(
-                    AuditAssignments.auditor_id == auditor.id,
-                    AuditAssignments.auditor_user_id == user_id,
+    if _table_exists(db, "contracts"):
+        if _table_exists(db, "audit_assignments"):
+            q = (
+                db.query(AuditAssignments, Contracts, Companies)
+                .outerjoin(Contracts, Contracts.id == AuditAssignments.contract_id)
+                .outerjoin(Companies, Companies.id == Contracts.company_id)
+                .filter(
+                    or_(
+                        AuditAssignments.auditor_id == auditor.id,
+                        AuditAssignments.auditor_user_id == user_id,
+                    )
                 )
+                .order_by(AuditAssignments.id.desc())
+                .limit(300)
             )
-            .order_by(AuditAssignments.id.desc())
-            .limit(300)
+            for aa, contract, company in q.all():
+                if not contract:
+                    continue
+                if str(aa.status or "").lower() in {"cancelled", "canceled", "rejected"}:
+                    continue
+                start = contract.audit_period_start
+                end = contract.audit_period_end
+                if filter_month and not _overlaps_month(start, end, month_start, month_end):
+                    continue
+                raw_rows.append((aa, contract, company))
+                seen_contracts.add(int(contract.id))
+                if contract.lead_auditor_id:
+                    team_id_candidates.add(int(contract.lead_auditor_id))
+                team_id_candidates.update(_parse_id_list(contract.member_auditor_ids))
+
+        # Fallback: lead auditor contracts without assignment rows
+        lead_q = (
+            db.query(Contracts, Companies)
+            .outerjoin(Companies, Companies.id == Contracts.company_id)
+            .filter(Contracts.lead_auditor_id == auditor.id)
+            .order_by(Contracts.audit_period_start.desc())
+            .limit(200)
         )
-        for aa, contract, company in q.all():
-            if not contract:
+        for contract, company in lead_q.all():
+            if int(contract.id) in seen_contracts:
                 continue
-            if str(aa.status or "").lower() in {"cancelled", "canceled", "rejected"}:
+            if str(contract.status or "").lower() in {"cancelled", "canceled"}:
                 continue
             start = contract.audit_period_start
             end = contract.audit_period_end
             if filter_month and not _overlaps_month(start, end, month_start, month_end):
                 continue
-            raw_rows.append((aa, contract, company))
+            raw_rows.append((None, contract, company))
             seen_contracts.add(int(contract.id))
             if contract.lead_auditor_id:
                 team_id_candidates.add(int(contract.lead_auditor_id))
             team_id_candidates.update(_parse_id_list(contract.member_auditor_ids))
 
-    # Fallback: lead auditor contracts without assignment rows
-    lead_q = (
-        db.query(Contracts, Companies)
-        .outerjoin(Companies, Companies.id == Contracts.company_id)
-        .filter(Contracts.lead_auditor_id == auditor.id)
-        .order_by(Contracts.audit_period_start.desc())
-        .limit(200)
-    )
-    for contract, company in lead_q.all():
-        if int(contract.id) in seen_contracts:
-            continue
-        if str(contract.status or "").lower() in {"cancelled", "canceled"}:
-            continue
-        start = contract.audit_period_start
-        end = contract.audit_period_end
-        if filter_month and not _overlaps_month(start, end, month_start, month_end):
-            continue
-        raw_rows.append((None, contract, company))
-        seen_contracts.add(int(contract.id))
-        if contract.lead_auditor_id:
-            team_id_candidates.add(int(contract.lead_auditor_id))
-        team_id_candidates.update(_parse_id_list(contract.member_auditor_ids))
+        name_cache = _auditor_name_map(db, team_id_candidates)
 
-    name_cache = _auditor_name_map(db, team_id_candidates)
-
-    for aa, contract, company in raw_rows:
-        if aa is not None:
-            items.append(
-                _schedule_item_from_contract(
-                    db,
-                    contract,
-                    company,
-                    assignment_id=aa.id,
-                    status=aa.status,
-                    status_label=_assignment_status_label(aa.status)
-                    or _assignment_status_label(contract.status),
-                    role=aa.assignment_role or aa.role,
-                    name_cache=name_cache,
+        for aa, contract, company in raw_rows:
+            if aa is not None:
+                items.append(
+                    _schedule_item_from_contract(
+                        db,
+                        contract,
+                        company,
+                        assignment_id=aa.id,
+                        status=aa.status,
+                        status_label=_assignment_status_label(aa.status)
+                        or _assignment_status_label(contract.status),
+                        role=aa.assignment_role or aa.role,
+                        name_cache=name_cache,
+                    )
                 )
+            else:
+                items.append(
+                    _schedule_item_from_contract(
+                        db,
+                        contract,
+                        company,
+                        assignment_id=None,
+                        status=contract.status,
+                        status_label=_assignment_status_label(contract.status)
+                        or contract.status,
+                        role="lead",
+                        name_cache=name_cache,
+                    )
+                )
+
+    # 개인 불가일정 — 캘린더에서 배정과 함께 표시
+    if _table_exists(db, "auditor_unavailability"):
+        uq = db.query(AuditorUnavailability).filter(
+            AuditorUnavailability.auditor_id == auditor.id
+        )
+        if filter_month:
+            uq = uq.filter(
+                AuditorUnavailability.start_date <= month_end,
+                AuditorUnavailability.end_date >= month_start,
             )
-        else:
+        for row in uq.order_by(AuditorUnavailability.start_date.asc()).limit(300).all():
+            note = (row.note or "").strip() or None
             items.append(
-                _schedule_item_from_contract(
-                    db,
-                    contract,
-                    company,
-                    assignment_id=None,
-                    status=contract.status,
-                    status_label=_assignment_status_label(contract.status)
-                    or contract.status,
-                    role="lead",
-                    name_cache=name_cache,
+                AuditorScheduleItem(
+                    item_type="unavailability",
+                    unavailability_id=row.id,
+                    company_name="불가일정",
+                    audit_date=row.start_date,
+                    audit_period_end=row.end_date,
+                    status="unavailable",
+                    status_label="불가일정",
+                    note=note,
                 )
             )
 
     def _sort_key(it: AuditorScheduleItem):
-        return it.audit_date or date.max
+        return (
+            it.audit_date or date.max,
+            0 if (it.item_type or "assignment") == "assignment" else 1,
+            it.unavailability_id or it.assignment_id or 0,
+        )
 
     items.sort(key=_sort_key)
     return items[:limit]
@@ -1012,8 +1041,14 @@ def get_auditor_dashboard_summary(
         memberships, quals
     )
 
+    assignment_month = [
+        s for s in schedules_month if (s.item_type or "assignment") == "assignment"
+    ]
+    assignment_list = [
+        s for s in schedules_all if (s.item_type or "assignment") == "assignment"
+    ]
     kpis = AuditorKpiBlock(
-        scheduled_this_month=len(schedules_month),
+        scheduled_this_month=len(assignment_month),
         draft_reports=len(drafts),
         ncr_review_pending=len(ncrs),
         affiliation_status=aff_status,
@@ -1026,7 +1061,7 @@ def get_auditor_dashboard_summary(
         auditor_id=auditor.id,
         auditor_name=auditor.name,
         kpis=kpis,
-        schedules=schedules_all,
+        schedules=assignment_list,
         ncrs_pending=ncrs,
         draft_reports=drafts,
         memberships=memberships,
@@ -1143,7 +1178,6 @@ from fastapi import Request
 from pydantic import BaseModel, Field
 
 from app.models.auth import Notifications, Users
-from app.models.auditor import AuditorUnavailability
 from app.services.auditor_assignment_fees import (
     mark_assignment_docs_signed,
     serialize_assignment,

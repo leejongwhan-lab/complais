@@ -1036,6 +1036,104 @@ button.cal-cell.is-empty:hover,
   pointer-events: none;
 }
 
+.cal-event.is-unavailability {
+  background: rgba(90, 98, 104, 0.14);
+  color: #4a5560;
+}
+
+.aud-detail-card.is-unavailability h4 {
+  color: #4a5560;
+}
+
+.aud-unavail-form {
+  margin: 14px 0 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--portal-border, #e8ece9);
+  border-radius: var(--admin-radius-lg, 12px);
+  background: var(--portal-card, #fff);
+}
+
+.aud-unavail-form[hidden] {
+  display: none !important;
+}
+
+.aud-unavail-form h3 {
+  margin: 0 0 12px;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--portal-ink, #1e2a24);
+}
+
+.aud-unavail-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: flex-end;
+}
+
+.aud-unavail-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--portal-muted, #5f7264);
+}
+
+.aud-unavail-fields input[type="date"],
+.aud-unavail-fields input[type="text"] {
+  min-width: 150px;
+  padding: 8px 10px;
+  border: 1px solid var(--portal-border, #d7ddd8);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--portal-ink, #1e2a24);
+  background: #fff;
+}
+
+.aud-unavail-note {
+  flex: 1 1 220px;
+}
+
+.aud-unavail-note input {
+  min-width: 220px;
+  width: 100%;
+}
+
+.aud-unavail-err {
+  min-height: 1.2em;
+  margin: 10px 0 0;
+  color: var(--portal-red, #c94c52);
+}
+
+.aud-unavail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.aud-cal-nav-with-action {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.aud-cal-nav-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.aud-cal-nav-controls h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--portal-ink, var(--admin-ink, #1e2a24));
+  letter-spacing: -0.02em;
+}
+
 .cal-more {
   font-size: 0.75rem;
   font-weight: 650;

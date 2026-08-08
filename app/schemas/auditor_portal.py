@@ -19,7 +19,11 @@ class AuditorKpiBlock(BaseModel):
 
 
 class AuditorScheduleItem(BaseModel):
+    """배정 일정 또는 불가일정. item_type 으로 구분 (기본 assignment)."""
+
+    item_type: str = "assignment"  # assignment | unavailability
     assignment_id: Optional[int] = None
+    unavailability_id: Optional[int] = None
     contract_id: Optional[int] = None
     company_id: Optional[int] = None
     company_name: Optional[str] = None
@@ -39,6 +43,7 @@ class AuditorScheduleItem(BaseModel):
     company_address: Optional[str] = None
     contact_name: Optional[str] = None
     contact_phone: Optional[str] = None
+    note: Optional[str] = None
 
 
 class AuditorNcrItem(BaseModel):

@@ -741,13 +741,29 @@
     <!-- Schedules (month calendar) -->
     <section id="tab-schedules" class="tab-panel">
       <div class="aud-calendar-wrap portal-cal-wrap">
-        <div class="aud-calendar-nav portal-cal-nav">
-          <button type="button" class="btn ghost" id="aud-cal-prev" aria-label="이전 달">‹</button>
-          <h3 id="aud-cal-title">—</h3>
-          <button type="button" class="btn ghost" id="aud-cal-next" aria-label="다음 달">›</button>
+        <div class="aud-calendar-nav portal-cal-nav aud-cal-nav-with-action">
+          <div class="aud-cal-nav-controls">
+            <button type="button" class="btn ghost" id="aud-cal-prev" aria-label="이전 달">‹</button>
+            <h3 id="aud-cal-title">—</h3>
+            <button type="button" class="btn ghost" id="aud-cal-next" aria-label="다음 달">›</button>
+          </div>
+          <button type="button" class="btn" id="aud-unavail-open">불가일정 등록</button>
         </div>
-        <p class="portal-cal-hint muted">날짜를 선택하면 해당 일 배정 일정이 아래에 표시됩니다.</p>
+        <p class="portal-cal-hint muted">날짜를 선택하면 해당 일 배정·불가일정이 아래에 표시됩니다. 초록=배정, 회색=불가일정.</p>
         <div class="aud-calendar" id="aud-calendar" aria-label="심사 일정 달력"></div>
+      </div>
+      <div id="aud-unavail-form" class="aud-unavail-form" hidden>
+        <h3>불가일정 등록</h3>
+        <div class="aud-unavail-fields">
+          <label>시작일 <input type="date" id="aud-unavail-start" required /></label>
+          <label>종료일 <input type="date" id="aud-unavail-end" required /></label>
+          <label class="aud-unavail-note">사유(선택) <input type="text" id="aud-unavail-note" maxlength="200" placeholder="예: 개인 일정, 타 심사" /></label>
+        </div>
+        <p class="aud-unavail-err muted" id="aud-unavail-err" aria-live="polite"></p>
+        <div class="aud-unavail-actions">
+          <button type="button" class="btn ghost" id="aud-unavail-cancel">취소</button>
+          <button type="button" class="btn" id="aud-unavail-submit">등록</button>
+        </div>
       </div>
       <div class="aud-day-detail" id="aud-day-detail">
         <h3 id="aud-day-detail-title">날짜를 선택하세요</h3>
@@ -1137,7 +1153,7 @@
     </div>
   </div>
 
-  <script src="/static/js/auditor_portal.js?v=20260807theme1"></script>
+  <script src="/static/js/auditor_portal.js?v=20260808unavail1"></script>
   <script src="/static/js/auditor_audit_notes.js?v=20260807theme1"></script>
 </body>
 </html>

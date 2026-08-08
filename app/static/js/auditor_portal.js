@@ -3,7 +3,7 @@
   const API = "/api/v1";
   const TAB_META = {
     dashboard: { title: "대시보드", sub: "배정 일정 · 보고서 · NCR · 소속 현황" },
-    schedules: { title: "심사 일정 관리", sub: "월간 캘린더 · 배정 상세" },
+    schedules: { title: "심사 일정 관리", sub: "월간 캘린더 · 배정 · 불가일정" },
     reports: { title: "심사 보고서 · 심사노트", sub: "조항별 심사노트 · 작성 중인 보고서" },
     docs: { title: "인증심사 문서", sub: "최초·사후·갱신·전환·특별 문서세트 · Master DB 데모" },
     ncrs: { title: "시정조치(NCR) 검토", sub: "기업 제출 시정조치 검토" },
@@ -136,6 +136,10 @@
     return v == null || v === "" ? "—" : String(v);
   }
 
+  function isUnavailability(item) {
+    return (item && item.item_type) === "unavailability";
+  }
+
   function scheduleCoversDate(item, iso) {
     const start = item.audit_date ? String(item.audit_date).slice(0, 10) : null;
     const end = item.audit_period_end
@@ -143,6 +147,14 @@
       : start;
     if (!start) return false;
     return start <= iso && iso <= (end || start);
+  }
+
+  function eventChipLabel(ev) {
+    if (isUnavailability(ev)) {
+      const note = (ev.note || "").trim();
+      return note ? "불가 · " + note : "불가일정";
+    }
+    return ev.company_name || "일정";
   }
 
   function renderCalendar() {
@@ -219,12 +231,11 @@
       const list = byDate[iso] || [];
       const names = list
         .slice(0, 3)
-        .map(
-          (ev) =>
-            '<span class="cal-event">' +
-            esc(ev.company_name || "일정") +
-            "</span>"
-        )
+        .map((ev) => {
+          const cls =
+            "cal-event" + (isUnavailability(ev) ? " is-unavailability" : "");
+          return '<span class="' + cls + '">' + esc(eventChipLabel(ev)) + "</span>";
+        })
         .join("");
       const more =
         list.length > 3
@@ -269,13 +280,13 @@
         '<div class="aud-empty">캘린더에서 날짜를 클릭하면 상세가 표시됩니다.</div>';
       return;
     }
-    if (title) title.textContent = iso + " 배정 일정";
+    if (title) title.textContent = iso + " 일정";
     const dayItems = (calState.events || []).filter((ev) =>
       scheduleCoversDate(ev, iso)
     );
     if (!dayItems.length) {
       list.innerHTML =
-        '<div class="aud-empty">이 날짜에 배정된 일정이 없습니다.</div>';
+        '<div class="aud-empty">이 날짜에 등록된 일정이 없습니다.</div>';
       return;
     }
     list.innerHTML = dayItems
@@ -285,6 +296,20 @@
           (r.audit_period_end && r.audit_period_end !== r.audit_date
             ? " ~ " + fmtDate(r.audit_period_end)
             : "");
+        if (isUnavailability(r)) {
+          const uid = r.unavailability_id || "";
+          return `<article class="aud-detail-card is-unavailability">
+          <h4>불가일정</h4>
+          <dl class="aud-dl">
+            <dt>기간</dt><dd>${esc(period)}</dd>
+            <dt>사유</dt><dd>${esc(dash(r.note))}</dd>
+            <dt>구분</dt><dd>불가일정</dd>
+          </dl>
+          <div style="margin-top:10px;">
+            <button type="button" class="btn ghost" data-del-unavail="${esc(uid)}">삭제</button>
+          </div>
+        </article>`;
+        }
         return `<article class="aud-detail-card">
           <h4>${esc(r.company_name || (r.company_id ? "#" + r.company_id : "기업"))}</h4>
           <dl class="aud-dl">
@@ -305,6 +330,91 @@
         </article>`;
       })
       .join("");
+  }
+
+  function setUnavailFormOpen(open) {
+    const form = document.getElementById("aud-unavail-form");
+    const err = document.getElementById("aud-unavail-err");
+    if (!form) return;
+    form.hidden = !open;
+    if (err) err.textContent = "";
+    if (open) {
+      const start = document.getElementById("aud-unavail-start");
+      const end = document.getElementById("aud-unavail-end");
+      const note = document.getElementById("aud-unavail-note");
+      const preset = calState.selectedDate || "";
+      if (start && !start.value) start.value = preset;
+      if (end && !end.value) end.value = preset || (start && start.value) || "";
+      if (note) note.value = note.value || "";
+      if (start) start.focus();
+    }
+  }
+
+  async function submitUnavailability() {
+    const err = document.getElementById("aud-unavail-err");
+    const startEl = document.getElementById("aud-unavail-start");
+    const endEl = document.getElementById("aud-unavail-end");
+    const noteEl = document.getElementById("aud-unavail-note");
+    const start = startEl && startEl.value;
+    const end = endEl && endEl.value;
+    const note = ((noteEl && noteEl.value) || "").trim();
+    if (err) err.textContent = "";
+    if (!start || !end) {
+      if (err) err.textContent = "시작일과 종료일을 입력해 주세요.";
+      return;
+    }
+    if (end < start) {
+      if (err) err.textContent = "종료일은 시작일 이후여야 합니다.";
+      return;
+    }
+    try {
+      const res = await fetch(API + "/auditor/unavailability", {
+        method: "POST",
+        headers: authHeaders(true),
+        body: JSON.stringify({
+          start_date: start,
+          end_date: end,
+          note: note || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) return redirectLogin("세션이 만료되었습니다.");
+      if (!res.ok) {
+        const detail = data.detail;
+        throw new Error(
+          typeof detail === "string" ? detail : "불가일정 등록 실패 (" + res.status + ")"
+        );
+      }
+      if (startEl) startEl.value = "";
+      if (endEl) endEl.value = "";
+      if (noteEl) noteEl.value = "";
+      setUnavailFormOpen(false);
+      await loadSchedulesPanel();
+    } catch (e) {
+      if (err) err.textContent = e.message || "불가일정 등록 실패";
+    }
+  }
+
+  async function deleteUnavailability(rowId) {
+    if (!rowId) return;
+    if (!confirm("이 불가일정을 삭제할까요?")) return;
+    try {
+      const res = await fetch(API + "/auditor/unavailability/" + encodeURIComponent(rowId), {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (res.status === 401) return redirectLogin("세션이 만료되었습니다.");
+      if (!res.ok && res.status !== 204) {
+        const data = await res.json().catch(() => ({}));
+        const detail = data.detail;
+        throw new Error(
+          typeof detail === "string" ? detail : "삭제 실패 (" + res.status + ")"
+        );
+      }
+      await loadSchedulesPanel();
+    } catch (e) {
+      alert(e.message || "삭제 실패");
+    }
   }
 
   /* ── rendering helpers ── */
@@ -1394,6 +1504,12 @@
       renderCalendar();
       return;
     }
+    const delUnavail = evt.target.closest("[data-del-unavail]");
+    if (delUnavail) {
+      evt.preventDefault();
+      deleteUnavailability(delUnavail.getAttribute("data-del-unavail"));
+      return;
+    }
     const openReport = evt.target.closest("[data-open-report]");
     if (openReport) {
       evt.preventDefault();
@@ -1511,6 +1627,15 @@
     }
     calState.selectedDate = null;
     loadSchedulesPanel();
+  });
+  document.getElementById("aud-unavail-open")?.addEventListener("click", () => {
+    setUnavailFormOpen(true);
+  });
+  document.getElementById("aud-unavail-cancel")?.addEventListener("click", () => {
+    setUnavailFormOpen(false);
+  });
+  document.getElementById("aud-unavail-submit")?.addEventListener("click", () => {
+    submitUnavailability();
   });
 
   document.getElementById("apply-cancel")?.addEventListener("click", closeApplyModal);
