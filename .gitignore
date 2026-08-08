@@ -15,3 +15,6 @@ data/*.xlsx
 
 # One-time secret handoff (never commit)
 SECRET_KEY_FOR_RENDER.txt
+
+# E2E run output (may contain account emails / redacted tokens)
+scripts/e2e_results_latest.json
