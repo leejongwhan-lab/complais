@@ -253,8 +253,8 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
 <div id="hdr">
   <div class="logo">ComplAIs <small>2단계 심사보고서 — ISO/IEC 17021-1 §9.3.1.3</small></div>
   <div class="hdr-r">
-    <span id="conn-badge" class="cb-wait">⚡ 연계 대기</span>
-    <button class="hbtn" onclick="requestData()">📡 심사노트 연계</button>
+    <span id="conn-badge" class="cb-wait">⚡ 심사노트 대기</span>
+    <button class="hbtn" onclick="requestData()">📡 심사노트 불러오기</button>
     <button class="hbtn no-print" onclick="window.print()">🖨️ 인쇄 / PDF</button>
   </div>
 </div>
@@ -320,9 +320,10 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
     </div>
   </div>
   <div class="cp-tip no-print">
-    💡 <b>audit_v15_final.html (심사노트)</b>를 같은 브라우저에서 열고
-    헤더의 <b>[📄 2단계 보고서 전송]</b> 버튼을 클릭하면 심사 데이터가 자동으로 연계됩니다.<br>
-    또는 이 페이지의 <b>[📡 심사노트 연계]</b> 버튼으로 요청할 수 있습니다.
+    💡 페이지 로드 시 <b>심사노트 API</b>(<code>/api/v1/auditor/audit-notes/session</code> ·
+    <code>/matrix</code>)에서 계약(<code>contract_id</code>) 기준 데이터를 자동으로 불러옵니다.<br>
+    심사원 포털에 로그인한 상태여야 하며, 기록이 없는 조항은
+    <b>「심사노트에 기록 없음」</b>으로 표시됩니다.
   </div>
 </div>
 
@@ -332,10 +333,10 @@ body{font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif
     <div style="text-align:center;padding:50px;color:var(--text3)">
       <div style="font-size:36px;opacity:.15;margin-bottom:10px">📋</div>
       <div style="font-size:13px;font-weight:600;margin-bottom:5px">2단계 심사보고서</div>
-      <div style="font-size:11px">기본 정보 입력 후 심사노트에서 [📄 보고서 연동 전송]을 클릭하세요</div>
+      <div style="font-size:11px">기본 정보 확인 후 심사노트 데이터를 불러오세요</div>
       <button class="hbtn no-print" style="margin-top:14px;background:var(--blue);border-color:var(--blue);
               color:#fff;padding:8px 20px;font-size:11px;border-radius:6px" onclick="requestData()">
-        📡 심사노트 연계 요청
+        📡 심사노트 불러오기
       </button>
     </div>
   </div>
@@ -2705,47 +2706,287 @@ const KPI_LIB = {
 let auditData={saved:{},obsData:{},coName:'',selectedStds:[],auditMode:'clause',auditDate:''};
 let extra={opinion:'',s1summary:'',closing_note:''};
 let connected=false;
+/** Clauses built from audit-notes API (preferred over hardcoded CLAUSES). */
+let apiClauses=null;
+const EMPTY_NOTE='심사노트에 기록 없음';
+const NOTES_API='/api/v1/auditor/audit-notes';
+let _notesLoading=false;
 
 // ════════════════════════════════════════
-// BroadcastChannel 연계
+// 심사노트 API 연계 (BroadcastChannel 제거)
 // ════════════════════════════════════════
-const bc = new BroadcastChannel('complais_audit');
+function notesAuthHeaders(){
+  const t=localStorage.getItem('access_token')||'';
+  return {Authorization:'Bearer '+t};
+}
 
-bc.onmessage = function(e){
-  if(e.data.type==='AUDIT_DATA'){
-    auditData = e.data.data;
-    connected = true;
-    const badge=document.getElementById('conn-badge');
-    badge.className='cb-ok';
-    const cnt=Object.keys(auditData.saved||{}).length;
-    badge.textContent=`✅ 연계됨 (${cnt}개 조항)`;
-    // 기업명 자동 입력
-    if(auditData.coName && !document.getElementById('f-org').value)
-      document.getElementById('f-org').value=auditData.coName;
-    // 표준 자동 입력
-    if(auditData.selectedStds?.length && !document.getElementById('f-std').value){
-      document.getElementById('f-std').value=
-        auditData.selectedStds.map(k=>{const st=STANDARDS.find(x=>x.k===k);return st?st.label:k;}).join(', ');
-    }
-    if(auditData.auditDate && !document.getElementById('f-date').value)
-      document.getElementById('f-date').value=auditData.auditDate;
-    render();
+function mapApiVerdict(verdict, ncrGrade){
+  const g=String(ncrGrade||'').toLowerCase();
+  const v=String(verdict||'').trim();
+  if(g==='major'||v==='major'||v.indexOf('중대')>=0) return 'major';
+  if(g==='minor'||v==='minor'||v.indexOf('경미')>=0) return 'minor';
+  if(g==='observation'||g==='obs'||v==='obs'||v==='observation'||v.indexOf('관찰')>=0) return 'obs';
+  if(v==='적합'||v==='ok'||v==='conform'||v.toLowerCase()==='ok') return 'ok';
+  return '';
+}
+
+function resolveContractId(ctx){
+  const params=new URLSearchParams(location.search);
+  const fromUrl=params.get('contract_id')||params.get('contract')||'';
+  const m=(ctx&&ctx.master)||{};
+  const fromCtx=m.contract_id||(ctx&&ctx.contract&&ctx.contract.id)||'';
+  const fromMaster=window.ComplaisAuditDocMaster&&window.ComplaisAuditDocMaster.context;
+  const m2=(fromMaster&&fromMaster.master)||{};
+  return String(fromUrl||fromCtx||m2.contract_id||(fromMaster&&fromMaster.contract&&fromMaster.contract.id)||'').trim();
+}
+
+function resolveStandardKeys(ctx){
+  const fromCtx=(ctx&&ctx.selected_standard_keys)||[];
+  const fromMaster=window.ComplaisAuditDocMaster&&window.ComplaisAuditDocMaster.context;
+  const keys=fromCtx.length?fromCtx:(fromMaster&&fromMaster.selected_standard_keys)||[];
+  if(Array.isArray(keys)&&keys.length) return keys.slice();
+  if(Array.isArray(auditData.selectedStds)&&auditData.selectedStds.length) return auditData.selectedStds.slice();
+  return [];
+}
+
+async function fetchNotesJson(url){
+  const res=await fetch(url,{credentials:'same-origin',headers:notesAuthHeaders()});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){
+    const detail=data.detail||('HTTP '+res.status);
+    const err=new Error(typeof detail==='string'?detail:JSON.stringify(detail));
+    err.status=res.status;
+    throw err;
   }
-};
+  return data;
+}
+
+function applySessionMetaFields(sess){
+  if(!sess) return;
+  if(sess.company_name && !document.getElementById('f-org').value)
+    document.getElementById('f-org').value=sess.company_name;
+  if(sess.cb_name && !document.getElementById('f-cb').value)
+    document.getElementById('f-cb').value=sess.cb_name;
+  if(sess.auditor_name && !document.getElementById('f-lead').value)
+    document.getElementById('f-lead').value=sess.auditor_name;
+  if(sess.audit_date && !document.getElementById('f-date').value)
+    document.getElementById('f-date').value=sess.audit_date;
+  if(sess.standards_label && !document.getElementById('f-std').value)
+    document.getElementById('f-std').value=sess.standards_label;
+  const at=String(sess.audit_type||'').toLowerCase();
+  if(at){
+    let mapped=null;
+    if(at.indexOf('recert')>=0||at.indexOf('renew')>=0||at.indexOf('갱신')>=0||at.indexOf('재인증')>=0) mapped='recert';
+    else if(at.indexOf('surv')>=0||at.indexOf('사후')>=0){
+      mapped=(at.indexOf('2')>=0||at.indexOf('second')>=0)?'surv2':'surv1';
+    } else if(at.indexOf('initial')>=0||at.indexOf('최초')>=0) mapped='initial';
+    if(mapped && typeof setAuditType==='function') setAuditType(mapped);
+  }
+}
+
+function buildInterviewFromSession(sess){
+  const entries=(sess&&sess.interview_entries)||[];
+  if(!entries.length){
+    const legacy=(sess&&sess.interview_content)||'';
+    if(!legacy) return {};
+    return {legacy:[{role:'면담',content:legacy,note:legacy}]};
+  }
+  const byRole={};
+  entries.forEach(iv=>{
+    const rk=iv.role_key||iv.role||'interview';
+    if(!byRole[rk]) byRole[rk]=[];
+    byRole[rk].push({
+      role:iv.role||rk,
+      dept:iv.dept||'',
+      note:iv.qa_content||iv.overall||'',
+      content:iv.qa_content||'',
+      summary:iv.overall||'',
+      findings:'',
+      mandatory:false
+    });
+  });
+  return byRole;
+}
+
+function applyAuditNotesPayload(sessions, matrix){
+  const saved={}, obsData={}, kpiVal={};
+  const selectedStds=[];
+  const clauses=[];
+  const seen=new Set();
+
+  (sessions||[]).forEach(sess=>{
+    const sk=sess.standard_key;
+    if(sk && selectedStds.indexOf(sk)<0) selectedStds.push(sk);
+    (sess.standards||[]).forEach(s=>{
+      const k=s.standard_key;
+      if(k && selectedStds.indexOf(k)<0) selectedStds.push(k);
+    });
+    (sess.clauses||[]).forEach(c=>{
+      const stdKey=c.standard_key||sk||'';
+      const clauseNo=String(c.clause_no||'').trim();
+      if(!clauseNo) return;
+      const uniq=stdKey+'|'+clauseNo+'|'+(c.note_seq||1);
+      if(seen.has(uniq)) return;
+      seen.add(uniq);
+      const labelTopic=(c.clause_topic||c.clause_title||'').trim();
+      clauses.push({
+        id:clauseNo,
+        std:stdKey,
+        g:c.process_group_name||c.group_name||'조항',
+        label:(clauseNo+(labelTopic?(' '+labelTopic):'')).trim()
+      });
+      const verdict=mapApiVerdict(c.verdict, c.ncr_grade);
+      const noteText=(c.note_text||c.ncr_fact||'').trim();
+      const hasData=!!(verdict||noteText||(c.kpi_values&&Object.keys(c.kpi_values).length));
+      if(!hasData) return;
+      const key=clauseNo+'|'+stdKey;
+      saved[key]={
+        verdict:verdict||'',
+        note:noteText,
+        doc:'',
+        kpiVals:c.kpi_values||{}
+      };
+      if(verdict==='major'||verdict==='minor'||verdict==='obs'){
+        obsData[key]={
+          finding:c.ncr_fact||noteText||'',
+          req:c.ncr_requirement||'',
+          recommend:'',
+          dept:c.ncr_dept||'',
+          due:c.ncr_due_date||''
+        };
+      }
+      if(c.kpi_values&&Object.keys(c.kpi_values).length) kpiVal[key]=c.kpi_values;
+    });
+  });
+
+  // Matrix fills verdict-only cells / missing clauses not returned by a session
+  (matrix&&matrix.cells||[]).forEach(cell=>{
+    const clauseNo=String(cell.clause_no||'').trim();
+    const stdKey=cell.standard_key||(matrix&&matrix.standard_key)||'';
+    if(!clauseNo) return;
+    const uniq=stdKey+'|'+clauseNo+'|1';
+    if(!seen.has(uniq)){
+      seen.add(uniq);
+      const labelTopic=(cell.clause_topic||cell.clause_title||'').trim();
+      clauses.push({
+        id:clauseNo,
+        std:stdKey,
+        g:cell.process_group_name||cell.group_name||'조항',
+        label:(clauseNo+(labelTopic?(' '+labelTopic):'')).trim()
+      });
+    }
+    if(stdKey && selectedStds.indexOf(stdKey)<0) selectedStds.push(stdKey);
+    const key=clauseNo+'|'+stdKey;
+    if(saved[key]) return;
+    const verdict=mapApiVerdict(cell.verdict, null);
+    if(verdict || cell.written){
+      saved[key]={verdict:verdict||'', note:'', doc:'', kpiVals:{}};
+    }
+  });
+
+  const primary=sessions&&sessions[0];
+  apiClauses=clauses;
+  auditData={
+    saved,
+    obsData,
+    kpiVal,
+    coName:(primary&&primary.company_name)||'',
+    selectedStds,
+    auditMode:(primary&&primary.note_method)||(matrix&&matrix.note_method)||'clause',
+    auditDate:(primary&&primary.audit_date)||'',
+    interviewData:buildInterviewFromSession(primary),
+    matrix:matrix||null,
+    sessions:sessions||[]
+  };
+  connected=true;
+  applySessionMetaFields(primary);
+  if(selectedStds.length && !document.getElementById('f-std').value){
+    document.getElementById('f-std').value=selectedStds.map(k=>{
+      const st=STANDARDS.find(x=>x.k===k||x.standard_key===k);
+      return st?(st.label||st.display_code||st.l||k):k;
+    }).join(', ');
+  }
+  const badge=document.getElementById('conn-badge');
+  const written=(matrix&&matrix.written_count!=null)?matrix.written_count:Object.keys(saved).length;
+  const required=(matrix&&matrix.required_count!=null)?matrix.required_count:clauses.length;
+  badge.className='cb-ok';
+  badge.textContent=`✅ 심사노트 연동 (${written}/${required} 조항)`;
+  render();
+}
+
+async function loadAuditNotesFromApi(ctx, opts){
+  opts=opts||{};
+  if(_notesLoading) return;
+  const contractId=resolveContractId(ctx);
+  const badge=document.getElementById('conn-badge');
+  if(!contractId){
+    badge.className='cb-err';
+    badge.textContent='⚠️ contract_id 없음';
+    if(opts.manual){
+      alert('contract_id가 없습니다.\nURL에 ?demo=1&contract_id=… 를 붙여 다시 열어주세요.');
+    }
+    return;
+  }
+  if(!(localStorage.getItem('access_token')||'').trim()){
+    badge.className='cb-err';
+    badge.textContent='⚠️ 로그인 필요';
+    if(opts.manual){
+      alert('심사노트 API는 심사원 로그인이 필요합니다.\n심사원 포털에 로그인한 뒤 이 페이지를 새로고침하세요.');
+    }
+    return;
+  }
+  _notesLoading=true;
+  badge.className='cb-wait';
+  badge.textContent='⏳ 심사노트 불러오는 중…';
+  try{
+    const params=new URLSearchParams(location.search);
+    const teamMeeting=params.get('team_meeting')==='1'||params.get('team_meeting')==='true';
+    const stdKeys=resolveStandardKeys(ctx);
+    const teamQ=teamMeeting?'&team_meeting=1':'';
+    const sessionPromises=stdKeys.length
+      ? stdKeys.map(sk=>fetchNotesJson(
+          NOTES_API+'/session?contract_id='+encodeURIComponent(contractId)+
+          '&standard_key='+encodeURIComponent(sk)+teamQ
+        ))
+      : [fetchNotesJson(
+          NOTES_API+'/session?contract_id='+encodeURIComponent(contractId)+teamQ
+        )];
+    const matrixPromise=fetchNotesJson(
+      NOTES_API+'/matrix?contract_id='+encodeURIComponent(contractId)+
+      '&all_standards=true'+teamQ
+    ).catch(err=>{
+      console.warn('[stage2_report] matrix fetch failed', err);
+      return null;
+    });
+    const [sessions, matrix]=await Promise.all([
+      Promise.all(sessionPromises),
+      matrixPromise
+    ]);
+    applyAuditNotesPayload(sessions, matrix);
+  }catch(err){
+    console.warn('[stage2_report] audit-notes load failed', err);
+    badge.className='cb-err';
+    badge.textContent=err.status===401||err.status===403
+      ? '⚠️ 인증 실패'
+      : '⚠️ 심사노트 로드 실패';
+    if(opts.manual){
+      alert('심사노트 데이터를 불러오지 못했습니다.\n\n'+
+        (err.message||String(err))+
+        '\n\n심사원 포털 로그인 상태와 contract_id를 확인하세요.');
+    }
+  }finally{
+    _notesLoading=false;
+  }
+}
 
 function requestData(){
-  bc.postMessage({type:'REQUEST_DATA'});
-  const badge=document.getElementById('conn-badge');
-  badge.className='cb-wait';
-  badge.textContent='⏳ 데이터 요청 중...';
-  setTimeout(()=>{
-    if(!connected){
-      badge.className='cb-err';
-      badge.textContent='⚠️ 응답 없음';
-      alert('심사노트에서 응답이 없습니다.\n\n1. audit_v9_final.html을 같은 브라우저에서 열어주세요.\n2. 헤더의 [📄 보고서 연동 전송] 버튼을 클릭하세요.\n3. 또는 새로고침 후 다시 시도해 주세요.');
-    }
-  }, 3000);
+  const ctx=(window.ComplaisAuditDocMaster&&window.ComplaisAuditDocMaster.context)||null;
+  loadAuditNotesFromApi(ctx,{manual:true});
 }
+
+document.addEventListener('complais-audit-doc-ready', function(ev){
+  loadAuditNotesFromApi(ev.detail||null,{manual:false});
+});
 
 // ════════════════════════════════════════
 // 유틸
@@ -2753,9 +2994,15 @@ function requestData(){
 function v(id){ return document.getElementById(id)?.value||''; }
 
 function getActiveClauses(){
+  if(Array.isArray(apiClauses) && apiClauses.length) return apiClauses;
   const stds=new Set(['c',...(auditData.selectedStds||[])]);
   if(stds.has('e')) stds.add('e26');
   if(stds.has('e26')) stds.add('e');
+  // Master DB chips use standard_key (QMS_2015…); map legacy short keys when possible
+  (auditData.selectedStds||[]).forEach(k=>{
+    const st=STANDARDS.find(x=>x.k===k||x.standard_key===k);
+    if(st&&st.legacy_k) stds.add(st.legacy_k);
+  });
   return CLAUSES.filter(cl=>cl.std==='c'||stds.has(cl.std));
 }
 
@@ -2776,9 +3023,9 @@ function calcCertDecision(clauses){
   let major=0, minor=0, obs=0, ok=0, total=0;
   const majorList=[], minorList=[], obsList=[];
   clauses.forEach(cl=>{
-    const d=getSavedClause(cl.id,cl.std);
-    if(!d) return;
     total++;
+    const d=getSavedClause(cl.id,cl.std);
+    if(!d || !d.verdict) return;
     if(d.verdict==='major'){ major++; majorList.push(cl); }
     else if(d.verdict==='minor'){ minor++; minorList.push(cl); }
     else if(d.verdict==='obs'){ obs++; obsList.push(cl); }
@@ -2787,7 +3034,7 @@ function calcCertDecision(clauses){
   const audited=major+minor+obs+ok;
   let decision, dClass, icon, text, desc, color;
   if(audited===0){ decision='pending'; dClass='pend'; icon='🔲';
-    text='심사 데이터 없음'; desc='심사노트에서 데이터를 연계하세요.'; color='#475569'; }
+    text='심사 데이터 없음'; desc='심사노트 API에서 조항 기록을 불러오거나, 심사노트에 판정을 저장하세요.'; color='#475569'; }
   else if(major>0){ decision='deny'; dClass='deny'; icon='❌';
     text='인증 불승인 — 중부적합 해소 필요';
     desc=`중부적합(Major) ${major}건이 발견되었습니다. 모든 중부적합 사항에 대한 시정조치 완료 및 검증 후 인증 결정이 가능합니다.`;
@@ -2811,7 +3058,7 @@ function render(){
   const org=v('f-org')||'(피심사 조직)';
   if(org==='(피심사 조직)'&&!connected){
     document.getElementById('rpt-inner').innerHTML=
-      '<div style="text-align:center;padding:50px;color:var(--text3)"><div style="font-size:36px;opacity:.15;margin-bottom:10px">📋</div><div style="font-size:13px;font-weight:600;margin-bottom:5px">2단계 심사보고서</div><div style="font-size:11px">기본 정보 입력 후 심사노트에서 [📄 보고서 연동 전송]을 클릭하세요</div></div>';
+      '<div style="text-align:center;padding:50px;color:var(--text3)"><div style="font-size:36px;opacity:.15;margin-bottom:10px">📋</div><div style="font-size:13px;font-weight:600;margin-bottom:5px">2단계 심사보고서</div><div style="font-size:11px">기본 정보 확인 후 [📡 심사노트 불러오기]를 클릭하세요</div></div>';
     return;
   }
 
@@ -2851,7 +3098,8 @@ function render(){
   const groups={};
   clauses.forEach(cl=>{ if(!groups[cl.g]) groups[cl.g]=[]; groups[cl.g].push(cl); });
   const vMap={major:{cls:'v-major',txt:'❌ 중부적합'},minor:{cls:'v-minor',txt:'⚠️ 경부적합'},
-              obs:{cls:'v-obs',txt:'🔵 관찰사항'},ok:{cls:'v-ok',txt:'✅ 적합'},'':{'cls':'v-empty',txt:'—'}};
+              obs:{cls:'v-obs',txt:'🔵 관찰사항'},ok:{cls:'v-ok',txt:'✅ 적합'},
+              '':{cls:'v-empty',txt:EMPTY_NOTE}};
   const trMap={major:'tr-major',minor:'tr-minor',obs:'tr-obs',ok:'tr-ok','':''};
   Object.entries(groups).forEach(([g,gCls])=>{
     clauseRows+=`<tr class="g-row"><td colspan="5">${g}</td></tr>`;
@@ -2859,13 +3107,17 @@ function render(){
       const d=getSavedClause(cl.id,cl.std);
       const vv=d?.verdict||'';
       const vi=vMap[vv]||vMap[''];
-      const st=STANDARDS.find(x=>x.k===cl.std);
+      const st=STANDARDS.find(x=>x.k===cl.std||x.standard_key===cl.std);
+      const noteSummary=d
+        ? ((d.note||'').slice(0,80)+((d.note||'').length>80?'...':''))
+        : EMPTY_NOTE;
+      const docCell=d?(d.doc||'—'):EMPTY_NOTE;
       clauseRows+=`<tr class="${trMap[vv]||''}">
-        <td><span class="chip ${st?st.cls:'chip-c'}">${st?st.short:'공통'}</span></td>
+        <td><span class="chip ${st?st.cls:'chip-c'}">${st?(st.short||st.s||st.family_code||'표준'):'표준'}</span></td>
         <td style="min-width:150px;font-size:10px">${cl.label}</td>
-        <td><span class="${vi.cls}">${vi.txt}</span></td>
-        <td style="font-size:9px;max-width:130px;color:var(--text2)">${d?.doc||''}</td>
-        <td style="font-size:9px;max-width:130px;color:var(--text2)">${(d?.note||'').slice(0,80)+(d?.note?.length>80?'...':'')}</td>
+        <td><span class="${vi.cls}">${d&&vv?vi.txt:EMPTY_NOTE}</span></td>
+        <td style="font-size:9px;max-width:130px;color:var(--text2)">${docCell}</td>
+        <td style="font-size:9px;max-width:130px;color:var(--text2)">${noteSummary||EMPTY_NOTE}</td>
       </tr>`;
     });
   });
@@ -2887,7 +3139,7 @@ function render(){
         <span class="nc-std">§${cl.id}</span>
       </div>
       <div class="nc-clause">${cl.label}</div>
-      <div class="nc-body" style="margin-top:6px">${obs.finding||d.note||'(심사 내용 참조)'}</div>
+      <div class="nc-body" style="margin-top:6px">${obs.finding||d.note||EMPTY_NOTE}</div>
       ${obs.req||obs.recommend?`
       <div class="nc-meta">
         ${obs.req?`<span class="nc-mk">요구사항</span><span class="nc-mv">${obs.req}</span>`:''}
@@ -3322,17 +3574,17 @@ function buildMatrix(clauses){
   Object.entries(groups).forEach(([g, gCls])=>{
     rows += `<tr><td colspan="${3+types.length}" class="group-row">${g}</td></tr>`;
     gCls.forEach(cl=>{
-      const st = STANDARDS.find(x=>x.k===cl.std);
+      const st = STANDARDS.find(x=>x.k===cl.std||x.standard_key===cl.std);
       const res = getAuditResult(cl.id, cl.std);
 
-      // 결과 아이콘
+      // 결과 아이콘 — 미기록은 빈칸/대시가 아니라 명시 문구
       const resIcon = {
         ok: '<span class="mi-done">✓</span>',
         major: '<span class="mi-nc">✗ NC(M)</span>',
         minor: '<span class="mi-nc" style="color:var(--amber)">✗ NC(m)</span>',
         obs: '<span style="color:var(--blue);font-size:10px;font-weight:700">● OBS</span>',
-        not_audited: '<span class="mi-na">—</span>',
-      }[res] || '<span class="mi-na">—</span>';
+        not_audited: `<span class="mi-na" style="font-size:8px;color:var(--text3)">${EMPTY_NOTE}</span>`,
+      }[res] || `<span class="mi-na" style="font-size:8px;color:var(--text3)">${EMPTY_NOTE}</span>`;
 
       // 각 심사 유형 셀
       const typeCells = types.map(t=>{
@@ -3377,7 +3629,7 @@ function buildMatrix(clauses){
 
       rows += `<tr style="${trBg}">
         <td style="padding:5px 7px">
-          <span class="chip ${st?st.cls:'chip-c'}" style="font-size:8px;padding:1px 4px;margin-right:3px">${st?st.short:'공통'}</span>
+          <span class="chip ${st?st.cls:'chip-c'}" style="font-size:8px;padding:1px 4px;margin-right:3px">${st?(st.short||st.s||st.family_code||'표준'):'표준'}</span>
           <span style="font-size:9px;font-weight:600">${cl.id}</span>
         </td>
         <td style="font-size:9px;max-width:180px;padding:5px 7px">${cl.label}</td>
@@ -3436,9 +3688,18 @@ try{
   if(b) b.classList.toggle('active', x===auditType);
 });
 
-// 자동 연계 요청
-setTimeout(()=>{ if(!connected) requestData(); }, 500);
+// Master context 이벤트 대기; 이미 로드됐으면 즉시 API 호출
+setTimeout(function(){
+  if(connected || _notesLoading) return;
+  const master=window.ComplaisAuditDocMaster;
+  if(master && master.enabled && master.context){
+    loadAuditNotesFromApi(master.context,{manual:false});
+    return;
+  }
+  const cid=resolveContractId(null);
+  if(cid) loadAuditNotesFromApi(null,{manual:false});
+}, 800);
 </script>
-<script src="/static/js/audit_doc_master.js?v=20260807demo2"></script>
+<script src="/static/js/audit_doc_master.js?v=20260808notes1"></script>
 </body>
 </html>
