@@ -8,9 +8,10 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.user_common import require_enterprise_user, resolve_company_id
@@ -33,6 +34,7 @@ from app.models.auth import Notifications, Users
 from app.models.certification import (
     Certificates,
     CertificationApplicationAnswers,
+    CertificationApplicationMdReviews,
     CertificationApplicationReviewLogs,
     CertificationApplications,
     CompanyKsicCodes,
@@ -47,6 +49,8 @@ from app.schemas.enterprise_cert import (
     EnterpriseCertSubmitIn,
     OkOut,
 )
+from app.services.cb_md_rate import calculate_agreed_amount
+from app.services.cert_app_md import parse_standards_json
 from app.services.company_aspects import (
     aspects_to_dict,
     get_company_aspects,
@@ -518,10 +522,11 @@ def _notify_users(
 @router.post("/{application_id}/company-accept", response_model=OkOut)
 def company_accept(
     application_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> OkOut:
-    """기업 확인(동의): approved → contracted."""
+    """기업 확인(동의): approved → contracted + Contracts 서명/금액 확정."""
     require_enterprise_user(current_user)
     company_id = resolve_company_id(current_user)
     app = _get_app_for_company(db, application_id, company_id)
@@ -531,11 +536,62 @@ def company_accept(
             status_code=400,
             detail="승인(조율대기) 상태에서만 확인할 수 있습니다.",
         )
+    if not app.contract_id:
+        raise HTTPException(status_code=400, detail="연결된 계약(Draft)이 없습니다.")
+
+    contract = db.get(Contracts, int(app.contract_id))
+    if contract is None:
+        raise HTTPException(status_code=404, detail="연결된 계약을 찾을 수 없습니다.")
+
+    md_row = (
+        db.query(CertificationApplicationMdReviews)
+        .filter(CertificationApplicationMdReviews.application_id == app.id)
+        .first()
+    )
+    final_md = float(md_row.final_md) if md_row and md_row.final_md else float(contract.total_md or 0)
+    standards = parse_standards_json(app.standards_json)
+    std_codes = [
+        (s.get("code") if isinstance(s, dict) else s) for s in standards if s
+    ]
+    std_codes = [str(c) for c in std_codes if c]
+    agreed = calculate_agreed_amount(
+        db,
+        cb_id=int(app.cb_id or contract.cb_id),
+        standard_codes=std_codes,
+        final_md=final_md,
+    )
+    if agreed <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="계약금 산출 실패 — CB 표준별 MD 단가(cb_std_md_rates 등)와 final_md를 확인하세요.",
+        )
+
+    client_ip = None
+    if request is not None:
+        client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
+            request.client.host if request.client else None
+        )
+
     now = datetime.now()
     after = "contracted"
     try:
         app.status = after
         app.updated_at = now
+
+        contract.agreed_amount = agreed
+        contract.total_md = Decimal(str(final_md))
+        contract.audit_days = Decimal(str(final_md))
+        contract.fee_audit = int(agreed)
+        contract.fee_total = int(agreed) + int(contract.fee_travel or 0)
+        contract.client_signed_at = now
+        contract.client_signed_by = current_user.id
+        if hasattr(contract, "client_signed_ip"):
+            contract.client_signed_ip = client_ip
+        # draft → signed (배정 전원 confirmed 시 scheduled로 승격)
+        if str(contract.status or "").lower() in ("draft", "approved", ""):
+            contract.status = "signed"
+        contract.updated_at = now
+
         _add_review_log(
             db,
             app.id,
@@ -543,7 +599,7 @@ def company_accept(
             "company_accept",
             before,
             after,
-            "기업 확인(동의)",
+            f"기업 확인(동의); agreed_amount={agreed}",
         )
         app_no = app.application_no or str(app.id)
         _notify_users(
@@ -551,7 +607,10 @@ def company_accept(
             _cb_notify_user_ids(db, app.cb_id),
             ntype="cert_app_company_accepted",
             title="기업이 인증신청을 확인했습니다",
-            body=f"신청번호 {app_no} — 기업이 확인(동의)하여 계약 단계로 진행합니다.",
+            body=(
+                f"신청번호 {app_no} — 기업이 확인(동의)하여 계약 단계로 진행합니다. "
+                f"계약금 {int(agreed):,}원 (MD {final_md})."
+            ),
             link="/cb-portal",
             sent_at=now,
         )
@@ -570,7 +629,13 @@ def company_accept(
         id=app.id,
         application_no=app.application_no,
         contract_id=app.contract_id,
-        data={"status": after, "status_label": "계약완료"},
+        data={
+            "status": after,
+            "status_label": "계약완료",
+            "agreed_amount": float(agreed),
+            "final_md": final_md,
+            "contract_status": contract.status,
+        },
     )
 
 

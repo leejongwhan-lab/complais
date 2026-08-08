@@ -722,3 +722,17 @@ class AuditorManagedCompanies(Base):
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class AuditorUnavailability(Base):
+    """심사원 개인 불가 일정 — filter_candidate_auditors existing_schedules 원천."""
+
+    __tablename__ = "auditor_unavailability"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    auditor_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="불가 사유")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

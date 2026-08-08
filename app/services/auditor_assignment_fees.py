@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.audit import AuditAssignments, AuditDocuments
 from app.models.auditor import Auditor, AuditorCbMemberships, AuditorConductSigns, AuditorManagedCompanies
 from app.models.cb import CbAuditorRoleRates
+from app.models.contract import Contracts
 from app.services.settlement_calculator import (
     calculate_assignment_fee,
     resolve_fee_type_for_auditor,
@@ -188,7 +189,7 @@ def ensure_auditor_assignment_docs(
     created_by: Optional[int],
     now: Optional[datetime] = None,
 ) -> List[int]:
-    """CONFIRMED 배정 시 AUDITOR_CONTRACT / NDA 문서 초안 생성(중복 방지)."""
+    """배정(assigned) 시 AUDITOR_CONTRACT / NDA 문서 초안 생성(중복 방지)."""
     now = now or datetime.now()
     created_ids: List[int] = []
     specs = (
@@ -250,6 +251,76 @@ def ensure_auditor_assignment_docs(
         db.flush()
         created_ids.append(int(doc.id))
     return created_ids
+
+
+def mark_assignment_docs_signed(
+    db: Session,
+    *,
+    contract_id: int,
+    auditor_id: int,
+    signed_by_user_id: Optional[int],
+    signed_ip: Optional[str] = None,
+    now: Optional[datetime] = None,
+) -> List[int]:
+    """심사원 accept 시 AUDITOR_CONTRACT/NDA → signed/completed + 서명 메타(data JSON)."""
+    now = now or datetime.now()
+    updated: List[int] = []
+    rows = (
+        db.query(AuditDocuments)
+        .filter(
+            AuditDocuments.contract_id == contract_id,
+            AuditDocuments.doc_type.in_([DOC_AUDITOR_CONTRACT, DOC_NDA]),
+            AuditDocuments.doc_subtype.in_(
+                [f"auditor:{auditor_id}", f"nda:{auditor_id}"]
+            ),
+        )
+        .all()
+    )
+    for doc in rows:
+        meta: Dict[str, Any] = {}
+        if doc.data:
+            try:
+                parsed = json.loads(doc.data)
+                if isinstance(parsed, dict):
+                    meta = parsed
+            except Exception:
+                meta = {"raw": doc.data}
+        meta["signed_at"] = now.isoformat(timespec="seconds")
+        meta["signed_by_user_id"] = signed_by_user_id
+        if signed_ip:
+            meta["signed_ip"] = signed_ip
+            meta["ip_address"] = signed_ip
+        doc.data = json.dumps(meta, ensure_ascii=False)
+        doc.status = "signed"
+        doc.doc_status = "completed"
+        doc.updated_by = signed_by_user_id
+        updated.append(int(doc.id))
+    return updated
+
+
+def sync_contract_scheduled_if_all_confirmed(db: Session, contract: Contracts) -> bool:
+    """전원 confirmed일 때만 contracts.status=scheduled. 아니면 scheduled→draft(서명후) 유지하지 않음.
+
+    이미 signed 등 상위 상태는 건드리지 않고, scheduled만 조건부 설정/해제한다.
+    """
+    rows = (
+        db.query(AuditAssignments.status)
+        .filter(AuditAssignments.contract_id == contract.id)
+        .all()
+    )
+    if not rows:
+        return False
+    statuses = [(r[0] or "").lower() for r in rows]
+    all_confirmed = all(s == "confirmed" for s in statuses)
+    cur = (contract.status or "").lower()
+    if all_confirmed:
+        if cur != "scheduled":
+            contract.status = "scheduled"
+        return True
+    # 미전원 확정: scheduled 였으면 되돌림(재배정/조율 중)
+    if cur == "scheduled":
+        contract.status = "signed" if getattr(contract, "client_signed_at", None) else "draft"
+    return False
 
 
 def serialize_assignment(row: AuditAssignments) -> Dict[str, Any]:

@@ -50,7 +50,9 @@ from app.services.auditor_assignment_fees import (
     default_assigned_days,
     ensure_auditor_assignment_docs,
     serialize_assignment,
+    sync_contract_scheduled_if_all_confirmed,
 )
+from app.services.auditor_unavailability import find_unavailability_conflicts
 from app.services.cert_app_md import (
     compute_base_md_for_app,
     md_review_to_dict,
@@ -803,10 +805,9 @@ def assign_auditors(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_cb_portal_user),
 ) -> OkOut:
-    """System1 심사원 배정 — Contracts + audit_assignments (+ 수수료 스냅샷).
+    """System1 심사원 배정 — status=assigned + 문서 초안 + 심사원 알림.
 
-    cb_admin.assign_auditors(DEPRECATED) 를 참고하되 AuditApplication/audit_contracts 가 아닌
-    CertificationApplications / contracts / audit_assignments 조합으로 저장한다.
+    confirm 플래그는 deprecated(무시). 확정은 심사원 accept 에서만 이뤄진다.
     """
     app = _get_app_for_cb(db, app_id, int(current_user.cb_id))  # type: ignore[arg-type]
     if not app.contract_id:
@@ -824,6 +825,23 @@ def assign_auditors(
     assert_auditors_exist(db, all_ids)
     assert_conduct_signs(db, all_ids)
 
+    conflicts = find_unavailability_conflicts(
+        db,
+        auditor_ids=all_ids,
+        audit_start=payload.audit_start,
+        audit_end=payload.audit_end,
+    )
+    if conflicts:
+        detail = "; ".join(
+            f"auditor_id={c.auditor_id} {c.start_date}~{c.end_date}"
+            + (f" ({c.note})" if c.note else "")
+            for c in conflicts[:5]
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"심사원 불가일정과 겹칩니다: {detail}",
+        )
+
     contract = db.get(Contracts, int(app.contract_id))
     if contract is None:
         raise HTTPException(status_code=404, detail="연결된 계약을 찾을 수 없습니다.")
@@ -840,11 +858,11 @@ def assign_auditors(
         assigned_days=payload.assigned_days,
     )
     now = datetime.now()
-    status_val = "confirmed" if payload.confirm else "assigned"
+    # confirm=True 이어도 assigned 강제 (심사원 동의 전 confirmed 금지)
+    status_val = "assigned"
     standards_raw = app.standards_json or contract.standards
     iaf_raw = app.iaf_codes_json
 
-    # 기존 배정 교체
     db.query(AuditAssignments).filter(AuditAssignments.contract_id == contract.id).delete()
 
     created_rows: List[AuditAssignments] = []
@@ -852,10 +870,12 @@ def assign_auditors(
         ("auditor", "team_member", mid) for mid in payload.member_auditor_ids
     ]
     doc_ids: List[int] = []
+    notify_user_ids: List[int] = []
 
     try:
         for role, assignment_role, auditor_id in role_plan:
             user_id = auditor_user_id_or_raise(db, auditor_id)
+            notify_user_ids.append(user_id)
             fee = build_fee_snapshot(
                 db,
                 auditor_id=auditor_id,
@@ -892,16 +912,16 @@ def assign_auditors(
             db.add(row)
             db.flush()
             created_rows.append(row)
-            if status_val == "confirmed":
-                doc_ids.extend(
-                    ensure_auditor_assignment_docs(
-                        db,
-                        contract_id=int(contract.id),
-                        assignment=row,
-                        created_by=current_user.id,
-                        now=now,
-                    )
+            # 문서 초안은 배정 시점에 생성 — 심사원이 읽고 accept/revision 판단
+            doc_ids.extend(
+                ensure_auditor_assignment_docs(
+                    db,
+                    contract_id=int(contract.id),
+                    assignment=row,
+                    created_by=current_user.id,
+                    now=now,
                 )
+            )
 
         contract.lead_auditor_id = payload.lead_auditor_id
         contract.member_auditor_ids = ",".join(str(i) for i in payload.member_auditor_ids) or None
@@ -910,13 +930,23 @@ def assign_auditors(
         if payload.total_md is not None:
             contract.total_md = Decimal(str(payload.total_md))
             contract.audit_days = Decimal(str(payload.total_md))
-        if status_val == "confirmed" and str(contract.status or "").lower() in (
-            "draft",
-            "approved",
-            "",
-        ):
-            contract.status = "scheduled"
+        # scheduled 는 전원 confirmed 시에만
+        sync_contract_scheduled_if_all_confirmed(db, contract)
         contract.updated_at = now
+
+        window = f"{payload.audit_start} ~ {payload.audit_end}"
+        _notify_users(
+            db,
+            sorted(set(notify_user_ids)),
+            ntype="assignment_pending_accept",
+            title="심사 배정 확인이 필요합니다",
+            body=(
+                f"신청 #{app.id} — {window} 심사 배정이 도착했습니다. "
+                "위촉계약서·NDA를 확인한 뒤 동의 또는 조율 요청을 진행해 주세요."
+            ),
+            link="/auditor-portal?tab=schedules",
+            sent_at=now,
+        )
 
         _add_log(
             db,
@@ -925,7 +955,7 @@ def assign_auditors(
             "assign_auditors",
             app.status,
             app.status,
-            f"lead={payload.lead_auditor_id}; members={payload.member_auditor_ids}; status={status_val}",
+            f"lead={payload.lead_auditor_id}; members={payload.member_auditor_ids}; status=assigned",
         )
         db.commit()
     except HTTPException:
@@ -938,13 +968,14 @@ def assign_auditors(
 
     return OkOut(
         ok=True,
-        message=f"배정 완료 (팀장 1 + 팀원 {len(payload.member_auditor_ids)}, status={status_val})",
+        message=f"배정 완료 (팀장 1 + 팀원 {len(payload.member_auditor_ids)}, 심사원 확인 대기)",
         id=app.id,
         contract_id=contract.id,
         data={
             "assignments": [serialize_assignment(r) for r in created_rows],
             "document_ids": doc_ids,
             "status": status_val,
+            "confirm_ignored": bool(payload.confirm),
         },
     )
 
@@ -955,7 +986,11 @@ def confirm_assignments(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_cb_portal_user),
 ) -> OkOut:
-    """배정 확정(confirmed) + AUDITOR_CONTRACT / NDA 문서 초안 생성."""
+    """DEPRECATED happy-path — CB가 confirmed로 올리지 않음. 재알림만 수행.
+
+    확정은 심사원 accept 전용. 이 엔드포인트는 assigned 배정에 대해
+    문서 초안 보장 + '배정 확인 필요' 알림 재발송만 한다.
+    """
     app = _get_app_for_cb(db, app_id, int(current_user.cb_id))  # type: ignore[arg-type]
     if not app.contract_id:
         raise HTTPException(status_code=400, detail="계약이 없습니다.")
@@ -969,14 +1004,14 @@ def confirm_assignments(
         .all()
     )
     if not rows:
-        raise HTTPException(status_code=400, detail="확정할 배정이 없습니다. 먼저 assign-auditors 를 호출하세요.")
+        raise HTTPException(status_code=400, detail="배정이 없습니다. 먼저 assign-auditors 를 호출하세요.")
 
     now = datetime.now()
     doc_ids: List[int] = []
+    notify_ids: List[int] = []
     try:
         for row in rows:
-            row.status = "confirmed"
-            row.updated_at = now
+            # status는 건드리지 않음 (assigned / revision_requested 유지)
             doc_ids.extend(
                 ensure_auditor_assignment_docs(
                     db,
@@ -986,10 +1021,36 @@ def confirm_assignments(
                     now=now,
                 )
             )
-        if str(contract.status or "").lower() in ("draft", "approved", ""):
-            contract.status = "scheduled"
-        contract.updated_at = now
-        _add_log(db, app.id, current_user, "confirm_assignments", app.status, app.status, None)
+            if row.auditor_user_id and (row.status or "").lower() in (
+                "assigned",
+                "revision_requested",
+            ):
+                notify_ids.append(int(row.auditor_user_id))
+        window = ""
+        if contract.audit_period_start and contract.audit_period_end:
+            window = f"{contract.audit_period_start} ~ {contract.audit_period_end}"
+        _notify_users(
+            db,
+            sorted(set(notify_ids)),
+            ntype="assignment_pending_accept",
+            title="심사 배정 확인이 필요합니다",
+            body=(
+                f"신청 #{app.id}"
+                + (f" — {window}" if window else "")
+                + " 배정 확인(동의/조율)을 요청합니다."
+            ),
+            link="/auditor-portal?tab=schedules",
+            sent_at=now,
+        )
+        _add_log(
+            db,
+            app.id,
+            current_user,
+            "confirm_assignments_renotify",
+            app.status,
+            app.status,
+            "재알림만 (status 변경 없음)",
+        )
         db.commit()
     except HTTPException:
         db.rollback()
@@ -997,16 +1058,17 @@ def confirm_assignments(
     except Exception as e:
         db.rollback()
         logger.exception("confirm_assignments failed")
-        raise HTTPException(status_code=500, detail=f"확정 실패: {e}") from e
+        raise HTTPException(status_code=500, detail=f"재알림 실패: {e}") from e
 
     return OkOut(
         ok=True,
-        message=f"배정 {len(rows)}건 확정 및 문서 {len(doc_ids)}건 생성",
+        message=f"배정 {len(rows)}건 재알림 완료 (status 변경 없음)",
         id=app.id,
         contract_id=contract.id,
         data={
             "assignments": [serialize_assignment(r) for r in rows],
             "document_ids": doc_ids,
+            "deprecated": "CB confirm no longer sets confirmed; auditor accept does",
         },
     )
 

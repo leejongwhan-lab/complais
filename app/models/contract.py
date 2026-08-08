@@ -70,6 +70,9 @@ class Contracts(Base):
     cb_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     client_signed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     client_signed_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    client_signed_ip: Mapped[Optional[str]] = mapped_column(
+        String(45), nullable=True, comment="기업 확인(동의) 시 클라이언트 IP"
+    )
     cb_signed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     cb_signed_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     audit_mode: Mapped[str] = mapped_column(String(50), nullable=False)

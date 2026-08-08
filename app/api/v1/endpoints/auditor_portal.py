@@ -1134,3 +1134,320 @@ def get_auditor_mypage(
     _require_auditor(current_user)
     auditor = _get_auditor_for_user(db, current_user.id)
     return _build_profile_summary(db, auditor)
+
+
+# ---------------------------------------------------------------------------
+# 배정 동의 / 불가일정 (브리핑 v4) — /auditor 와 /auditor-portal 동시 노출
+# ---------------------------------------------------------------------------
+from fastapi import Request
+from pydantic import BaseModel, Field
+
+from app.models.auth import Notifications, Users
+from app.models.auditor import AuditorUnavailability
+from app.services.auditor_assignment_fees import (
+    mark_assignment_docs_signed,
+    serialize_assignment,
+    sync_contract_scheduled_if_all_confirmed,
+)
+
+portal_router = APIRouter(prefix="/auditor-portal", tags=["Auditor Portal"])
+
+
+class AssignmentRevisionIn(BaseModel):
+    comment: str = Field(..., min_length=1)
+
+
+class UnavailabilityIn(BaseModel):
+    start_date: date
+    end_date: date
+    note: Optional[str] = None
+
+
+class UnavailabilityOut(BaseModel):
+    id: int
+    auditor_id: int
+    start_date: date
+    end_date: date
+    note: Optional[str] = None
+
+
+def _client_ip(request: Request) -> Optional[str]:
+    xff = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    if xff:
+        return xff
+    return request.client.host if request.client else None
+
+
+def _notify_user_ids(
+    db: Session,
+    user_ids: List[int],
+    *,
+    ntype: str,
+    title: str,
+    body: str,
+    link: str,
+    sent_at: datetime,
+) -> None:
+    for uid in user_ids:
+        if not uid:
+            continue
+        db.add(
+            Notifications(
+                user_id=int(uid),
+                type=ntype,
+                title=title,
+                body=body,
+                link=link,
+                channel="in_app",
+                is_read=False,
+                sent_at=sent_at,
+            )
+        )
+
+
+def _cb_user_ids(db: Session, cb_id: Optional[int]) -> List[int]:
+    if not cb_id:
+        return []
+    try:
+        rows = (
+            db.query(Users.id)
+            .filter(Users.cb_id == int(cb_id), Users.is_active == True)  # noqa: E712
+            .all()
+        )
+        return [int(uid) for (uid,) in rows if uid]
+    except Exception:
+        logger.exception("cb notify lookup soft-fail")
+        return []
+
+
+def _get_own_assignment(
+    db: Session, assignment_id: int, auditor: Auditor
+) -> AuditAssignments:
+    row = db.get(AuditAssignments, assignment_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="배정을 찾을 수 없습니다.")
+    if int(row.auditor_id or 0) != int(auditor.id) and int(row.auditor_user_id or 0) != int(
+        auditor.user_id or 0
+    ):
+        raise HTTPException(status_code=403, detail="본인 배정건만 처리할 수 있습니다.")
+    return row
+
+
+def _accept_assignment_impl(
+    *,
+    assignment_id: int,
+    request: Request,
+    db: Session,
+    current_user: CurrentUser,
+) -> Dict[str, Any]:
+    _require_auditor(current_user)
+    auditor = _get_auditor_for_user(db, current_user.id)
+    row = _get_own_assignment(db, assignment_id, auditor)
+    before = (row.status or "").lower()
+    if before not in {"assigned", "revision_requested"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"현재 상태({row.status})에서는 동의할 수 없습니다.",
+        )
+    if not row.contract_id:
+        raise HTTPException(status_code=400, detail="계약이 연결되지 않은 배정입니다.")
+    contract = db.get(Contracts, int(row.contract_id))
+    if contract is None:
+        raise HTTPException(status_code=404, detail="계약을 찾을 수 없습니다.")
+
+    now = datetime.now()
+    row.status = "confirmed"
+    row.updated_at = now
+    doc_ids = mark_assignment_docs_signed(
+        db,
+        contract_id=int(row.contract_id),
+        auditor_id=int(row.auditor_id),
+        signed_by_user_id=current_user.id,
+        signed_ip=_client_ip(request),
+        now=now,
+    )
+    scheduled = sync_contract_scheduled_if_all_confirmed(db, contract)
+    contract.updated_at = now
+    _notify_user_ids(
+        db,
+        _cb_user_ids(db, contract.cb_id),
+        ntype="assignment_accepted",
+        title="심사원이 배정에 동의했습니다",
+        body=f"배정 #{row.id} (auditor_id={row.auditor_id}) 동의 완료.",
+        link="/cb-portal",
+        sent_at=now,
+    )
+    db.commit()
+    db.refresh(row)
+    return {
+        "ok": True,
+        "assignment": serialize_assignment(row),
+        "document_ids": doc_ids,
+        "contract_status": contract.status,
+        "all_confirmed_scheduled": scheduled,
+    }
+
+
+def _revision_assignment_impl(
+    *,
+    assignment_id: int,
+    comment: str,
+    db: Session,
+    current_user: CurrentUser,
+) -> Dict[str, Any]:
+    _require_auditor(current_user)
+    auditor = _get_auditor_for_user(db, current_user.id)
+    row = _get_own_assignment(db, assignment_id, auditor)
+    before = (row.status or "").lower()
+    if before not in {"assigned", "revision_requested"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"현재 상태({row.status})에서는 조율 요청할 수 없습니다.",
+        )
+    note = (comment or "").strip()
+    if not note:
+        raise HTTPException(status_code=400, detail="조율 요청 사유를 입력해 주세요.")
+    if not row.contract_id:
+        raise HTTPException(status_code=400, detail="계약이 연결되지 않은 배정입니다.")
+    contract = db.get(Contracts, int(row.contract_id))
+    if contract is None:
+        raise HTTPException(status_code=404, detail="계약을 찾을 수 없습니다.")
+
+    now = datetime.now()
+    row.status = "revision_requested"
+    row.assignment_note = note
+    row.updated_at = now
+    sync_contract_scheduled_if_all_confirmed(db, contract)
+    contract.updated_at = now
+    _notify_user_ids(
+        db,
+        _cb_user_ids(db, contract.cb_id),
+        ntype="assignment_revision_requested",
+        title="심사원이 배정 조율을 요청했습니다",
+        body=f"배정 #{row.id} (auditor_id={row.auditor_id}): {note}",
+        link="/cb-portal",
+        sent_at=now,
+    )
+    db.commit()
+    db.refresh(row)
+    return {"ok": True, "assignment": serialize_assignment(row), "contract_status": contract.status}
+
+
+def _register_assignment_routes(r: APIRouter) -> None:
+    @r.post("/assignments/{assignment_id}/accept")
+    def accept_assignment(
+        assignment_id: int,
+        request: Request,
+        db: Session = Depends(get_db),
+        current_user: CurrentUser = Depends(get_current_user),
+    ):
+        """배정 동의: assigned → confirmed + 문서 signed/completed."""
+        return _accept_assignment_impl(
+            assignment_id=assignment_id,
+            request=request,
+            db=db,
+            current_user=current_user,
+        )
+
+    @r.post("/assignments/{assignment_id}/revision")
+    def revision_assignment(
+        assignment_id: int,
+        payload: AssignmentRevisionIn,
+        db: Session = Depends(get_db),
+        current_user: CurrentUser = Depends(get_current_user),
+    ):
+        """배정 조율 요청: → revision_requested + CB 알림."""
+        return _revision_assignment_impl(
+            assignment_id=assignment_id,
+            comment=payload.comment,
+            db=db,
+            current_user=current_user,
+        )
+
+    @r.post("/assignments/{assignment_id}/decline")
+    def decline_assignment_alias(
+        assignment_id: int,
+        payload: AssignmentRevisionIn,
+        db: Session = Depends(get_db),
+        current_user: CurrentUser = Depends(get_current_user),
+    ):
+        """decline 별칭 → revision_requested."""
+        return _revision_assignment_impl(
+            assignment_id=assignment_id,
+            comment=payload.comment,
+            db=db,
+            current_user=current_user,
+        )
+
+    @r.get("/unavailability", response_model=List[UnavailabilityOut])
+    def list_unavailability(
+        db: Session = Depends(get_db),
+        current_user: CurrentUser = Depends(get_current_user),
+    ):
+        _require_auditor(current_user)
+        auditor = _get_auditor_for_user(db, current_user.id)
+        rows = (
+            db.query(AuditorUnavailability)
+            .filter(AuditorUnavailability.auditor_id == auditor.id)
+            .order_by(AuditorUnavailability.start_date.desc())
+            .all()
+        )
+        return [
+            UnavailabilityOut(
+                id=r.id,
+                auditor_id=r.auditor_id,
+                start_date=r.start_date,
+                end_date=r.end_date,
+                note=r.note,
+            )
+            for r in rows
+        ]
+
+    @r.post("/unavailability", response_model=UnavailabilityOut)
+    def create_unavailability(
+        payload: UnavailabilityIn,
+        db: Session = Depends(get_db),
+        current_user: CurrentUser = Depends(get_current_user),
+    ):
+        _require_auditor(current_user)
+        auditor = _get_auditor_for_user(db, current_user.id)
+        if payload.end_date < payload.start_date:
+            raise HTTPException(status_code=400, detail="end_date 는 start_date 이후여야 합니다.")
+        now = datetime.now()
+        row = AuditorUnavailability(
+            auditor_id=auditor.id,
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+            note=payload.note,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return UnavailabilityOut(
+            id=row.id,
+            auditor_id=row.auditor_id,
+            start_date=row.start_date,
+            end_date=row.end_date,
+            note=row.note,
+        )
+
+    @r.delete("/unavailability/{row_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_unavailability(
+        row_id: int,
+        db: Session = Depends(get_db),
+        current_user: CurrentUser = Depends(get_current_user),
+    ):
+        _require_auditor(current_user)
+        auditor = _get_auditor_for_user(db, current_user.id)
+        row = db.get(AuditorUnavailability, row_id)
+        if row is None or int(row.auditor_id) != int(auditor.id):
+            raise HTTPException(status_code=404, detail="불가일정을 찾을 수 없습니다.")
+        db.delete(row)
+        db.commit()
+        return None
+
+
+_register_assignment_routes(router)
+_register_assignment_routes(portal_router)
