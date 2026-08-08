@@ -500,15 +500,6 @@ table.esg-kpi-table td.num {
   min-height: 120px;
 }
 
-@media (max-width: 900px) {
-  .layout { flex-direction: column; }
-  .grid { grid-template-columns: 1fr; }
-  .content { padding: 8px 16px 32px; }
-  .topbar { padding: 14px 16px 8px; }
-  .esg-legend-notes { align-items: flex-start; text-align: left; }
-}
-
-
 /* ── Enterprise company form / cert / archive ── */
 .ep-section {
   margin-bottom: 28px;
@@ -682,9 +673,6 @@ button.btn-navy:hover { background: #16304f; }
   padding: 8px 10px;
   white-space: nowrap;
 }
-@media (max-width: 800px) {
-  .ep-grid-2, .ep-grid-3, .site-row, .site-row.site-row-addr { grid-template-columns: 1fr; }
-}
 /* Address row: shared with style.css `.addr-row` / `.ep-addr-row` */
 .ep-addr-row {
   display: flex;
@@ -722,9 +710,6 @@ button.btn-navy:hover { background: #16304f; }
   gap: 12px;
   align-items: start;
   margin-bottom: 14px;
-}
-@media (max-width: 900px) {
-  .cert-app-top { grid-template-columns: 1fr 1fr; }
 }
 .cert-app-top h3 { margin: 0 0 4px; font-size: 1rem; }
 .cert-meta-label { display: block; font-size: 0.72rem; color: #999; margin-bottom: 2px; }
@@ -863,9 +848,6 @@ body.enterprise-page .ent-kpi .label {
   gap: 18px;
   align-items: start;
 }
-@media (max-width: 960px) {
-  .ent-dash-layout { grid-template-columns: 1fr; }
-}
 .ent-dash-main,
 .ent-dash-side {
   display: flex;
@@ -888,9 +870,6 @@ body.enterprise-page .ent-kpi .label {
 .ent-tl-meta { margin-bottom: 12px; }
 .ent-tl-stepper {
   grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-@media (max-width: 640px) {
-  .ent-tl-stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .ent-cert-table th,
 .ent-cert-table td { font-size: 0.86rem; }

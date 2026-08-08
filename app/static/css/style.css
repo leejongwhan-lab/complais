@@ -88,12 +88,18 @@ body.portal-page,
 body.admin-page {
   display: flex;
   min-height: 100vh;
+  min-width: 1200px; /* fixed desktop; see portal.css policy */
   margin: 0;
   background: var(--admin-bg);
   color: var(--admin-ink);
   font-family: var(--font-family-main, Pretendard, system-ui, sans-serif);
   letter-spacing: var(--letter-spacing-body, -0.03em);
   line-height: 1.5;
+}
+
+/* Audit-notes exception: allow tablet width without forcing 1200px shell */
+body.auditor-portal-page.aud-note-open {
+  min-width: 0;
 }
 
 a {
@@ -161,33 +167,6 @@ img {
   margin-bottom: 24px;
 }
 
-@media (max-width: 1100px) {
-  .grid-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  body.portal-page,
-  body.admin-page {
-    flex-direction: column;
-  }
-
-  .admin-sidebar {
-    width: 100%;
-    border-right: 0;
-    border-bottom: 1px solid var(--admin-border);
-  }
-
-  .admin-main {
-    padding: 20px 16px;
-  }
-
-  .grid-cards {
-    grid-template-columns: 1fr;
-  }
-}
-
 .card {
   background: var(--admin-surface);
   padding: 20px;
@@ -245,12 +224,6 @@ body.admin-page #tab-dashboard .stat-metric.is-clickable:focus-visible {
 
 body.admin-page #tab-dashboard .monitoring-cards {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-@media (max-width: 720px) {
-  body.admin-page #tab-dashboard .monitoring-cards {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 body.admin-page #tab-dashboard .revenue-total-row {
@@ -1270,14 +1243,6 @@ table.ac-esg-table .ac-esg-col-goal {
   max-width: none;
 }
 
-@media (max-width: 720px) {
-  .cb-field-grid,
-  .org-grid,
-  .org-grid-3 {
-    grid-template-columns: 1fr;
-  }
-}
-
 .cb-field label {
   display: block;
   margin-bottom: 5px;
@@ -1414,25 +1379,6 @@ body.cb-portal-page .cb-kpi-value {
   color: var(--admin-ink, #1a2e24);
 }
 
-/* Keep single-row card grids even when global .grid-cards breakpoints kick in */
-@media (max-width: 960px) {
-  body.cb-portal-page .cb-status-cards {
-    grid-template-columns: repeat(4, minmax(180px, 1fr));
-  }
-  body.cb-portal-page .pipeline-cards {
-    grid-template-columns: repeat(5, minmax(140px, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  body.cb-portal-page .cb-status-cards {
-    grid-template-columns: repeat(4, minmax(180px, 1fr));
-  }
-  body.cb-portal-page .pipeline-cards {
-    grid-template-columns: repeat(5, minmax(140px, 1fr));
-  }
-}
-
 /* Month calendar chrome: shared in /static/css/portal.css
    (.cb-calendar-wrap / .cal-grid / .cal-cell / …). Keep CB event clickable. */
 body.cb-portal-page .cal-event {
@@ -1511,12 +1457,6 @@ body.cb-portal-page .master-detail {
   gap: 16px;
   min-height: 420px;
   align-items: stretch;
-}
-
-@media (max-width: 900px) {
-  body.cb-portal-page .master-detail {
-    grid-template-columns: 1fr;
-  }
 }
 
 body.cb-portal-page .master-pane,
@@ -1704,18 +1644,6 @@ body.cb-portal-page .muted {
   border-radius: var(--admin-radius);
   background: var(--admin-surface);
   cursor: pointer;
-}
-
-@media (max-width: 900px) {
-  .std-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 560px) {
-  .std-row {
-    grid-template-columns: 1fr;
-  }
 }
 
 .std-row .std-item:has(input:checked) {
@@ -2000,18 +1928,6 @@ body.ent-cert-page .std-row {
   max-width: 100%;
 }
 
-@media (max-width: 900px) {
-  body.ent-cert-page .std-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 560px) {
-  body.ent-cert-page .std-row {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* Daum/Kakao postcode address group */
 .addr-row,
 .ep-addr-row {
@@ -2071,33 +1987,4 @@ button.btn-postcode:hover {
 .site-row.site-row-addr .btn-postcode {
   padding: 8px 10px;
   align-self: center;
-}
-@media (max-width: 960px) {
-  .site-row.site-row-addr {
-    grid-template-columns: 1fr;
-  }
-}
-@media (max-width: 720px) {
-  .portal-form .form-row,
-  .portal-form .ff,
-  .portal-form .org-field,
-  .portal-form .ep-field,
-  .cert-app-page .ff,
-  body.ent-cert-page .ff,
-  body.review-page .ff,
-  body.register-page .form-row,
-  body.register-page .ff {
-    grid-template-columns: 1fr;
-  }
-  .portal-form .form-row > label,
-  .portal-form .ff > label,
-  .portal-form .org-field > label,
-  .portal-form .ep-field > label,
-  .cert-app-page .ff > label,
-  body.ent-cert-page .ff > label,
-  body.review-page .ff > label,
-  body.register-page .form-row > label,
-  body.register-page .ff > label {
-    margin-bottom: 2px;
-  }
 }

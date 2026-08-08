@@ -15,6 +15,24 @@
 }
 
 /* ---- Layout shells ---- */
+/* Fixed desktop (admin / CB / enterprise / auditor non-notes).
+   Narrower viewports scroll horizontally instead of reflowing.
+   Exception: auditor audit-notes (body.aud-note-open) — see below. */
+.portal-page,
+body.portal-page,
+body.admin-page,
+body.enterprise-page,
+body.cb-portal-page,
+body.auditor-portal-page {
+  min-width: 1200px;
+}
+
+body.auditor-portal-page.aud-note-open {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 .portal-page,
 body.portal-page {
   margin: 0;
@@ -65,16 +83,13 @@ body.portal-page {
 
 .portal-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 16px;
 }
 
-@media (min-width: 768px) {
-  .portal-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .portal-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .portal-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
+.portal-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.portal-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .portal-kpi {
   background: var(--portal-card);
@@ -243,15 +258,12 @@ thead.bg-slate-50 th {
 .divide-y > * + * { border-top: 1px solid var(--portal-border); }
 .divide-slate-100 > * + * { border-top-color: #f1f5f9; }
 
-@media (min-width: 640px) {
-  .sm\:flex-row { flex-direction: row; }
-  .sm\:items-center { align-items: center; }
-}
-@media (min-width: 768px) {
-  .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
+/* Desktop-fixed: former sm:/md: breakpoint utilities always apply */
+.sm\:flex-row { flex-direction: row; }
+.sm\:items-center { align-items: center; }
+.md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 .p-2 { padding: 0.5rem; }
 .p-3 { padding: 0.75rem; }
@@ -531,20 +543,25 @@ body.auditor-portal-page.aud-note-open #tab-reports.tab-panel.active {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Audit-notes only: minimal narrow containment (no page-wide horizontal scroll) */
 @media (max-width: 1100px) {
   body.auditor-portal-page.aud-note-open,
   body.auditor-portal-page.aud-note-open .admin-main {
     height: auto;
     max-height: none;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   .aud-note-editor[aria-hidden="false"] {
     height: auto;
     max-height: none;
+    max-width: 100%;
+    overflow-x: hidden;
   }
   .aud-note-editor[aria-hidden="false"] .aud-note-grid {
     grid-template-columns: 1fr;
     overflow: visible;
+    max-width: 100%;
   }
   .aud-note-editor[aria-hidden="false"] .aud-note-nav-pane,
   .aud-note-editor[aria-hidden="false"] .aud-note-ai,
@@ -555,10 +572,12 @@ body.auditor-portal-page.aud-note-open #tab-reports.tab-panel.active {
     height: auto;
     max-height: none;
     overflow: visible;
+    max-width: 100%;
   }
   .aud-note-editor[aria-hidden="false"] .aud-note-main.doc-wrap,
   .aud-note-editor[aria-hidden="false"] .doc-wrap {
     max-height: min(70vh, 720px);
+    overflow-x: hidden;
     overflow-y: auto;
   }
 }
@@ -735,8 +754,9 @@ body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved.active .v,
   gap: 12px;
   margin: 0 0 14px;
 }
+/* Audit-notes KPI stack on narrow tablets */
 @media (max-width: 1100px) {
-  .aud-kpi-dual { grid-template-columns: 1fr; }
+  body.auditor-portal-page.aud-note-open .aud-kpi-dual { grid-template-columns: 1fr; }
 }
 .aud-kpi-panel {
   border: 1px solid #d7e2da;
@@ -854,8 +874,9 @@ body.auditor-portal-page .aud-note-nav button.aud-nav-btn.is-saved.active .v,
 }
 .aud-iv-q-box, .aud-iv-overall-box { margin-bottom: 12px; }
 .aud-iv-mini.active { background: #ecfdf5; font-weight: 700; color: #0f766e; }
+/* Audit-notes interview meta on narrow tablets */
 @media (max-width: 560px) {
-  .aud-iv-meta-grid { grid-template-columns: 1fr; }
+  body.auditor-portal-page.aud-note-open .aud-iv-meta-grid { grid-template-columns: 1fr; }
 }
 
 /* ---- Shared month calendar (auditor / CB portals) ---- */
@@ -1141,17 +1162,6 @@ button.cal-cell.is-empty:hover,
   padding: 1px 2px;
 }
 
-@media (max-width: 720px) {
-  .cal-cell,
-  button.cal-cell,
-  .cal-cell.is-empty {
-    min-height: 78px;
-    padding: 6px;
-  }
-  .cal-day { font-size: 0.85rem; }
-  .cal-event { font-size: 0.7rem; padding: 2px 4px; }
-}
-
 /* Auditor day-detail panel under calendar */
 .aud-day-detail {
   background: var(--portal-card, var(--admin-surface, #fff));
@@ -1199,11 +1209,6 @@ button.cal-cell.is-empty:hover,
   margin: 0;
   color: var(--portal-ink, var(--admin-ink, #1f2d24));
 }
-@media (max-width: 720px) {
-  .aud-dl { grid-template-columns: 1fr; gap: 2px 0; }
-  .aud-dl dt { font-size: 0.8rem; margin-top: 6px; }
-}
-
 /* Docs tab — process next-step + checklist */
 .aud-docs-next {
   margin: 0 0 16px;

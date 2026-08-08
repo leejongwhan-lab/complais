@@ -387,15 +387,22 @@ body.auditor-portal-page .aud-note-nav button.aud-nav-btn.active:not(.is-saved) 
   box-shadow: inset 2px 0 0 var(--admin-accent);
 }
 
+/* Audit-notes only: minimal narrow containment (kept intentionally) */
 @media (max-width: 1100px) {
   body.auditor-portal-page.aud-note-open,
   body.auditor-portal-page.aud-note-open .admin-main {
     height: auto;
     max-height: none;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  body.auditor-portal-page .aud-note-editor[aria-hidden="false"] {
+    max-width: 100%;
+    overflow-x: hidden;
   }
   body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-grid {
     grid-template-columns: 1fr;
+    max-width: 100%;
   }
   body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-nav-pane,
   body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-ai,
@@ -405,9 +412,11 @@ body.auditor-portal-page .aud-note-nav button.aud-nav-btn.active:not(.is-saved) 
     height: auto;
     max-height: none;
     overflow: visible;
+    max-width: 100%;
   }
   body.auditor-portal-page .aud-note-editor[aria-hidden="false"] .aud-note-main.doc-wrap {
     max-height: min(70vh, 720px);
+    overflow-x: hidden;
     overflow-y: auto;
   }
 }

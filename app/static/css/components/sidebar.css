@@ -136,15 +136,6 @@
   border-top: 1px solid var(--sidebar-border);
 }
 
-@media (max-width: 900px) {
-  .sidebar {
-    width: 100%;
-    height: auto;
-    position: relative;
-  }
-}
-
-
 .side-group { margin: 10px 0 4px; }
 .side-group-label {
   display: block;
