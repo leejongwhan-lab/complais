@@ -714,30 +714,99 @@
     history.replaceState(null, "", url.pathname + "?" + url.searchParams.toString());
   }
 
+  function openFlowStep(step) {
+    if (!step) return;
+    if (step.open_mode === "portal_tab" || step.parallel) {
+      switchTab(step.portal_tab || "reports");
+      return;
+    }
+    openDocsViewer(step.slug, step.title, step.path);
+  }
+
+  function renderDocsNextCard(progress) {
+    const card = document.getElementById("docs-next-card");
+    if (!card) return;
+    const next = progress && progress.next_step;
+    if (!next) {
+      if (progress && progress.all_completed) {
+        card.hidden = false;
+        card.innerHTML =
+          '<span class="aud-docs-next-label">프로세스 완료</span>' +
+          '<p class="aud-docs-next-title" style="margin:0;">이 계약의 문서 단계를 모두 완료했습니다.</p>' +
+          '<p class="aud-docs-next-meta" style="margin:6px 0 0;">' +
+          esc(progress.flow_label || progress.flow_key || "") +
+          " · contract #" +
+          esc(progress.contract_id) +
+          "</p>";
+      } else {
+        card.hidden = true;
+        card.innerHTML = "";
+      }
+      return;
+    }
+    card.hidden = false;
+    card.innerHTML =
+      '<span class="aud-docs-next-label">다음 할 일</span>' +
+      '<p class="aud-docs-next-title">' +
+      esc(next.title) +
+      "</p>" +
+      '<p class="aud-docs-next-meta">' +
+      esc(progress.flow_label || progress.flow_key || "") +
+      " · " +
+      esc(progress.audit_type || "") +
+      " · contract #" +
+      esc(progress.contract_id) +
+      (progress.contract_no ? " " + esc(progress.contract_no) : "") +
+      "</p>" +
+      '<button type="button" class="btn" id="docs-next-open">열기</button>';
+    const btn = document.getElementById("docs-next-open");
+    if (btn) {
+      btn.addEventListener("click", () => openFlowStep(next));
+    }
+  }
+
+  function docsStatusLabel(step) {
+    if (step.parallel) return "병행 (선택)";
+    if (step.completed) return "완료";
+    if (step.is_next) return "다음";
+    return step.doc_status === "in_progress" ? "진행중" : "대기";
+  }
+
   async function loadDocsPanel() {
     const box = document.getElementById("docs-hub-list");
+    const nextCard = document.getElementById("docs-next-card");
     if (!box) return;
     const { cid, q } = docsQuery();
     const urlParams = new URLSearchParams(location.search);
     const openDoc = urlParams.get("doc") || "";
     box.innerHTML = '<div class="aud-empty">불러오는 중…</div>';
+    if (nextCard) {
+      nextCard.hidden = true;
+      nextCard.innerHTML = "";
+    }
     try {
-      const res = await fetch(API + "/demo/audit-docs/context?" + q);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "문서 컨텍스트 조회 실패");
+      const [ctxRes, progRes] = await Promise.all([
+        fetch(API + "/demo/audit-docs/context?" + q),
+        fetch(API + "/auditor/contracts/" + encodeURIComponent(cid) + "/audit-docs-progress", {
+          headers: authHeaders(),
+        }),
+      ]);
+      const data = await ctxRes.json().catch(() => ({}));
+      if (!ctxRes.ok) throw new Error(data.detail || "문서 컨텍스트 조회 실패");
+      const progress = await progRes.json().catch(() => ({}));
+      if (!progRes.ok) {
+        // progress optional for layout — still show catalog if auth/profile issue
+        console.warn("audit-docs-progress:", progress.detail || progRes.status);
+      }
+
       const m = data.master || {};
-      const groups = {};
-      const order = [];
       const bySlug = {};
       (data.pages || []).forEach((p) => {
         bySlug[p.slug] = p;
-        const g = p.group || "other";
-        if (!groups[g]) {
-          groups[g] = { label: p.group_label || g, pages: [] };
-          order.push(g);
-        }
-        groups[g].pages.push(p);
       });
+
+      renderDocsNextCard(progRes.ok ? progress : null);
+
       let html =
         '<p class="muted" style="margin:0 0 12px;">company #' +
         esc(m.company_id) +
@@ -750,7 +819,42 @@
         " · " +
         esc((m.standard_keys || []).join(", ")) +
         (data.audit_plan_id ? " · audit_plan #" + esc(data.audit_plan_id) : "") +
-        '</p><div class="aud-quick" style="margin-bottom:14px;">' +
+        (progress.flow_label
+          ? " · 프로세스 " + esc(progress.flow_label)
+          : "") +
+        "</p>";
+
+      const steps = progRes.ok && Array.isArray(progress.steps) ? progress.steps : [];
+      if (steps.length) {
+        html +=
+          "<h4 style='margin:8px 0 8px;'>프로세스 문서</h4><div class='aud-docs-flow'>";
+        steps.forEach((step) => {
+          const mark = step.completed ? "✓" : step.is_next ? "→" : step.parallel ? "∥" : "○";
+          const cls =
+            "aud-docs-flow-item" +
+            (step.completed ? " is-done" : "") +
+            (step.is_next ? " is-next" : "") +
+            (step.parallel ? " is-parallel" : "");
+          html +=
+            '<button type="button" class="' +
+            cls +
+            '" data-flow-key="' +
+            esc(step.key) +
+            '">' +
+            '<span class="aud-docs-flow-mark" aria-hidden="true">' +
+            mark +
+            "</span><span class='aud-docs-flow-body'><strong>" +
+            esc(step.title) +
+            "</strong><span>" +
+            esc(docsStatusLabel(step)) +
+            (step.parallel ? " · 심사노트 탭" : "") +
+            "</span></span></button>";
+        });
+        html += "</div>";
+      }
+
+      html +=
+        '<div class="aud-quick" style="margin-bottom:14px;">' +
         '<button type="button" class="btn ghost" data-goto="reports">심사노트</button>' +
         '<a class="btn ghost" href="/auditor-portal?tab=reports&view=report&' +
         q +
@@ -758,13 +862,29 @@
         '<a class="btn ghost" href="/auditor-portal?tab=schedules&demo=1">일정</a>' +
         '<a class="btn ghost" href="/demo/audit-docs?' +
         q +
-        '">데모 허브</a></div>';
+        '">전체 카탈로그</a></div>';
+
+      // Keep full catalog under process list (reference / other types)
+      const groups = {};
+      const order = [];
+      (data.pages || []).forEach((p) => {
+        const g = p.group || "other";
+        if (!groups[g]) {
+          groups[g] = { label: p.group_label || g, pages: [] };
+          order.push(g);
+        }
+        groups[g].pages.push(p);
+      });
+      html += "<h4 style='margin:16px 0 8px;'>전체 문서 카탈로그</h4>";
       order.forEach((g) => {
         html +=
-          "<h4 style='margin:16px 0 8px;'>" +
+          "<h4 style='margin:12px 0 8px;font-size:0.9rem;'>" +
           esc(groups[g].label) +
           "</h4><div class='aud-quick'>";
         groups[g].pages.forEach((p) => {
+          const done = steps.some(
+            (s) => s.slug === p.slug && s.completed && !s.parallel
+          );
           html +=
             '<button type="button" class="btn ghost" data-open-doc="' +
             esc(p.slug) +
@@ -773,19 +893,24 @@
             '" data-doc-path="' +
             esc(p.path) +
             '">' +
+            (done ? "✓ " : "") +
             esc(p.title) +
             "</button>";
         });
         html += "</div>";
       });
-      // portal-native deep links (노트/보고서는 기존 reports 패널)
-      html +=
-        "<h4 style='margin:16px 0 8px;'>포털 연동</h4><div class='aud-quick'>" +
-        '<button type="button" class="btn" data-goto="reports">심사노트 (reports)</button>' +
-        '<a class="btn ghost" href="/auditor-portal?tab=reports&view=report&' +
-        q +
-        '">결과보고서</a></div>';
+
       box.innerHTML = html;
+
+      const stepByKey = {};
+      steps.forEach((s) => {
+        stepByKey[s.key] = s;
+      });
+      box.querySelectorAll("[data-flow-key]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          openFlowStep(stepByKey[btn.getAttribute("data-flow-key")]);
+        });
+      });
       box.querySelectorAll("[data-open-doc]").forEach((btn) => {
         btn.addEventListener("click", () => {
           openDocsViewer(

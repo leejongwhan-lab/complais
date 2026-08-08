@@ -36,6 +36,7 @@ from app.models.enums import (
     UsersRole,
 )
 from app.schemas.auditor_portal import (
+    AuditDocsProgressResponse,
     AuditorCareerItem,
     AuditorDashboardSummary,
     AuditorEducationItem,
@@ -48,6 +49,7 @@ from app.schemas.auditor_portal import (
     AuditorReportItem,
     AuditorScheduleItem,
 )
+from app.services.audit_process_progress import build_audit_docs_progress
 from app.services.auditor_grade import to_ui_grade
 
 logger = logging.getLogger(__name__)
@@ -980,6 +982,31 @@ def _affiliation_kpi(
     if memberships:
         return "미승인", f"소속 {len(memberships)}건", 0, nearest_date, nearest_dday
     return "미등록", "소속 CB 없음", 0, nearest_date, nearest_dday
+
+
+@router.get(
+    "/contracts/{contract_id}/audit-docs-progress",
+    response_model=AuditDocsProgressResponse,
+)
+def get_audit_docs_progress(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Process path + doc_status-derived next step for a contract (no current_stage).
+
+    Read-only helper for the docs tab. Auth = auditor/admin (same as portal shell).
+    Does not require assignment — docs context already opens by contract_id URL.
+    """
+    _require_auditor(current_user)
+    _get_auditor_for_user(db, current_user.id)  # ensures auditor profile exists
+    data = build_audit_docs_progress(db, contract_id=int(contract_id))
+    if not data.get("found"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="계약을 찾을 수 없습니다.",
+        )
+    return AuditDocsProgressResponse(**data)
 
 
 @router.get("/dashboard-summary", response_model=AuditorDashboardSummary)

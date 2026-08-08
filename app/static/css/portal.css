@@ -1203,3 +1203,93 @@ button.cal-cell.is-empty:hover,
   .aud-dl { grid-template-columns: 1fr; gap: 2px 0; }
   .aud-dl dt { font-size: 0.8rem; margin-top: 6px; }
 }
+
+/* Docs tab — process next-step + checklist */
+.aud-docs-next {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--admin-accent, #2563EB);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--admin-accent, #2563EB) 8%, var(--admin-card, #fff));
+}
+.aud-docs-next[hidden] { display: none !important; }
+.aud-docs-next .aud-docs-next-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--admin-accent, #2563EB);
+  margin: 0 0 4px;
+}
+.aud-docs-next .aud-docs-next-title {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--admin-ink, #1e2a24);
+}
+.aud-docs-next .aud-docs-next-meta {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: var(--admin-muted, #5f7264);
+}
+.aud-docs-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 18px;
+}
+.aud-docs-flow-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border, #e3ebe4);
+  border-radius: 8px;
+  background: var(--admin-card, #fff);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.aud-docs-flow-item:hover {
+  border-color: var(--admin-accent, #2563EB);
+}
+.aud-docs-flow-item.is-next {
+  border-color: var(--admin-accent, #2563EB);
+  box-shadow: inset 3px 0 0 var(--admin-accent, #2563EB);
+}
+.aud-docs-flow-item.is-done {
+  opacity: 0.85;
+}
+.aud-docs-flow-item.is-parallel {
+  border-style: dashed;
+}
+.aud-docs-flow-mark {
+  flex: 0 0 1.4rem;
+  width: 1.4rem;
+  text-align: center;
+  font-weight: 700;
+  color: var(--admin-muted, #5f7264);
+}
+.aud-docs-flow-item.is-done .aud-docs-flow-mark {
+  color: #15803d;
+}
+.aud-docs-flow-item.is-next .aud-docs-flow-mark {
+  color: var(--admin-accent, #2563EB);
+}
+.aud-docs-flow-body {
+  flex: 1;
+  min-width: 0;
+}
+.aud-docs-flow-body strong {
+  display: block;
+  font-size: 0.95rem;
+}
+.aud-docs-flow-body span {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--admin-muted, #5f7264);
+  margin-top: 2px;
+}

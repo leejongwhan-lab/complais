@@ -181,3 +181,34 @@ class AuditorDashboardSummary(BaseModel):
     draft_reports: List[AuditorReportItem] = Field(default_factory=list)
     memberships: List[AuditorMembershipItem] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
+
+
+class AuditDocsFlowStep(BaseModel):
+    """One step in the contract's process path (from audit_process_flows)."""
+
+    key: str
+    title: str
+    slug: Optional[str] = None
+    doc_type: Optional[str] = None
+    path: Optional[str] = None
+    parallel: bool = False
+    open_mode: str = "doc"  # doc | portal_tab
+    portal_tab: Optional[str] = None
+    doc_status: str = "pending"
+    completed: bool = False
+    document_id: Optional[int] = None
+    is_next: bool = False
+
+
+class AuditDocsProgressResponse(BaseModel):
+    """Process-ordered audit docs + next incomplete step for a contract."""
+
+    contract_id: int
+    contract_no: Optional[str] = None
+    found: bool = True
+    audit_type: Optional[str] = None
+    flow_key: Optional[str] = None
+    flow_label: Optional[str] = None
+    steps: List[AuditDocsFlowStep] = Field(default_factory=list)
+    next_step: Optional[AuditDocsFlowStep] = None
+    all_completed: bool = False
