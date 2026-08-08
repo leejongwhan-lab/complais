@@ -391,6 +391,8 @@ def accept_client_proposal(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
+    # DEPRECATED — System 2 EAA 경로. 진짜 경로는 certification_applications +
+    # cb_cert_applications.py (enterprise_cert_applications). 삭제 예정(정리 후보). 오늘 작업에서 사용 금지.
     """제안 수락 — EAA는 CONTRACTED, proposal_flow는 수락 메모."""
     _require_client(current_user)
     cid = _resolve_company_id(current_user, company_id)

@@ -1,3 +1,5 @@
+# DEPRECATED — 진짜 경로는 certification_applications + cb_cert_applications.py (enterprise_cert_applications). 삭제 예정(정리 후보). 오늘 작업에서 사용 금지.
+# 특히 /applications/{id}/md-review, /applications/{id}/approve 는 System 1(cb_cert_applications) 사용.
 """CB Admin Dashboard — MD 검토 / 신청 승인 / 심사원 배정."""
 from __future__ import annotations
 

@@ -130,6 +130,10 @@ class ReviewActionIn(BaseModel):
     exclusion_note: Optional[str] = None
 
 
+class CompanyRevisionIn(BaseModel):
+    comment: str = Field(..., min_length=1)
+
+
 class OkOut(BaseModel):
     ok: bool = True
     message: Optional[str] = None

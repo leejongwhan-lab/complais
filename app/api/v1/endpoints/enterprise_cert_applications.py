@@ -1,3 +1,4 @@
+# CANONICAL — 기업↔CB 인증신청 메인 경로
 """Enterprise certification application (계약 전 심사 수주 — 기업 신청).
 
 Routes under /api/v1/enterprise-cert-applications
@@ -28,9 +29,11 @@ from app.data.company_aspects_catalog import (
 )
 from app.data.standards_catalog import standard_display_payload
 from app.db.session import get_db
+from app.models.auth import Notifications, Users
 from app.models.certification import (
     Certificates,
     CertificationApplicationAnswers,
+    CertificationApplicationReviewLogs,
     CertificationApplications,
     CompanyKsicCodes,
 )
@@ -39,6 +42,7 @@ from app.models.company import Companies
 from app.models.contract import Contracts
 from app.models.master import MasterKsicIaf
 from app.schemas.enterprise_cert import (
+    CompanyRevisionIn,
     EnterpriseCertListItem,
     EnterpriseCertSubmitIn,
     OkOut,
@@ -437,6 +441,200 @@ def list_my_applications(
             )
         )
     return out
+
+
+def _get_app_for_company(
+    db: Session, application_id: int, company_id: int
+) -> CertificationApplications:
+    app = db.get(CertificationApplications, application_id)
+    if app is None or int(app.company_id) != int(company_id):
+        raise HTTPException(status_code=404, detail="인증신청을 찾을 수 없습니다.")
+    return app
+
+
+def _add_review_log(
+    db: Session,
+    app_id: int,
+    user: CurrentUser,
+    action: str,
+    before: Optional[str],
+    after: Optional[str],
+    memo: Optional[str] = None,
+) -> None:
+    db.add(
+        CertificationApplicationReviewLogs(
+            application_id=app_id,
+            actor_user_id=user.id,
+            actor_role=user.role,
+            action=action,
+            before_status=before,
+            after_status=after,
+            memo=memo,
+            created_at=datetime.now(),
+        )
+    )
+
+
+def _cb_notify_user_ids(db: Session, cb_id: Optional[int]) -> List[int]:
+    if not cb_id:
+        return []
+    try:
+        rows = (
+            db.query(Users.id)
+            .filter(Users.cb_id == int(cb_id), Users.is_active == True)  # noqa: E712
+            .all()
+        )
+        return [int(uid) for (uid,) in rows if uid]
+    except Exception:
+        logger.exception("cb notify user lookup soft-fail")
+        return []
+
+
+def _notify_users(
+    db: Session,
+    user_ids: List[int],
+    *,
+    ntype: str,
+    title: str,
+    body: str,
+    link: str,
+    sent_at: datetime,
+) -> None:
+    for uid in user_ids:
+        db.add(
+            Notifications(
+                user_id=int(uid),
+                type=ntype,
+                title=title,
+                body=body,
+                link=link,
+                channel="in_app",
+                is_read=False,
+                sent_at=sent_at,
+            )
+        )
+
+
+@router.post("/{application_id}/company-accept", response_model=OkOut)
+def company_accept(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> OkOut:
+    """기업 확인(동의): approved → contracted."""
+    require_enterprise_user(current_user)
+    company_id = resolve_company_id(current_user)
+    app = _get_app_for_company(db, application_id, company_id)
+    before = app.status
+    if before != "approved":
+        raise HTTPException(
+            status_code=400,
+            detail="승인(조율대기) 상태에서만 확인할 수 있습니다.",
+        )
+    now = datetime.now()
+    after = "contracted"
+    try:
+        app.status = after
+        app.updated_at = now
+        _add_review_log(
+            db,
+            app.id,
+            current_user,
+            "company_accept",
+            before,
+            after,
+            "기업 확인(동의)",
+        )
+        app_no = app.application_no or str(app.id)
+        _notify_users(
+            db,
+            _cb_notify_user_ids(db, app.cb_id),
+            ntype="cert_app_company_accepted",
+            title="기업이 인증신청을 확인했습니다",
+            body=f"신청번호 {app_no} — 기업이 확인(동의)하여 계약 단계로 진행합니다.",
+            link="/cb-portal",
+            sent_at=now,
+        )
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("company-accept failed")
+        raise HTTPException(status_code=500, detail=f"저장 실패: {e}") from e
+
+    return OkOut(
+        ok=True,
+        message="확인(동의)이 완료되었습니다.",
+        id=app.id,
+        application_no=app.application_no,
+        contract_id=app.contract_id,
+        data={"status": after, "status_label": "계약완료"},
+    )
+
+
+@router.post("/{application_id}/company-revision", response_model=OkOut)
+def company_revision(
+    application_id: int,
+    payload: CompanyRevisionIn,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> OkOut:
+    """기업 조율 요청: approved → company_revision_requested (need_fix 아님)."""
+    require_enterprise_user(current_user)
+    company_id = resolve_company_id(current_user)
+    app = _get_app_for_company(db, application_id, company_id)
+    before = app.status
+    if before != "approved":
+        raise HTTPException(
+            status_code=400,
+            detail="승인(조율대기) 상태에서만 조율 요청할 수 있습니다.",
+        )
+    comment = (payload.comment or "").strip()
+    if not comment:
+        raise HTTPException(status_code=400, detail="조율 요청 내용을 입력해 주세요.")
+    now = datetime.now()
+    after = "company_revision_requested"
+    try:
+        app.status = after
+        app.review_note = comment
+        app.updated_at = now
+        _add_review_log(
+            db,
+            app.id,
+            current_user,
+            "company_revision",
+            before,
+            after,
+            comment,
+        )
+        app_no = app.application_no or str(app.id)
+        _notify_users(
+            db,
+            _cb_notify_user_ids(db, app.cb_id),
+            ntype="cert_app_company_revision",
+            title="기업 조율 요청",
+            body=f"신청번호 {app_no} — {comment}",
+            link="/cb-portal",
+            sent_at=now,
+        )
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("company-revision failed")
+        raise HTTPException(status_code=500, detail=f"저장 실패: {e}") from e
+
+    return OkOut(
+        ok=True,
+        message="조율 요청이 전달되었습니다.",
+        id=app.id,
+        application_no=app.application_no,
+        data={"status": after, "status_label": "기업조율요청"},
+    )
 
 
 @router.post("", response_model=OkOut, status_code=status.HTTP_201_CREATED)

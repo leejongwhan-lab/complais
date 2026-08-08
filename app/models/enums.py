@@ -470,6 +470,7 @@ class CertificationApplicationsStatus(str, enum.Enum):
     UNDER_REVIEW = "under_review"
     NEED_FIX = "need_fix"
     APPROVED = "approved"
+    COMPANY_REVISION_REQUESTED = "company_revision_requested"  # 기업 조율 요청(CB 내부승인 후)
     REJECTED = "rejected"
     CONTRACTED = "contracted"
     WITHDRAWN = "withdrawn"

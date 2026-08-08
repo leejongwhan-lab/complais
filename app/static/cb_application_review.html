@@ -225,7 +225,7 @@
 <script>
 (function () {
   const API = (window.COMPLAIS_API_BASE || "/api/v1").replace(/\/$/, "");
-  const STATUS_KR = { draft:"작성중", submitted:"제출완료", under_review:"검토중", need_fix:"보완요청", approved:"승인", rejected:"반려", contracted:"계약완료", withdrawn:"취소" };
+  const STATUS_KR = { draft:"작성중", submitted:"제출완료", under_review:"검토중", need_fix:"보완요청", approved:"승인(조율대기)", company_revision_requested:"기업조율요청", rejected:"반려", contracted:"계약완료", withdrawn:"취소" };
   const qs = new URLSearchParams(location.search);
   const appId = Number(qs.get("id") || 0);
   let app = null;

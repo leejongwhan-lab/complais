@@ -191,7 +191,8 @@
     submitted: "제출완료",
     under_review: "검토중",
     need_fix: "보완요청",
-    approved: "승인",
+    approved: "승인(조율대기)",
+    company_revision_requested: "기업조율요청",
     rejected: "반려",
     contracted: "계약완료",
     withdrawn: "취소",
@@ -207,7 +208,7 @@
     const status =
       opts.status ||
       qs().get("status") ||
-      "submitted,under_review,need_fix";
+      "submitted,under_review,need_fix,company_revision_requested";
     try {
       const res = await fetch(
         API +

@@ -108,6 +108,9 @@ class CbNotices(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
+# DEPRECATED — cert-application flow 용 CbProposals / CbProposalTeam / CbProposalApprovals /
+# CbProposalNegotiations. 진짜 경로는 certification_applications + cb_cert_applications.py
+# (enterprise_cert_applications). 삭제 예정(정리 후보). 오늘 작업에서 사용 금지.
 class CbProposalApprovals(Base):
     __tablename__ = "cb_proposal_approvals"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

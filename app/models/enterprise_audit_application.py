@@ -1,3 +1,4 @@
+# DEPRECATED — 진짜 경로는 certification_applications + cb_cert_applications.py (enterprise_cert_applications). 삭제 예정(정리 후보). 오늘 작업에서 사용 금지.
 """기업 인증신청 MD 스냅샷 테이블 (enterprise_audit_applications).
 
 주의: 기존 `audit_applications` 테이블/모델(`AuditApplication` in auditor.py)은

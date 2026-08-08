@@ -1,3 +1,4 @@
+# CANONICAL — 기업↔CB 인증신청 메인 경로
 """CB certification application review pipeline (계약 전 심사 수주).
 
 Auth: require_cb_portal_user (not platform_admin).
@@ -25,6 +26,7 @@ from app.models.certification import (
     CertificationApplications,
     CompanyKsicCodes,
 )
+from app.models.auth import Notifications, Users
 from app.models.cb import CertificationBodies
 from app.models.company import Companies
 from app.models.contract import Contracts
@@ -52,12 +54,17 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/cb-cert-applications", tags=["cb-cert-applications"])
 
-STATUS_FILTER_DEFAULT = ("submitted", "under_review", "need_fix")
+STATUS_FILTER_DEFAULT = (
+    "submitted",
+    "under_review",
+    "need_fix",
+    "company_revision_requested",
+)
 
 ALLOWED_TRANSITIONS = {
-    "under_review": ["submitted"],
+    "under_review": ["submitted", "company_revision_requested"],
     "need_fix": ["submitted", "under_review", "need_fix"],
-    "approved": ["under_review", "need_fix"],
+    "approved": ["under_review", "need_fix", "company_revision_requested"],
     "rejected": ["submitted", "under_review", "need_fix"],
 }
 
@@ -66,7 +73,8 @@ STATUS_KR = {
     "submitted": "제출완료",
     "under_review": "검토중",
     "need_fix": "보완요청",
-    "approved": "승인",
+    "approved": "승인(조율대기)",
+    "company_revision_requested": "기업조율요청",
     "rejected": "반려",
     "contracted": "계약완료",
     "withdrawn": "취소",
@@ -186,6 +194,52 @@ def _add_log(
             created_at=datetime.now(),
         )
     )
+
+
+def _company_notify_user_ids(
+    db: Session, company_id: int, applicant_user_id: Optional[int]
+) -> List[int]:
+    ids: set[int] = set()
+    if applicant_user_id:
+        ids.add(int(applicant_user_id))
+    try:
+        rows = (
+            db.query(Users.id)
+            .filter(Users.company_id == int(company_id), Users.is_active == True)  # noqa: E712
+            .all()
+        )
+        for (uid,) in rows:
+            if uid:
+                ids.add(int(uid))
+    except Exception:
+        # Do not rollback — caller may already have pending writes in this session.
+        logger.exception("company notify user lookup soft-fail")
+    return sorted(ids)
+
+
+def _notify_users(
+    db: Session,
+    user_ids: List[int],
+    *,
+    ntype: str,
+    title: str,
+    body: str,
+    link: str,
+    sent_at: datetime,
+) -> None:
+    for uid in user_ids:
+        db.add(
+            Notifications(
+                user_id=int(uid),
+                type=ntype,
+                title=title,
+                body=body,
+                link=link,
+                channel="in_app",
+                is_read=False,
+                sent_at=sent_at,
+            )
+        )
 
 
 def _build_detail(db: Session, app: CertificationApplications) -> EnterpriseCertDetail:
@@ -693,6 +747,26 @@ def review_action(
             new_contract_id = contract.id
 
         _add_log(db, app.id, current_user, action, before, action, memo_final)
+
+        if action == "approved":
+            # 상태 approved 유지(= 기업 조율 대기). 기업 사용자에게 인앱 알림.
+            notify_ids = _company_notify_user_ids(
+                db, int(app.company_id), app.applicant_user_id
+            )
+            app_no = app.application_no or str(app.id)
+            _notify_users(
+                db,
+                notify_ids,
+                ntype="cert_app_approved",
+                title="인증신청이 승인되었습니다",
+                body=(
+                    f"신청번호 {app_no} — CB 내부승인이 완료되었습니다. "
+                    "기업 포털에서 확인(동의) 또는 조율 요청을 진행해 주세요."
+                ),
+                link="/enterprise/dashboard#cert-apply",
+                sent_at=now,
+            )
+
         db.commit()
     except HTTPException:
         db.rollback()

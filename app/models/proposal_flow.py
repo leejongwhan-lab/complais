@@ -1,3 +1,4 @@
+# DEPRECATED — 진짜 경로는 certification_applications + cb_cert_applications.py (enterprise_cert_applications). 삭제 예정(정리 후보). 오늘 작업에서 사용 금지.
 """제안서 결재 플로우 저장 (ProposalApprovalFlow)."""
 from sqlalchemy import (
     Boolean,

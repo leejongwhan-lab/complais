@@ -53,8 +53,11 @@ _STATUS_TO_STEP = {
     "under_review": 2,
     "reviewing": 2,
     "reviewed": 2,
+    "need_fix": 2,
     "coordinating": 3,
     "negotiating": 3,
+    "approved": 3,  # CB 승인 후 기업 조율중
+    "company_revision_requested": 3,
     "contract": 4,
     "contracted": 4,
     "signed": 4,
@@ -66,7 +69,6 @@ _STATUS_TO_STEP = {
     "corrective_action": 6,
     "completed": 7,
     "closed": 7,
-    "approved": 7,
     "finished": 7,
 }
 
@@ -1092,7 +1094,8 @@ def get_dashboard_summary(
 
     todos: List[DashboardTodoOut] = []
     for a in apps:
-        if (a.status or "").lower() in {"need_fix", "보완"}:
+        st = (a.status or "").lower()
+        if st in {"need_fix", "보완"}:
             due = a.preferred_start_date
             td: Optional[int] = None
             if due:
@@ -1107,6 +1110,17 @@ def get_dashboard_summary(
                     due_date=due,
                     dday=td,
                     kind="doc_revision",
+                    link="#cert-apply",
+                )
+            )
+        elif st == "approved" and a.source == "certification_applications":
+            todos.append(
+                DashboardTodoOut(
+                    id=f"app-coord-{a.id}",
+                    title=f"조율 확인 — {a.application_no or a.id}",
+                    due_date=None,
+                    dday=None,
+                    kind="coordinate",
                     link="#cert-apply",
                 )
             )
