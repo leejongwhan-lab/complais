@@ -279,6 +279,8 @@ class AuditorConflictHistoryConflictType(str, enum.Enum):
     CONSULTING = "consulting"
 
 class AuditorEducationsDegree(str, enum.Enum):
+    HIGH_SCHOOL = "high_school"
+    ASSOCIATE = "associate"
     BACHELOR = "bachelor"
     MASTER = "master"
     DOCTOR = "doctor"

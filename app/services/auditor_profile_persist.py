@@ -6,6 +6,8 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from sqlalchemy.orm import Session
 
+import json
+
 from app.models.auditor import (
     AuditorEducation,
     AuditorExternalCert,
@@ -13,6 +15,7 @@ from app.models.auditor import (
     AuditorWorkExperience,
 )
 from app.services.auditor_grade import to_db_grade
+from app.services.iaf_recommendation import resolve_iaf_from_major
 
 
 def parse_date(value: Optional[str]) -> Optional[date]:
@@ -41,6 +44,38 @@ def normalize_iaf_codes(codes: Optional[Sequence[Any]]) -> List[str]:
     return out
 
 
+_ALLOWED_DEGREES = {
+    "high_school",
+    "associate",
+    "bachelor",
+    "master",
+    "doctor",
+    "other",
+}
+
+
+def _mapped_iaf_json(db: Session, major: Optional[str]) -> Optional[str]:
+    """resolve_iaf_from_major → AuditorEducation.mapped_iaf_codes JSON 문자열."""
+    if not major or not str(major).strip() or str(major).strip() == "-":
+        return None
+    try:
+        hints = resolve_iaf_from_major(db, str(major).strip())
+    except Exception:
+        return None
+    if not hints:
+        return None
+    payload = [
+        {
+            "iaf_code": h.iaf_code,
+            "iaf_code_id": h.iaf_code_id,
+            "industry_name_ko": h.industry_name_ko,
+            "source": h.source,
+        }
+        for h in hints
+    ]
+    return json.dumps(payload, ensure_ascii=False)
+
+
 def add_educations(
     db: Session,
     *,
@@ -55,16 +90,21 @@ def add_educations(
         major = getattr(edu, "major", None) or (edu.get("major") if isinstance(edu, dict) else None)
         if not school:
             continue
+        degree_key = str(degree).strip().lower() or "bachelor"
+        if degree_key not in _ALLOWED_DEGREES:
+            degree_key = "other"
         entered = getattr(edu, "entered_at", None) if not isinstance(edu, dict) else edu.get("entered_at")
         graduated = getattr(edu, "graduated_at", None) if not isinstance(edu, dict) else edu.get("graduated_at")
+        major_text = (str(major).strip() if major else "-") or "-"
         db.add(
             AuditorEducation(
                 auditor_id=auditor_id,
                 school_name=str(school).strip(),
-                degree=str(degree).strip() or "bachelor",
-                major=(str(major).strip() if major else "-") or "-",
+                degree=degree_key,
+                major=major_text,
                 entered_at=parse_date(entered) if not isinstance(entered, date) else entered,
                 graduated_at=parse_date(graduated) if not isinstance(graduated, date) else graduated,
+                mapped_iaf_codes=_mapped_iaf_json(db, major_text),
                 is_verified=False,
                 created_at=now,
             )

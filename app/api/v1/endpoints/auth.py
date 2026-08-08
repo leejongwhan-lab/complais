@@ -129,7 +129,7 @@ class MembershipDecisionRequest(BaseModel):
 
 class EducationItem(BaseModel):
     school_name: str
-    degree: str = "bachelor"  # bachelor, master, doctor, other
+    degree: str = "bachelor"  # high_school|associate|bachelor|master|doctor|other
     major: Optional[str] = None
     entered_at: Optional[str] = None
     graduated_at: Optional[str] = None

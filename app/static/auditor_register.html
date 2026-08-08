@@ -70,6 +70,21 @@
     .suggest-box button:hover { background: #f1f5f9; }
     .temp-fields { display: none; margin-top: 10px; padding: 12px; background: #f8fafc; border-radius: 8px; }
     .qual-block { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 10px; }
+    .repeat-list { display: flex; flex-direction: column; gap: 10px; }
+    .repeat-card {
+      border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc;
+    }
+    .repeat-card .card-head {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+      font-weight: 600; font-size: 0.9rem; color: #334155;
+    }
+    .repeat-card .btn-remove {
+      border: 0; background: transparent; color: #dc2626; cursor: pointer; font-size: 0.85rem;
+    }
+    .qual-std-row {
+      border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px; margin-top: 8px; background: #fff;
+    }
+    .qual-std-row .std-label { font-weight: 700; margin-bottom: 6px; color: #1e293b; }
   </style>
   <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
   <script src="/static/js/daum_postcode.js?v=20260807id"></script>
@@ -150,49 +165,14 @@
     </div>
 
     <h2 class="section">학력 / 전공</h2>
-    <div class="form-row">
-      <label for="major_name">전공학과명</label>
-      <input id="major_name" placeholder="예: 화학공학" autocomplete="off" />
-      <div class="suggest-box" id="major-suggest"></div>
-      <div class="hint">마스터 검색 후 선택하거나 직접 입력하세요.</div>
-    </div>
+    <div id="edu-list" class="repeat-list"></div>
+    <button type="button" class="btn-ghost" id="btn-add-edu" style="margin-top:8px;">+ 학력 추가</button>
+    <div class="hint">학위·학교·전공을 행 단위로 추가하세요. 전공 입력 시 IAF 추천이 백엔드에 저장됩니다.</div>
 
     <h2 class="section">경력 정보</h2>
-    <div class="form-row">
-      <label>경력 기업</label>
-      <div class="addr-row">
-        <input id="company_keyword" placeholder="기업명 또는 사업자번호 (2자 이상)" />
-        <button type="button" class="btn-ghost" id="btn-company-search">기업 검색</button>
-      </div>
-      <div id="company-search-results" class="suggest-box" style="display:block;margin-top:8px;"></div>
-      <div id="selected-company" class="hint" style="display:none;"></div>
-    </div>
-    <div class="temp-fields" id="temp-company-fields">
-      <div class="grid-2">
-        <div class="form-row">
-          <label for="temp_company_name">기업명 (직접입력)</label>
-          <input id="temp_company_name" />
-        </div>
-        <div class="form-row">
-          <label for="temp_biz_no">사업자번호 (선택)</label>
-          <input id="temp_biz_no" />
-        </div>
-      </div>
-      <div class="grid-2">
-        <div class="form-row">
-          <label for="career_start">근무 시작일</label>
-          <input id="career_start" type="date" />
-        </div>
-        <div class="form-row">
-          <label for="career_end">근무 종료일</label>
-          <input id="career_end" type="date" />
-        </div>
-      </div>
-      <div class="form-row">
-        <label for="career_duties">담당 업무</label>
-        <input id="career_duties" placeholder="주요 담당 업무" />
-      </div>
-    </div>
+    <div id="career-list" class="repeat-list"></div>
+    <button type="button" class="btn-ghost" id="btn-add-career" style="margin-top:8px;">+ 경력 추가</button>
+    <div class="hint">복수 경력기업을 등록할 수 있습니다. 기업 검색 또는 직접입력.</div>
 
     <h2 class="section">심사 자격 정보</h2>
     <div class="qual-block">
@@ -207,26 +187,11 @@
           <label><input type="checkbox" name="std" value="FSMS" /> FSMS</label>
           <label><input type="checkbox" name="std" value="MDQMS" /> MDQMS</label>
         </div>
-        <div class="hint">화면에는 약어로 표시합니다. (관리 화면에서는 ISO ####:#### 표기)</div>
+        <div class="hint">화면에는 약어로 표시합니다. 표준마다 자격기관·번호를 따로 입력합니다.</div>
       </div>
-      <div class="grid-2">
-        <div class="form-row">
-          <label for="cert_body">자격 발급기관</label>
-          <select id="cert_body">
-            <option value="">선택</option>
-            <option value="KAR">KAR</option>
-            <option value="IRCA">IRCA</option>
-            <option value="Exemplar Global">Exemplar Global</option>
-            <option value="Other">기타</option>
-          </select>
-        </div>
-        <div class="form-row">
-          <label for="cert_no">자격증 번호</label>
-          <input id="cert_no" placeholder="자격증 번호" />
-        </div>
-      </div>
+      <div id="qual-rows"></div>
       <div class="form-row">
-        <label for="qual_grade">자격 등급</label>
+        <label for="qual_grade">자격 등급 (공통)</label>
         <select id="qual_grade">
           <option value="lead_auditor">선임심사원</option>
           <option value="auditor" selected>심사원</option>
@@ -235,7 +200,7 @@
         </select>
       </div>
       <div class="form-row">
-        <label for="iaf_codes">IAF 코드 (쉼표 구분, 선택)</label>
+        <label for="iaf_codes">IAF 코드 (쉼표 구분, 선택·공통)</label>
         <input id="iaf_codes" placeholder="예: 14, 19, 28" list="iaf-datalist" />
         <datalist id="iaf-datalist"></datalist>
       </div>
@@ -252,20 +217,324 @@
   <script>
     const API = "/api/v1";
     const state = {
-      companyId: null,
-      companyName: "",
-      bizNo: "",
-      ksicCode: "",
-      isTemporary: false,
       verified: false,
       identityCfg: null,
       prematch: null,
+      careers: [], // {companyId, companyName, bizNo, ksicCode, isTemporary, start, end, duties}
     };
+
+    const DEGREE_OPTS = [
+      ["high_school", "고졸"],
+      ["associate", "전문학사"],
+      ["bachelor", "학사"],
+      ["master", "석사"],
+      ["doctor", "박사"],
+      ["other", "기타"],
+    ];
+    const CERT_BODY_OPTS = ["", "KAR", "IRCA", "Exemplar Global", "Other"];
 
     if (window.ComplaisValidation) {
       ComplaisValidation.bindField(document.getElementById("phone"), "phone");
       ComplaisValidation.bindField(document.getElementById("email"), "email");
     }
+
+    function esc(s) {
+      return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    }
+
+    function degreeSelectHtml(selected) {
+      return DEGREE_OPTS.map(([v, label]) =>
+        `<option value="${v}"${v === (selected || "bachelor") ? " selected" : ""}>${label}</option>`
+      ).join("");
+    }
+
+    function certBodySelectHtml(selected) {
+      return CERT_BODY_OPTS.map((v) =>
+        `<option value="${esc(v)}"${v === (selected || "") ? " selected" : ""}>${v || "선택"}</option>`
+      ).join("");
+    }
+
+    function addEduRow(prefill) {
+      const p = prefill || {};
+      const card = document.createElement("div");
+      card.className = "repeat-card edu-card";
+      card.innerHTML = `
+        <div class="card-head"><span>학력</span><button type="button" class="btn-remove">삭제</button></div>
+        <div class="grid-2">
+          <div class="form-row">
+            <label>학위</label>
+            <select class="edu-degree">${degreeSelectHtml(p.degree)}</select>
+          </div>
+          <div class="form-row">
+            <label>학교명</label>
+            <input class="edu-school" placeholder="예: ○○대학교" value="${esc(p.school_name || "")}" />
+          </div>
+        </div>
+        <div class="form-row">
+          <label>전공학과명</label>
+          <input class="edu-major" placeholder="예: 화학공학" autocomplete="off" value="${esc(p.major || "")}" />
+          <div class="suggest-box edu-major-suggest"></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-row">
+            <label>입학</label>
+            <input class="edu-entered" type="date" value="${esc((p.entered_at || "").toString().slice(0, 10))}" />
+          </div>
+          <div class="form-row">
+            <label>졸업</label>
+            <input class="edu-graduated" type="date" value="${esc((p.graduated_at || "").toString().slice(0, 10))}" />
+          </div>
+        </div>`;
+      card.querySelector(".btn-remove").addEventListener("click", () => {
+        if (document.querySelectorAll(".edu-card").length <= 1) return;
+        card.remove();
+      });
+      const majorInput = card.querySelector(".edu-major");
+      const box = card.querySelector(".edu-major-suggest");
+      let t = null;
+      majorInput.addEventListener("input", () => {
+        clearTimeout(t);
+        t = setTimeout(() => searchMajorsInto(majorInput, box), 250);
+      });
+      document.getElementById("edu-list").appendChild(card);
+    }
+
+    function collectEducations() {
+      return [...document.querySelectorAll(".edu-card")].map((card) => ({
+        degree: card.querySelector(".edu-degree").value,
+        school_name: card.querySelector(".edu-school").value.trim(),
+        major: card.querySelector(".edu-major").value.trim() || null,
+        entered_at: card.querySelector(".edu-entered").value || null,
+        graduated_at: card.querySelector(".edu-graduated").value || null,
+      })).filter((e) => e.school_name);
+    }
+
+    function renderCareers() {
+      const list = document.getElementById("career-list");
+      list.innerHTML = "";
+      state.careers.forEach((c, idx) => {
+        const card = document.createElement("div");
+        card.className = "repeat-card career-card";
+        card.dataset.idx = String(idx);
+        card.innerHTML = `
+          <div class="card-head"><span>경력 ${idx + 1}</span>
+            <button type="button" class="btn-remove">삭제</button></div>
+          <div class="form-row">
+            <label>경력 기업</label>
+            <div class="addr-row">
+              <input class="career-keyword" placeholder="기업명 또는 사업자번호 (2자 이상)" value="${esc(c.companyName || "")}" />
+              <button type="button" class="btn-ghost btn-career-search">기업 검색</button>
+            </div>
+            <div class="suggest-box career-results" style="display:block;margin-top:8px;"></div>
+            <div class="hint career-selected">${c.companyId ? `선택됨 #${c.companyId}` : (c.isTemporary ? "직접입력" : "")}</div>
+          </div>
+          <div class="grid-2">
+            <div class="form-row">
+              <label>기업명</label>
+              <input class="career-name" value="${esc(c.companyName || "")}" />
+            </div>
+            <div class="form-row">
+              <label>사업자번호</label>
+              <input class="career-biz" value="${esc(c.bizNo || "")}" />
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-row">
+              <label>근무 시작일</label>
+              <input class="career-start" type="date" value="${esc(c.start || "")}" />
+            </div>
+            <div class="form-row">
+              <label>근무 종료일</label>
+              <input class="career-end" type="date" value="${esc(c.end || "")}" />
+            </div>
+          </div>
+          <div class="form-row">
+            <label>담당 업무</label>
+            <input class="career-duties" placeholder="주요 담당 업무" value="${esc(c.duties || "")}" />
+          </div>`;
+        card.querySelector(".btn-remove").addEventListener("click", () => {
+          syncCareerFromDom();
+          if (state.careers.length <= 1) return;
+          state.careers.splice(idx, 1);
+          renderCareers();
+        });
+        card.querySelector(".btn-career-search").addEventListener("click", () => searchCompanyForCard(card, idx));
+        card.querySelector(".career-keyword").addEventListener("keyup", (e) => {
+          if (e.key === "Enter") { e.preventDefault(); searchCompanyForCard(card, idx); }
+        });
+        ["career-name", "career-biz", "career-start", "career-end", "career-duties"].forEach((cls) => {
+          card.querySelector("." + cls).addEventListener("change", () => syncCareerFromDom());
+        });
+        list.appendChild(card);
+      });
+    }
+
+    function syncCareerFromDom() {
+      const cards = [...document.querySelectorAll(".career-card")];
+      cards.forEach((card, idx) => {
+        if (!state.careers[idx]) state.careers[idx] = {};
+        const c = state.careers[idx];
+        c.companyName = card.querySelector(".career-name").value.trim();
+        c.bizNo = card.querySelector(".career-biz").value.trim();
+        c.start = card.querySelector(".career-start").value || "";
+        c.end = card.querySelector(".career-end").value || "";
+        c.duties = card.querySelector(".career-duties").value.trim();
+      });
+    }
+
+    function addCareer(prefill) {
+      syncCareerFromDom();
+      state.careers.push(Object.assign({
+        companyId: null, companyName: "", bizNo: "", ksicCode: "",
+        isTemporary: false, start: "", end: "", duties: "",
+      }, prefill || {}));
+      renderCareers();
+    }
+
+    function collectCareers() {
+      syncCareerFromDom();
+      return state.careers
+        .filter((c) => (c.companyName || "").trim() && c.start)
+        .map((c) => ({
+          company_id: c.companyId || null,
+          company_name: c.companyName.trim(),
+          biz_no: c.bizNo || null,
+          ksic_code: c.ksicCode || null,
+          is_temporary: !!c.isTemporary || !c.companyId,
+          start_date: c.start,
+          end_date: c.end || null,
+          is_current: !c.end,
+          duties: c.duties || null,
+          note: c.duties || null,
+        }));
+    }
+
+    async function searchCompanyForCard(card, idx) {
+      const q = card.querySelector(".career-keyword").value.trim();
+      const box = card.querySelector(".career-results");
+      box.innerHTML = "";
+      if (q.length < 2) { box.innerHTML = "<p class='hint'>검색어를 2자 이상 입력하세요.</p>"; return; }
+      try {
+        const res = await fetch(`${API}/companies/search?q=${encodeURIComponent(q)}`);
+        const list = await res.json().catch(() => []);
+        if (!res.ok) throw new Error(list.detail || "검색 실패");
+        if (!list.length) {
+          if (confirm("등록된 기업이 없습니다. 직접 입력하시겠습니까?")) {
+            state.careers[idx].companyId = null;
+            state.careers[idx].companyName = q;
+            state.careers[idx].isTemporary = true;
+            card.querySelector(".career-name").value = q;
+            card.querySelector(".career-selected").textContent = "직접입력 모드";
+            syncCareerFromDom();
+          }
+          return;
+        }
+        window._companyCache = window._companyCache || {};
+        box.innerHTML = list.map((c) => {
+          window._companyCache[c.id] = c;
+          return `<button type="button" data-id="${c.id}"><strong>${esc(c.name)}</strong> · ${esc(c.biz_no || "-")}</button>`;
+        }).join("");
+        box.querySelectorAll("button").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const c = window._companyCache[Number(btn.dataset.id)];
+            if (!c) return;
+            state.careers[idx].companyId = c.id;
+            state.careers[idx].companyName = c.name;
+            state.careers[idx].bizNo = c.biz_no || "";
+            state.careers[idx].ksicCode = c.ksic_code || "";
+            state.careers[idx].isTemporary = false;
+            card.querySelector(".career-keyword").value = c.name;
+            card.querySelector(".career-name").value = c.name;
+            card.querySelector(".career-biz").value = c.biz_no || "";
+            card.querySelector(".career-selected").textContent =
+              `선택: ${c.name} (${c.biz_no || "-"}) · KSIC ${c.ksic_code || "-"}`;
+            box.innerHTML = "";
+            syncCareerFromDom();
+          });
+        });
+      } catch (e) {
+        box.innerHTML = `<p class='hint'>${e.message}</p>`;
+      }
+    }
+
+    function syncQualRows() {
+      const wrap = document.getElementById("qual-rows");
+      const checked = [...document.querySelectorAll("input[name=std]:checked")].map((el) => el.value);
+      const existing = {};
+      wrap.querySelectorAll(".qual-std-row").forEach((row) => {
+        existing[row.dataset.std] = {
+          cert_body: row.querySelector(".qual-body").value,
+          cert_no: row.querySelector(".qual-no").value.trim(),
+        };
+      });
+      wrap.innerHTML = "";
+      checked.forEach((std) => {
+        const prev = existing[std] || {};
+        const row = document.createElement("div");
+        row.className = "qual-std-row";
+        row.dataset.std = std;
+        row.innerHTML = `
+          <div class="std-label">${esc(std)}</div>
+          <div class="grid-2">
+            <div class="form-row">
+              <label>자격 발급기관</label>
+              <select class="qual-body">${certBodySelectHtml(prev.cert_body)}</select>
+            </div>
+            <div class="form-row">
+              <label>자격증 번호</label>
+              <input class="qual-no" placeholder="자격증 번호" value="${esc(prev.cert_no || "")}" />
+            </div>
+          </div>`;
+        wrap.appendChild(row);
+      });
+    }
+
+    function collectQualifications(majorFallback) {
+      const grade = document.getElementById("qual_grade").value;
+      const iafCodes = document.getElementById("iaf_codes").value.trim()
+        .split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean);
+      return [...document.querySelectorAll(".qual-std-row")].map((row) => ({
+        standard_code: row.dataset.std,
+        cert_body_name: row.querySelector(".qual-body").value || null,
+        cert_no: row.querySelector(".qual-no").value.trim() || null,
+        auditor_grade: grade,
+        iaf_codes: iafCodes,
+        major_name: majorFallback || null,
+      }));
+    }
+
+    async function searchMajorsInto(inputEl, box) {
+      const q = inputEl.value.trim();
+      if (q.length < 1) { box.style.display = "none"; box.innerHTML = ""; return; }
+      try {
+        const res = await fetch(`${API}/meta/majors?q=${encodeURIComponent(q)}`);
+        const list = await res.json().catch(() => []);
+        if (!list.length) { box.style.display = "none"; return; }
+        box.style.display = "block";
+        box.innerHTML = list.map((m) =>
+          `<button type="button" data-name="${esc(m.name)}">${esc(m.name)}</button>`
+        ).join("");
+        box.querySelectorAll("button").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            inputEl.value = btn.dataset.name;
+            box.style.display = "none";
+          });
+        });
+      } catch (_) {
+        box.style.display = "none";
+      }
+    }
+
+    document.getElementById("btn-add-edu").addEventListener("click", () => addEduRow());
+    document.getElementById("btn-add-career").addEventListener("click", () => addCareer());
+    document.querySelectorAll("input[name=std]").forEach((el) => {
+      el.addEventListener("change", syncQualRows);
+    });
+
+    // initial rows
+    addEduRow();
+    addCareer();
+    syncQualRows();
 
     function setVerified(ok, msg) {
       state.verified = !!ok;
@@ -330,47 +599,55 @@
         document.getElementById("phone").value = data.phone;
         document.getElementById("user_phone").value = data.phone;
       }
-      if (data.major_name) document.getElementById("major_name").value = data.major_name;
       if (data.apply_grade) document.getElementById("apply_grade").value = data.apply_grade;
       if (data.email && !document.getElementById("email").value) {
         document.getElementById("email").value = data.email;
       }
 
       const educations = data.educations || [];
-      if (educations[0] && educations[0].major) {
-        document.getElementById("major_name").value = educations[0].major;
+      const eduList = document.getElementById("edu-list");
+      eduList.innerHTML = "";
+      if (educations.length) {
+        educations.forEach((e) => addEduRow(e));
+      } else if (data.major_name) {
+        addEduRow({ school_name: "", degree: "bachelor", major: data.major_name });
+      } else {
+        addEduRow();
       }
 
       const careers = data.careers || [];
-      if (careers[0]) {
-        const c = careers[0];
-        state.companyId = c.company_id || null;
-        state.companyName = c.company_name || "";
-        state.bizNo = c.biz_no || "";
-        state.isTemporary = !!c.is_temporary || !c.company_id;
-        document.getElementById("temp-company-fields").style.display = "block";
-        document.getElementById("temp_company_name").value = c.company_name || "";
-        document.getElementById("temp_biz_no").value = c.biz_no || "";
-        document.getElementById("career_start").value = (c.start_date || "").slice(0, 10);
-        document.getElementById("career_end").value = (c.end_date || "").slice(0, 10);
-        document.getElementById("career_duties").value = c.duties || c.note || "";
-        document.getElementById("company_keyword").value = c.company_name || "";
-        document.getElementById("selected-company").style.display = "block";
-        document.getElementById("selected-company").textContent =
-          `사전등록 경력: ${c.company_name || "-"}`;
+      state.careers = [];
+      if (careers.length) {
+        careers.forEach((c) => addCareer({
+          companyId: c.company_id || null,
+          companyName: c.company_name || "",
+          bizNo: c.biz_no || "",
+          isTemporary: !!c.is_temporary || !c.company_id,
+          start: (c.start_date || "").toString().slice(0, 10),
+          end: (c.end_date || "").toString().slice(0, 10),
+          duties: c.duties || c.note || "",
+        }));
+      } else {
+        addCareer();
       }
 
       const quals = data.qualifications || [];
       document.querySelectorAll("input[name=std]").forEach((el) => { el.checked = false; });
       if (quals.length) {
-        const first = quals[0];
         quals.forEach((q) => {
           const el = document.querySelector(`input[name=std][value="${q.standard_code}"]`);
           if (el) el.checked = true;
         });
-        if (first.cert_body_name) document.getElementById("cert_body").value = first.cert_body_name;
-        if (first.cert_no) document.getElementById("cert_no").value = first.cert_no;
-        if (first.auditor_grade) document.getElementById("qual_grade").value = first.auditor_grade;
+        syncQualRows();
+        quals.forEach((q) => {
+          const row = document.querySelector(`.qual-std-row[data-std="${q.standard_code}"]`);
+          if (!row) return;
+          if (q.cert_body_name) row.querySelector(".qual-body").value = q.cert_body_name;
+          if (q.cert_no) row.querySelector(".qual-no").value = q.cert_no;
+        });
+        if (quals[0].auditor_grade) document.getElementById("qual_grade").value = quals[0].auditor_grade;
+      } else {
+        syncQualRows();
       }
 
       const iaf = data.iaf_codes && data.iaf_codes.length
@@ -485,103 +762,6 @@
       await onIdentitySuccess({ ci_key: ci, name, phone, source: "테스트(mock)" });
     });
 
-    let majorTimer = null;
-    document.getElementById("major_name").addEventListener("input", () => {
-      clearTimeout(majorTimer);
-      majorTimer = setTimeout(searchMajors, 250);
-    });
-
-    async function searchMajors() {
-      const q = document.getElementById("major_name").value.trim();
-      const box = document.getElementById("major-suggest");
-      if (q.length < 1) { box.style.display = "none"; box.innerHTML = ""; return; }
-      try {
-        const res = await fetch(`${API}/meta/majors?q=${encodeURIComponent(q)}`);
-        const list = await res.json().catch(() => []);
-        if (!list.length) { box.style.display = "none"; return; }
-        box.style.display = "block";
-        box.innerHTML = list.map((m) =>
-          `<button type="button" data-name="${m.name.replace(/"/g, "&quot;")}">${m.name}</button>`
-        ).join("");
-        box.querySelectorAll("button").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            document.getElementById("major_name").value = btn.dataset.name;
-            box.style.display = "none";
-          });
-        });
-      } catch (_) {
-        box.style.display = "none";
-      }
-    }
-
-    document.getElementById("btn-company-search").addEventListener("click", searchCompany);
-    document.getElementById("company_keyword").addEventListener("keyup", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); searchCompany(); }
-    });
-
-    async function searchCompany() {
-      const q = document.getElementById("company_keyword").value.trim();
-      const box = document.getElementById("company-search-results");
-      box.innerHTML = "";
-      if (q.length < 2) { box.innerHTML = "<p class='hint'>검색어를 2자 이상 입력하세요.</p>"; return; }
-      try {
-        const res = await fetch(`${API}/companies/search?q=${encodeURIComponent(q)}`);
-        const list = await res.json().catch(() => []);
-        if (!res.ok) throw new Error(list.detail || "검색 실패");
-        if (!list.length) {
-          if (confirm("등록된 기업이 없습니다. 직접 입력하시겠습니까?")) {
-            showTempCompany(q);
-          } else {
-            box.innerHTML = "<p class='hint'>검색 결과가 없습니다.</p>";
-          }
-          return;
-        }
-        hideTempCompanyKeepDates();
-        window._companyCache = {};
-        box.innerHTML = list.map((c) => {
-          window._companyCache[c.id] = c;
-          return `<button type="button" onclick="selectCompany(${c.id})"><strong>${c.name}</strong> · ${c.biz_no || "-"}</button>`;
-        }).join("");
-        box.style.display = "block";
-      } catch (e) {
-        box.innerHTML = `<p class='hint'>${e.message}</p>`;
-      }
-    }
-
-    function showTempCompany(name) {
-      state.companyId = null;
-      state.companyName = name;
-      state.isTemporary = true;
-      document.getElementById("temp-company-fields").style.display = "block";
-      document.getElementById("temp_company_name").value = name;
-      document.getElementById("selected-company").style.display = "block";
-      document.getElementById("selected-company").textContent = "임시 기업 직접입력 모드";
-      document.getElementById("company-search-results").innerHTML = "";
-    }
-
-    function hideTempCompanyKeepDates() {
-      state.isTemporary = false;
-    }
-
-    function selectCompany(id) {
-      const c = (window._companyCache || {})[id];
-      if (!c) return;
-      state.companyId = c.id;
-      state.companyName = c.name;
-      state.bizNo = c.biz_no || "";
-      state.ksicCode = c.ksic_code || "";
-      state.isTemporary = false;
-      document.getElementById("company_keyword").value = c.name;
-      document.getElementById("company-search-results").innerHTML = "";
-      document.getElementById("selected-company").style.display = "block";
-      document.getElementById("selected-company").textContent =
-        `선택: ${c.name} (${c.biz_no || "-"}) · KSIC ${c.ksic_code || "-"}`;
-      document.getElementById("temp-company-fields").style.display = "block";
-      document.getElementById("temp_company_name").value = c.name;
-      document.getElementById("temp_biz_no").value = c.biz_no || "";
-    }
-    window.selectCompany = selectCompany;
-
     document.getElementById("form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const errorEl = document.getElementById("error");
@@ -601,79 +781,11 @@
       const zip = (document.getElementById("zipcode").value || "").trim();
       const baseAddr = (document.getElementById("address").value || "").trim();
       const detail = (document.getElementById("address_detail").value || "").trim();
-      const major = document.getElementById("major_name").value.trim();
-      const standards = [...document.querySelectorAll("input[name=std]:checked")].map((el) => el.value);
-      const certBody = document.getElementById("cert_body").value;
-      const certNo = document.getElementById("cert_no").value.trim();
-      const qualGrade = document.getElementById("qual_grade").value;
-      const iafRaw = document.getElementById("iaf_codes").value.trim();
-      const iafCodes = iafRaw ? iafRaw.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean) : [];
 
-      const companyName = state.isTemporary
-        ? (document.getElementById("temp_company_name").value.trim() || state.companyName)
-        : (state.companyName || document.getElementById("temp_company_name").value.trim());
-      const bizNo = state.isTemporary
-        ? document.getElementById("temp_biz_no").value.trim()
-        : (state.bizNo || document.getElementById("temp_biz_no").value.trim());
-      const careerStart = document.getElementById("career_start").value;
-      const careerEnd = document.getElementById("career_end").value;
-      const duties = document.getElementById("career_duties").value.trim();
-
-      let work_experiences = [];
-      let educations = [];
-      let qualifications = [];
-
-      if (state.prematch && state.prematch.matched) {
-        educations = state.prematch.educations || [];
-        work_experiences = (state.prematch.careers || []).map((c) => ({
-          company_name: c.company_name,
-          company_id: c.company_id || null,
-          biz_no: c.biz_no || null,
-          position: c.position || null,
-          start_date: c.start_date,
-          end_date: c.end_date || null,
-          is_current: !!c.is_current,
-          is_temporary: !!c.is_temporary || !c.company_id,
-          duties: c.duties || c.note || null,
-          note: c.note || null,
-        }));
-        qualifications = (state.prematch.qualifications || []).map((q) => ({
-          standard_code: q.standard_code,
-          cert_body_name: q.cert_body_name || null,
-          cert_no: q.cert_no || null,
-          auditor_grade: q.auditor_grade || qualGrade,
-          iaf_codes: q.iaf_codes || iafCodes,
-          major_name: q.major_name || major || null,
-        }));
-      }
-
-      if (!work_experiences.length && companyName && careerStart) {
-        work_experiences.push({
-          company_name: companyName,
-          company_id: state.companyId,
-          biz_no: bizNo || null,
-          start_date: careerStart,
-          end_date: careerEnd || null,
-          is_current: !careerEnd,
-          is_temporary: !!state.isTemporary || !state.companyId,
-          duties: duties || null,
-          ksic_code: state.ksicCode || null,
-          note: duties || null,
-        });
-      }
-      if (!qualifications.length && standards.length) {
-        qualifications = standards.map((std) => ({
-          standard_code: std,
-          cert_body_name: certBody || null,
-          cert_no: certNo || null,
-          auditor_grade: qualGrade,
-          iaf_codes: iafCodes,
-          major_name: major || null,
-        }));
-      }
-      if (!educations.length && major) {
-        educations = [{ school_name: "미입력", degree: "bachelor", major }];
-      }
+      const educations = collectEducations();
+      const work_experiences = collectCareers();
+      const majorFallback = (educations.find((ed) => ed.major) || {}).major || null;
+      const qualifications = collectQualifications(majorFallback);
 
       const payload = {
         name: document.getElementById("name").value.trim(),
@@ -685,7 +797,7 @@
         zip_code: zip || null,
         address: baseAddr || "미입력",
         detail_address: detail || "미입력",
-        major_name: major || null,
+        major_name: majorFallback,
         ci_key: document.getElementById("ci_key").value || null,
         pre_registered_id: document.getElementById("pre_registered_id").value
           ? Number(document.getElementById("pre_registered_id").value)
